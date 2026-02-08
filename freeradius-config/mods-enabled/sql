@@ -1,52 +1,45 @@
 sql {
     dialect = "postgresql"
     driver = "rlm_sql_postgresql"
+    
     server = "postgres"
     port = 5432
     login = "radius"
     password = "radiuspass"
     radius_db = "radius"
-
-    user_name_attribute = "User-Name"
-
-    acct_table1 = "radacct"
-    postauth_table = "radpostauth"
-
-    authorize_check_query = "SELECT id, username, attribute, value, op FROM radcheck WHERE username = '%{${user_name_attribute}}' ORDER BY id"
-    authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{${user_name_attribute}}' ORDER BY id"
-    group_membership_query = "SELECT groupname FROM radusergroup WHERE username='%{${user_name_attribute}}'"
-
+    
+    sql_user_name = "%{User-Name}"
+    
     read_clients = yes
     client_table = "nas"
-
-        # ✅ ACCOUNTING QUERIES YANG SESUAI STRUKTUR TABEL
+    
+    # QUERY AUTHORIZATION - INI YANG PENTING!
+    authorize_check_query = "SELECT id, username, attribute, value, op FROM radcheck WHERE username = '%{SQL-User-Name}' ORDER BY id"
+    
+    authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{SQL-User-Name}' ORDER BY id"
+    
+    # ACCOUNTING QUERIES
     accounting {
         reference = "%{tolower:type.%{Acct-Status-Type}.query}"
         
         type {
             start {
-                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, nasporttype, acctstarttime, acctstoptime, acctsessiontime, acctauthentic, connectinfo_start, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, acctterminatecause, servicetype, framedprotocol, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{User-Name}', '%{NAS-IP-Address}', '%{NAS-Port-Id}', '%{NAS-Port-Type}', '%S', NULL, 0, '%{Acct-Authentic}', '%{Connect-Info}', 0, 0, '%{Called-Station-Id}', '%{Calling-Station-Id}', '', '%{Service-Type}', '%{Framed-Protocol}', '%{Framed-IP-Address}')"
-            }
-            
-            interim-update {
-                query = "WITH updated AS (UPDATE radacct SET acctsessiontime = '%{Acct-Session-Time}', acctinputoctets = '%{Acct-Input-Octets}', acctoutputoctets = '%{Acct-Output-Octets}', acctterminatecause = '%{Acct-Terminate-Cause}', acctupdatetime = NOW() WHERE acctsessionid = '%{Acct-Session-Id}' AND acctuniqueid = '%{Acct-Unique-Session-Id}' RETURNING *) INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, nasporttype, acctstarttime, acctstoptime, acctsessiontime, acctauthentic, connectinfo_start, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, acctterminatecause, servicetype, framedprotocol, framedipaddress) SELECT '%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{User-Name}', '%{NAS-IP-Address}', '%{NAS-Port-Id}', '%{NAS-Port-Type}', NOW() - INTERVAL '%{Acct-Session-Time} seconds', NULL, '%{Acct-Session-Time}', '%{Acct-Authentic}', '%{Connect-Info}', '%{Acct-Input-Octets}', '%{Acct-Output-Octets}', '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Acct-Terminate-Cause}', '%{Service-Type}', '%{Framed-Protocol}', '%{Framed-IP-Address}' WHERE NOT EXISTS (SELECT 1 FROM updated)"
+                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctinputoctets, acctoutputoctets) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), 0, 0)"
             }
             
             stop {
-                query = "UPDATE radacct SET acctstoptime = '%S', acctsessiontime = '%{Acct-Session-Time}', acctinputoctets = '%{Acct-Input-Octets}', acctoutputoctets = '%{Acct-Output-Octets}', acctterminatecause = '%{Acct-Terminate-Cause}' WHERE acctsessionid = '%{Acct-Session-Id}' AND acctuniqueid = '%{Acct-Unique-Session-Id}'"
+                query = "UPDATE radacct SET acctstoptime = NOW(), acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0}, acctterminatecause = '%{Acct-Terminate-Cause}' WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}'"
+            }
+            
+            interim-update {
+                query = "UPDATE radacct SET acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0} WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}'"
             }
         }
     }
-
-        # ✅ PERBAIKI POST-AUTH QUERY - CATAT HASIL AUTHENTICATION
-    post-auth {
-        query = "INSERT INTO radpostauth (username, pass, reply, authdate, calledstationid, callingstationid) VALUES ('%{User-Name}', '%{User-Password}', '%{reply:Packet-Type}', '%S', '%{Called-Station-Id}', '%{Calling-Station-Id}')"
-    }
-
-    # ✅ TAMBAHKAN POOL CONFIGURATION
+    
     pool {
         start = 5
-        min = 4
+        min = 3
         max = 10
         spare = 3
         uses = 0

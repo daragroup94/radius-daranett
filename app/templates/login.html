@@ -2,288 +2,239 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Login - RADIUS Manager</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Tailwind CSS (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+    <!-- Lucide Icons (Local) -->
+    <script src="{{ url_for('static', filename='js/lucide.min.js') }}"></script>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        
-        * { font-family: 'Inter', sans-serif; }
-        
         body {
-            background: linear-gradient(135deg, #1e293b 0%, #111827 50%, #1f2937 100%);
-            background-size: 200% 200%;
-            animation: gradientShift 15s ease infinite;
+            background-color: #111827;
         }
-        
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+
+        /* High Contrast Input Fix */
+        .login-input {
+            background-color: #1f2937;
+            color: #ffffff;
+            border: 2px solid #374151;
         }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
+
+        .login-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+            outline: none;
         }
-        
-        .float { animation: float 6s ease-in-out infinite; }
-        
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .fade-in-up { animation: fadeInUp 0.8s ease-out; }
-        
-        .glass {
-            background: rgba(31, 41, 55, 0.5);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(75, 85, 99, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        }
-        
-        .input-group input:focus {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-        }
-        
-        .btn-login {
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-login::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-        
-        .btn-login:hover::before {
-            width: 300px;
-            height: 300px;
-        }
-        
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        }
-        
-        .particle {
-            position: absolute;
-            background: rgba(148, 163, 184, 0.3);
-            border-radius: 50%;
-            animation: rise 10s infinite ease-in;
-        }
-        
-        @keyframes rise {
-            0% { bottom: -100px; opacity: 0; }
-            50% { opacity: 1; }
-            100% { bottom: 100%; opacity: 0; }
-        }
-        
-        @keyframes logoPulse {
-            0%, 100% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
-            }
-            50% {
-                transform: scale(1.05);
-                box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
-            }
-        }
-        
-        .logo-pulse {
-            animation: logoPulse 2s ease-in-out infinite;
+
+        /* Override autofill */
+        .login-input:-webkit-autofill,
+        .login-input:-webkit-autofill:hover,
+        .login-input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 30px #1f2937 inset !important;
+            -webkit-text-fill-color: white !important;
+            transition: background-color 5000s ease-in-out 0s;
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
-    
-    <!-- Animated Particles -->
-    <div class="particle" style="width: 10px; height: 10px; left: 10%; animation-delay: 0s;"></div>
-    <div class="particle" style="width: 8px; height: 8px; left: 20%; animation-delay: 2s;"></div>
-    <div class="particle" style="width: 12px; height: 12px; left: 30%; animation-delay: 4s;"></div>
-    <div class="particle" style="width: 6px; height: 6px; left: 40%; animation-delay: 1s;"></div>
-    <div class="particle" style="width: 14px; height: 14px; left: 50%; animation-delay: 3s;"></div>
-    <div class="particle" style="width: 10px; height: 10px; left: 60%; animation-delay: 5s;"></div>
-    <div class="particle" style="width: 8px; height: 8px; left: 70%; animation-delay: 2.5s;"></div>
-    <div class="particle" style="width: 12px; height: 12px; left: 80%; animation-delay: 4.5s;"></div>
-    <div class="particle" style="width: 6px; height: 6px; left: 90%; animation-delay: 1.5s;"></div>
+<body class="min-h-screen flex items-center justify-center p-4 sm:p-6 pb-20">
 
-    <div class="relative z-10 w-full max-w-md">
-        
-        <!-- Logo Section -->
-        <div class="text-center mb-8 float fade-in-up">
-            <div class="inline-block">
-                <div class="w-24 h-24 bg-gray-800/80 rounded-3xl flex items-center justify-center mx-auto mb-4 logo-pulse shadow-2xl border border-gray-700">
-                    <i class="fas fa-wifi text-6xl bg-gradient-to-br from-blue-400 to-purple-400 bg-clip-text text-transparent"></i>
+    <!-- Container: Stacked di Mobile, Split di Laptop -->
+    <div class="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center mb-8">
+
+        <!-- Left Side: Branding (Hidden di mobile kecil, stacked di medium) -->
+        <div class="hidden lg:block text-left animate-fade-in">
+            <div class="inline-block mb-6">
+                <div class="w-32 h-32 bg-gray-800 rounded-3xl flex items-center justify-center shadow-2xl border-4 border-gray-700">
+                    <i data-lucide="shield-check" class="text-blue-500 w-16 h-16"></i>
                 </div>
-                <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">RADIUS Manager</h1>
-                <p class="text-gray-400 text-lg">Network Control Center</p>
+            </div>
+            <h1 class="text-5xl font-extrabold text-white mb-4 tracking-tight">
+                RADIUS Manager
+            </h1>
+            <p class="text-2xl text-gray-400 font-medium mb-6">
+                Network Control Center
+            </p>
+            <p class="text-gray-500 text-lg leading-relaxed max-w-lg">
+                Manage your PPPoE users, NAS connections, and network monitoring with ease and security.
+            </p>
+            <div class="flex gap-3 mt-8">
+                <div class="px-4 py-2 bg-gray-800 rounded-full text-gray-300 text-sm font-medium border border-gray-700 flex items-center">
+                    <i data-lucide="users" class="w-4 h-4 mr-2"></i>User Management
+                </div>
+                <div class="px-4 py-2 bg-gray-800 rounded-full text-gray-300 text-sm font-medium border border-gray-700 flex items-center">
+                    <i data-lucide="activity" class="w-4 h-4 mr-2"></i>Monitoring
+                </div>
+                <div class="px-4 py-2 bg-gray-800 rounded-full text-gray-300 text-sm font-medium border border-gray-700 flex items-center">
+                    <i data-lucide="shield" class="w-4 h-4 mr-2"></i>Secure
+                </div>
             </div>
         </div>
 
-        <!-- Login Card -->
-        <div class="glass rounded-3xl shadow-2xl p-8 fade-in-up" style="animation-delay: 0.2s">
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold text-white mb-2">
-                    <i class="fas fa-sign-in-alt mr-2"></i>
-                    Welcome Back
-                </h2>
-                <p class="text-gray-400">Sign in to access your dashboard</p>
-            </div>
-
-            <form method="POST" action="/login" id="loginForm" class="space-y-6">
+        <!-- Right Side: Login Card (Full width di mobile) -->
+        <div class="w-full max-w-md mx-auto lg:mx-0 animate-fade-in">
+            <div class="bg-gray-900 border-2 border-gray-700 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl">
                 
-                <!-- Username Input -->
-                <div class="input-group">
-                    <label class="block text-gray-300 text-sm font-semibold mb-2">
-                        <i class="fas fa-user mr-2"></i>
-                        Username
-                    </label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i class="fas fa-user text-gray-500"></i>
-                        </div>
-                        <input 
-                            type="text" 
-                            name="username" 
-                            required
-                            class="w-full pl-12 pr-4 py-4 bg-gray-800/50 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all duration-300"
-                            placeholder="Enter your username"
-                        >
+                <!-- Header -->
+                <div class="text-center mb-6 sm:mb-8">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i data-lucide="log-in" class="text-white w-8 h-8"></i>
                     </div>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-2">Welcome Back!</h2>
+                    <p class="text-gray-400 text-base sm:text-lg">Sign in to your account</p>
                 </div>
 
-                <!-- Password Input -->
-                <div class="input-group">
-                    <label class="block text-gray-300 text-sm font-semibold mb-2">
-                        <i class="fas fa-lock mr-2"></i>
-                        Password
-                    </label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i class="fas fa-lock text-gray-500"></i>
-                        </div>
-                        <input 
-                            type="password" 
-                            name="password" 
-                            id="password"
-                            required
-                            class="w-full pl-12 pr-12 py-4 bg-gray-800/50 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all duration-300"
-                            placeholder="Enter your password"
-                        >
-                        <button 
-                            type="button"
-                            onclick="togglePassword()"
-                            class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-300 transition-colors"
-                        >
-                            <i class="fas fa-eye" id="toggleIcon"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Remember Me & Forgot Password -->
-                <div class="flex items-center justify-between text-sm">
-                    <label class="flex items-center text-gray-400 cursor-pointer hover:text-gray-300 transition-colors">
-                        <input type="checkbox" class="mr-2 rounded">
-                        <span>Remember me</span>
-                    </label>
-                    <a href="#" class="text-gray-400 hover:text-gray-300 font-medium transition-colors">
-                        Forgot password?
-                    </a>
-                </div>
-
-                <!-- Login Button -->
-                <button 
-                    type="submit"
-                    class="btn-login w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg relative overflow-hidden"                >
-                    <span class="relative z-10 flex items-center justify-center">
-                        <i class="fas fa-arrow-right mr-2"></i>
-                        Sign In
-                    </span>
-                </button>
-
-            </form>
-
-            <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="mt-4 space-y-2">
-                        {% for category, message in messages %}
-                            <div class="p-3 rounded-xl {% if category == 'error' %}bg-red-500/80{% else %}bg-green-500/80{% endif %} text-white text-sm">
-                                {{ message }}
+                <form method="POST" action="/login" id="loginForm" class="space-y-5 sm:space-y-6">
+                    
+                    <!-- Username -->
+                    <div>
+                        <label class="block text-gray-300 text-sm font-bold mb-2">
+                            Username
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="user" class="text-gray-500 w-5 h-5"></i>
                             </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
-
-            <!-- Demo Credentials -->
-            <div class="mt-8 p-4 bg-gray-800/30 rounded-xl border border-gray-700">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0">
-                        <div class="w-10 h-10 bg-gray-700/50 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-info-circle text-gray-400"></i>
+                            <input
+                                type="text"
+                                name="username"
+                                required
+                                autocomplete="off"
+                                class="login-input w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-xl font-medium text-base sm:text-lg"
+                                placeholder="Enter username"
+                            >
                         </div>
                     </div>
-                    <div class="ml-3">
-                        <h3 class="text-gray-300 font-semibold text-sm mb-2">Demo Credentials</h3>
-                        <div class="space-y-1 text-xs text-gray-500">
-                            <p><strong class="text-gray-400">Username:</strong> admin</p>
-                            <p><strong class="text-gray-400">Password:</strong> admin123</p>
+
+                    <!-- Password -->
+                    <div>
+                        <label class="block text-gray-300 text-sm font-bold mb-2">
+                            Password
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="lock" class="text-gray-500 w-5 h-5"></i>
+                            </div>
+                            <input
+                                type="password"
+                                name="password"
+                                id="password"
+                                required
+                                autocomplete="off"
+                                class="login-input w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-xl font-medium text-base sm:text-lg"
+                                placeholder="Enter password"
+                            >
+                            <button
+                                type="button"
+                                onclick="togglePassword()"
+                                class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-blue-400"
+                            >
+                                <i data-lucide="eye" id="toggleIcon" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center justify-between text-sm">
+                        <label class="flex items-center text-gray-400 cursor-pointer hover:text-gray-300">
+                            <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-gray-800 focus:ring-blue-500">
+                            <span class="ml-2 font-medium">Remember me</span>
+                        </label>
+                        <a href="#" class="text-blue-400 hover:text-blue-300 font-semibold">Forgot password?</a>
+                    </div>
+
+                    <!-- Button -->
+                    <button
+                        type="submit"
+                        class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3.5 sm:py-4 rounded-xl font-bold text-lg sm:text-xl shadow-lg transition-all hover:-translate-y-0.5"
+                    >
+                        Sign In
+                    </button>
+                </form>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mt-6 space-y-2">
+                            {% for category, message in messages %}
+                                <div class="p-4 rounded-xl flex items-center space-x-3 {% if category == 'error' %}bg-red-500/90{% else %}bg-green-500/90{% endif %} text-white text-sm">
+                                    <i data-lucide="{% if category == 'error' %}alert-circle{% else %}check-circle{% endif %}" class="w-5 h-5"></i>
+                                    <span class="font-medium">{{ message }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Divider -->
+                <div class="flex items-center my-6">
+                    <div class="flex-1 border-t-2 border-gray-700"></div>
+                    <span class="px-4 text-gray-500 text-sm font-medium">or</span>
+                    <div class="flex-1 border-t-2 border-gray-700"></div>
+                </div>
+
+                <!-- Demo Card - FIXED LAYOUT -->
+                <div class="bg-gray-800 rounded-2xl p-5 border-2 border-gray-700">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="info" class="text-blue-400 w-5 h-5"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-white font-bold text-sm mb-3">Demo Credentials</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex items-center">
+                                    <span class="text-gray-400 w-20 flex-shrink-0">Username:</span>
+                                    <code class="text-blue-400 font-bold ml-2">admin</code>
+                                </div>
+                                <div class="flex items-center">
+                                    <span class="text-gray-400 w-20 flex-shrink-0">Password:</span>
+                                    <code class="text-blue-400 font-bold ml-2">admin123</code>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Quick Login -->
+                <button
+                    onclick="quickLogin()"
+                    class="mt-4 w-full py-3 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 rounded-xl font-bold text-sm transition-all border-2 border-gray-600 hover:shadow-lg"
+                >
+                    Quick Login (Demo)
+                </button>
             </div>
-
-            <!-- Quick Login Button -->
-            <button 
-                onclick="quickLogin()"
-                class="mt-4 w-full py-3 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 rounded-xl font-medium text-sm transition-all duration-300 border border-gray-600"
-            >
-                <i class="fas fa-bolt mr-2"></i>
-                Quick Login (Demo)
-            </button>
-        </div>
-
-        <!-- Footer -->
-        <div class="text-center mt-8 text-gray-500 text-sm fade-in-up" style="animation-delay: 0.4s">
-            <p>
-                <i class="fas fa-shield-alt mr-1"></i>
-                Secured by RADIUS Authentication
-            </p>
-            <p class="mt-2">
-                © 2024 RADIUS Manager. All rights reserved.
-            </p>
         </div>
 
     </div>
 
+    <!-- Footer -->
+    <div class="fixed bottom-0 left-0 right-0 py-4 text-center pointer-events-none z-10">
+        <p class="text-gray-500 text-xs sm:text-sm flex items-center justify-center">
+            <i data-lucide="shield-check" class="w-4 h-4 mr-2"></i>
+            <span class="hidden sm:inline">Secured by RADIUS Authentication • © 2025 RADIUS Manager</span>
+            <span class="sm:hidden">© 2025 RADIUS Manager</span>
+        </p>
+    </div>
+
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            lucide.createIcons();
+        });
+
         function togglePassword() {
             const passwordInput = document.getElementById('password');
             const toggleIcon = document.getElementById('toggleIcon');
-            
+
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
-                toggleIcon.classList.remove('fa-eye');
-                toggleIcon.classList.add('fa-eye-slash');
+                toggleIcon.setAttribute('data-lucide', 'eye-off');
             } else {
                 passwordInput.type = 'password';
-                toggleIcon.classList.remove('fa-eye-slash');
-                toggleIcon.classList.add('fa-eye');
+                toggleIcon.setAttribute('data-lucide', 'eye');
             }
+
+            lucide.createIcons();
         }
 
         function quickLogin() {

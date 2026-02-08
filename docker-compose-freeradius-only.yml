@@ -1,0 +1,32 @@
+  freeradius:
+    build:
+      context: .
+      dockerfile: Dockerfile-freeradius
+    container_name: freeradius-server
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: radius
+      DB_USER: radius
+      DB_PASS: radiuspass
+      TZ: Asia/Jakarta
+    ports:
+      - "1812:1812/udp"  # Authentication
+      - "1813:1813/udp"  # Accounting
+    volumes:
+      # Client configuration - PATH DIPERBAIKI
+      - ./clients.conf:/etc/freeradius/3.0/clients.conf:ro
+      # SQL module configuration
+      - ./freeradius-config/mods-available/sql:/etc/freeradius/3.0/mods-available/sql:ro
+      # Sites configuration
+      - ./freeradius-config/sites-enabled/default:/etc/freeradius/3.0/sites-enabled/default:ro
+      # Logs directory
+      - ./freeradius-logs:/var/log/freeradius
+      # JANGAN mount mods-enabled/sql - biarkan entrypoint buat symlink!
+    networks:
+      my-net:
+        ipv4_address: 172.100.10.118
+    depends_on:
+      postgres:
+        condition: service_healthy

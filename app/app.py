@@ -599,37 +599,33 @@ def api_logs():
 
 @app.route('/api/auth-activity')
 def api_auth_activity():
-    """Get authentication activity for the last 30 minutes - FIXED"""
+    """Get authentication activity for the last 30 minutes - FIXED COUNTING"""
     try:
-        # Query ini lebih robust. Ia menghasilkan 30 baris, satu untuk setiap menit.
-        # Jika tidak ada aktivitas di menit tertentu, nilainya akan 0.
         activity = execute_query("""
-            SELECT 
-                minute, 
-                COUNT(p.authdate) as attempts
-            FROM (
+            WITH minutes AS (
                 SELECT generate_series(
-                    NOW() - INTERVAL '30 minutes', 
-                    NOW(), 
+                    DATE_TRUNC('minute', NOW() - INTERVAL '30 minutes'),
+                    DATE_TRUNC('minute', NOW()),
                     INTERVAL '1 minute'
-                ) as minute
-            ) minutes
-            LEFT JOIN radpostauth p ON DATE_TRUNC('minute', p.authdate) = minutes.minute
-            GROUP BY minutes.minute
-            ORDER BY minutes.minute
+                ) AS minute
+            )
+            SELECT 
+                TO_CHAR(m.minute, 'HH24:MI') as time_label,
+                COUNT(p.id) as attempts
+            FROM minutes m
+            LEFT JOIN radpostauth p ON DATE_TRUNC('minute', p.authdate) = m.minute
+            GROUP BY m.minute, time_label
+            ORDER BY m.minute
         """)
         
-        labels = []
-        data = []
-        for item in activity:
-            # Format label HH:MM
-            labels.append(item['minute'].strftime('%H:%M'))
-            data.append(item['attempts'])
+        labels = [item['time_label'] for item in activity]
+        data = [item['attempts'] for item in activity]
         
         return jsonify({'labels': labels, 'data': data})
     except Exception as e:
         print(f"Error in auth activity: {str(e)}")
-        # Kembalikan data kosong dengan struktur yang benar
+        import traceback
+        traceback.print_exc()
         return jsonify({'labels': [], 'data': []})
 
 @app.route('/api/sessions-by-nas')
@@ -679,7 +675,7 @@ def api_recent_activity():
         
         for item in activity:
             is_success = item['reply'] == 'Access-Accept'
-            icon = 'fa-check-circle' if is_success else 'fa-times-circle'
+            icon = 'check-circle' if is_success else 'x-circle'
             color = 'green' if is_success else 'red'
             text = f"User {item['username']} {'login successful' if is_success else 'login failed'}"
             

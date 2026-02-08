@@ -1,7 +1,30 @@
 FROM ubuntu:22.04
 
-RUN apt-get update && \
-    apt-get install -y freeradius freeradius-postgresql && \
-    apt-get clean
+ENV DEBIAN_FRONTEND=noninteractive
 
-CMD ["freeradius", "-X"]
+# Install FreeRADIUS with PostgreSQL support
+RUN apt-get update && \
+    apt-get install -y \
+    freeradius \
+    freeradius-postgresql \
+    freeradius-utils \
+    postgresql-client \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy entrypoint script
+COPY entrypoint-freeradius.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create log directory with proper permissions
+RUN mkdir -p /var/log/freeradius && \
+    chown -R freerad:freerad /var/log/freeradius
+
+# Expose RADIUS ports
+EXPOSE 1812/udp 1813/udp
+
+# Use custom entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Default command
+CMD ["freeradius", "-X", "-l", "stdout"]

@@ -1,35 +1,52 @@
 sql {
     dialect = "postgresql"
     driver = "rlm_sql_postgresql"
+    
     server = "postgres"
     port = 5432
     login = "radius"
     password = "radiuspass"
     radius_db = "radius"
     
-    acct_table1 = "radacct"
-    acct_table2 = "radacct"
-    postauth_table = "radpostauth"
-    authcheck_table = "radcheck"
-    groupcheck_table = "radgroupcheck"
-    authreply_table = "radreply"
-    groupreply_table = "radgroupreply"
-    usergroup_table = "radusergroup"
+    sql_user_name = "%{User-Name}"
     
     read_clients = yes
     client_table = "nas"
     
-    group_membership_query = "SELECT groupname FROM radusergroup WHERE username='%{SQL-User-Name}' ORDER BY priority"
+    authorize_check_query = "SELECT id, username, attribute, value, op FROM radcheck WHERE username = '%{SQL-User-Name}' ORDER BY id"
     
-    authorize_check_query = "SELECT id, username, attribute, value, op FROM ${authcheck_table} WHERE username = '%{SQL-User-Name}' ORDER BY id"
+    authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{SQL-User-Name}' ORDER BY id"
     
-    authorize_reply_query = "SELECT id, username, attribute, value, op FROM ${authreply_table} WHERE username = '%{SQL-User-Name}' ORDER BY id"
+    accounting {
+        reference = "%{tolower:type.%{Acct-Status-Type}.query}"
+        
+        type {
+            start {
+                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), 0, 0, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}')"
+            }
+            
+            stop {
+                query = "UPDATE radacct SET acctstoptime = NOW(), acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0}, acctterminatecause = '%{Acct-Terminate-Cause}' WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}'"
+            }
+            
+            interim-update {
+                query = "UPDATE radacct SET acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0} WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}'"
+            }
+        }
+    }
     
-    authorize_group_check_query = "SELECT id, groupname, attribute, value, op FROM ${groupcheck_table} WHERE groupname = '%{SQL-Group}' ORDER BY id"
+    post-auth {
+        reference = ".query"
+        query = "INSERT INTO radpostauth (username, pass, reply, authdate, calledstationid, callingstationid) VALUES ('%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', NOW(), '%{Called-Station-Id}', '%{Calling-Station-Id}')"
+    }
     
-    authorize_group_reply_query = "SELECT id, groupname, attribute, value, op FROM ${groupreply_table} WHERE groupname = '%{SQL-Group}' ORDER BY id"
-    
-    simul_count_query = "SELECT COUNT(*) FROM ${acct_table1} WHERE username = '%{SQL-User-Name}' AND acctstoptime IS NULL"
-    
-    simul_verify_query = "SELECT radacctid, acctsessionid, username, nasipaddress, nasportid, framedipaddress, callingstationid, framedprotocol FROM ${acct_table1} WHERE username = '%{SQL-User-Name}' AND acctstoptime IS NULL"
+    pool {
+        start = 5
+        min = 3
+        max = 10
+        spare = 3
+        uses = 0
+        lifetime = 0
+        idle_timeout = 60
+    }
 }
