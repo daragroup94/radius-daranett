@@ -38,3 +38,7 @@ class Config:
     
     # Redis Configuration (optional)
     REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
+    # Telegram Notification Configuration
+    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+    TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '')

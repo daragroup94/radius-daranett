@@ -9,6 +9,7 @@
     .icon-gradient-sessions { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     .pulse-ring {
         animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        will-change: transform, opacity;
     }
     @keyframes pulse-ring {
         0%, 100% { opacity: 1; transform: scale(1); }
@@ -26,8 +27,8 @@
                     <i class="fas fa-signal text-white text-3xl"></i>
                 </div>
                 <div>
-                    <h3 class="text-2xl font-bold text-gray-800">Active PPPoE Sessions</h3>
-                    <p class="text-sm text-gray-500 mt-1">Real-time connection monitoring with detailed information</p>
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-white">Active PPPoE Sessions</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Real-time connection monitoring with detailed information</p>
                 </div>
             </div>
             <div class="flex space-x-3">
@@ -205,12 +206,12 @@
             });
             
             return `
-                <div class="bg-gradient-to-r from-white to-blue-50 rounded-2xl p-6 border-2 border-blue-200 hover:border-blue-400 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                <div class="bg-white rounded-2xl p-6 border border-blue-200 hover:border-blue-400 hover:shadow-md transition-[transform,box-shadow,border-color] duration-300 transform hover:-translate-y-0.5" style="contain: content;">
                     <!-- Header -->
                     <div class="flex items-start justify-between mb-6">
                         <div class="flex items-center space-x-4">
                             <div class="relative">
-                                <div class="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                <div class="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
                                     <i class="fas fa-user text-white text-xl"></i>
                                 </div>
                                 <div class="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white pulse-ring"></div>
@@ -220,7 +221,7 @@
                                 <p class="text-xs text-gray-500 font-medium mt-1">Session #${index + 1} • ${session.acctsessionid}</p>
                             </div>
                         </div>
-                        <span class="bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-lg flex items-center space-x-2">
+                        <span class="bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-md flex items-center space-x-2">
                             <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                             <span>LIVE</span>
                         </span>
@@ -228,28 +229,28 @@
                     
                     <!-- Network Info Grid -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-white rounded-xl p-4 shadow-md border-2 border-gray-200">
+                        <div class="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
                                 <i class="fas fa-server text-blue-500 mr-2"></i>NAS IP
                             </p>
                             <p class="font-mono text-sm font-bold text-gray-800">${session.nasipaddress}</p>
                         </div>
                         
-                        <div class="bg-white rounded-xl p-4 shadow-md border-2 border-gray-200">
+                        <div class="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
                                 <i class="fas fa-network-wired text-green-500 mr-2"></i>Client IP
                             </p>
                             <p class="font-mono text-sm font-bold ${session.framedipaddress ? 'text-blue-600' : 'text-gray-400'}">${session.framedipaddress || 'Dynamic'}</p>
                         </div>
                         
-                        <div class="bg-white rounded-xl p-4 shadow-md border-2 border-gray-200">
+                        <div class="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
                                 <i class="fas fa-ethernet text-purple-500 mr-2"></i>NAS Port
                             </p>
                             <p class="text-sm font-bold text-gray-800">${session.nasportid || 'N/A'}</p>
                         </div>
                         
-                        <div class="bg-white rounded-xl p-4 shadow-md border-2 border-gray-200">
+                        <div class="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
                             <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
                                 <i class="fas fa-sitemap text-orange-500 mr-2"></i>Port Type
                             </p>
@@ -259,21 +260,21 @@
                     
                     <!-- Time Info Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 shadow-md border-2 border-blue-200">
+                        <div class="bg-blue-50 rounded-xl p-4 shadow-sm border border-blue-100">
                             <p class="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2 flex items-center">
                                 <i class="fas fa-calendar-alt mr-2"></i>Start Time
                             </p>
                             <p class="text-sm font-bold text-gray-800">${startTime}</p>
                         </div>
                         
-                        <div class="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-4 shadow-md border-2 border-purple-200">
+                        <div class="bg-purple-50 rounded-xl p-4 shadow-sm border border-purple-100">
                             <p class="text-xs font-bold text-purple-700 uppercase tracking-wider mb-2 flex items-center">
                                 <i class="fas fa-hourglass-half mr-2"></i>Duration
                             </p>
                             <p class="text-sm font-bold text-purple-600">${duration}</p>
                         </div>
                         
-                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 shadow-md border-2 border-green-200">
+                        <div class="bg-green-50 rounded-xl p-4 shadow-sm border border-green-100">
                             <p class="text-xs font-bold text-green-700 uppercase tracking-wider mb-2 flex items-center">
                                 <i class="fas fa-layer-group mr-2"></i>Protocol
                             </p>
@@ -284,7 +285,7 @@
                     <!-- Data Usage -->
                     ${(session.acctinputoctets || session.acctoutputoctets) ? `
                         <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-5 rounded-2xl shadow-lg border-2 border-blue-400">
+                            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-5 rounded-2xl shadow-md">
                                 <div class="flex items-center justify-between mb-3">
                                     <span class="text-sm font-bold text-white uppercase tracking-wider">Download</span>
                                     <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -294,7 +295,7 @@
                                 <p class="text-3xl font-black text-white mb-1">${formatBytes(session.acctinputoctets || 0)}</p>
                                 <p class="text-xs text-blue-200 font-medium">${formatBytesShort(session.acctinputoctets || 0)}</p>
                             </div>
-                            <div class="bg-gradient-to-br from-purple-500 to-violet-600 p-5 rounded-2xl shadow-lg border-2 border-purple-400">
+                            <div class="bg-gradient-to-br from-purple-500 to-violet-600 p-5 rounded-2xl shadow-md">
                                 <div class="flex items-center justify-between mb-3">
                                     <span class="text-sm font-bold text-white uppercase tracking-wider">Upload</span>
                                     <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">

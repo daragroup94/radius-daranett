@@ -41,7 +41,7 @@
 </div>
 
 <!-- Add NAS Modal - Enhanced -->
-<div id="addNasModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center hidden z-50">
+<div id="addNasModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
     <div class="modern-card rounded-3xl shadow-2xl p-8 w-full max-w-2xl mx-4 border-2 border-white/20">
         <div class="flex justify-between items-center mb-6">
             <div class="flex items-center">
@@ -185,10 +185,10 @@
             }
 
             nasList.innerHTML = data.map(nas => `
-                <div class="bg-gradient-to-r from-white to-blue-50 rounded-2xl p-6 border-2 border-blue-100 hover:border-blue-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                <div class="bg-white rounded-2xl p-6 border border-blue-100 hover:border-blue-300 hover:shadow-md transition-[transform,box-shadow,border-color] duration-300 transform hover:-translate-y-0.5" style="contain: content;">
                     <div class="flex justify-between items-start">
                         <div class="flex items-center space-x-5 flex-1">
-                            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0">
                                 <i class="fas fa-server text-white text-2xl"></i>
                             </div>
                             <div class="flex-1 min-w-0">
@@ -197,29 +197,29 @@
                                     <span class="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full flex-shrink-0">${nas.shortname}</span>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4 text-sm">
-                                    <div class="flex items-center text-gray-700 bg-white/70 px-3 py-2 rounded-lg">
+                                    <div class="flex items-center text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
                                         <i class="fas fa-tag text-purple-500 mr-2 w-4"></i>
                                         <span class="font-medium">Type:</span>
                                         <span class="ml-1 font-bold">${nas.type || 'other'}</span>
                                     </div>
-                                    <div class="flex items-center text-gray-700 bg-white/70 px-3 py-2 rounded-lg">
+                                    <div class="flex items-center text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
                                         <i class="fas fa-ethernet text-green-500 mr-2 w-4"></i>
                                         <span class="font-medium">Port:</span>
                                         <span class="ml-1 font-bold">${nas.ports || '1812'}</span>
                                     </div>
-                                    <div class="flex items-center text-gray-700 bg-white/70 px-3 py-2 rounded-lg col-span-2">
+                                    <div class="flex items-center text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 col-span-2">
                                         <i class="fas fa-key text-red-500 mr-2 w-4"></i>
                                         <span class="font-medium">Secret:</span>
                                         <code class="ml-2 bg-gray-800 text-green-400 px-3 py-1 rounded text-xs font-mono flex-1">${nas.secret}</code>
                                     </div>
-                                    <div class="flex items-center text-gray-700 bg-white/70 px-3 py-2 rounded-lg col-span-2">
+                                    <div class="flex items-center text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 col-span-2">
                                         <i class="fas fa-fingerprint text-orange-500 mr-2 w-4"></i>
                                         <span class="font-medium">Device ID:</span>
                                         <span class="ml-2 font-mono font-bold text-blue-600">#${nas.id}</span>
                                     </div>
                                 </div>
                                 ${nas.description ? `
-                                    <div class="mt-3 bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 rounded-xl border border-indigo-200">
+                                    <div class="mt-3 bg-gray-50 px-4 py-3 rounded-xl border border-indigo-100">
                                         <p class="text-sm text-gray-700 flex items-start">
                                             <i class="fas fa-info-circle text-indigo-600 mr-2 mt-0.5"></i>
                                             <span><strong class="font-bold">Description:</strong> ${nas.description}</span>
@@ -229,7 +229,7 @@
                             </div>
                         </div>
                         <button onclick="deleteNAS(${nas.id})" 
-                                class="ml-4 w-12 h-12 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded-xl flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg flex-shrink-0" 
+                                class="ml-4 w-12 h-12 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded-xl flex items-center justify-center transition-colors duration-300 shadow-sm hover:shadow-md flex-shrink-0" 
                                 title="Delete NAS">
                             <i class="fas fa-trash text-lg"></i>
                         </button>

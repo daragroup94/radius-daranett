@@ -32,9 +32,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install postgresql-client
+# Install postgresql-client and curl for health checks
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends postgresql-client iputils-ping && \
+    apt-get install -y --no-install-recommends postgresql-client iputils-ping curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

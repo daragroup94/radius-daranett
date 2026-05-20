@@ -3,6 +3,9 @@ data/
 backups/
 logs/
 uploads/
+freeradius-logs/
+pgadmin-data/
+init.db/
 
 # File konfigurasi spesifik lingkungan
 .env

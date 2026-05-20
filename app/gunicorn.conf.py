@@ -6,8 +6,8 @@ bind = "0.0.0.0:5000"
 backlog = 2048
 
 # Worker Configuration
-workers = os.getenv('GUNICORN_WORKERS', 2)
-worker_class = "sync"
+workers = 1 # SocketIO needs 1 worker for eventlet/gevent
+worker_class = "eventlet"
 worker_connections = 1000
 timeout = 120
 graceful_timeout = 30

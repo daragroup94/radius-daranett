@@ -1,0 +1,23 @@
+{
+  "name": "RADIUS Manager Pro",
+  "short_name": "RADIUS",
+  "description": "RADIUS Manager Dashboard for PPPoE Users",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#3b82f6",
+  "icons": [
+  {
+    "src": "https://img.icons8.com/fluency/192/000000/shield.png",
+    "sizes": "192x192",
+    "type": "image/png",
+    "purpose": "any maskable"
+  },
+  {
+    "src": "https://img.icons8.com/fluency/512/000000/shield.png",
+    "sizes": "512x512",
+    "type": "image/png"
+  }
+  ]
+
+}

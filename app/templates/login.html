@@ -86,7 +86,33 @@
                 </div>
 
                 <form method="POST" action="/login" id="loginForm" class="space-y-5 sm:space-y-6">
+                    {% if mfa_required %}
+                    <input type="hidden" name="username" value="{{ username }}">
+                    <input type="hidden" name="password" value="{{ password }}">
                     
+                    <!-- MFA Code -->
+                    <div>
+                        <label class="block text-blue-400 text-sm font-bold mb-2">
+                            Two-Factor Authentication
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="shield-check" class="text-blue-500 w-5 h-5"></i>
+                            </div>
+                            <input
+                                type="text"
+                                name="mfa_code"
+                                required
+                                autofocus
+                                autocomplete="one-time-code"
+                                class="login-input w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-xl font-bold text-center text-2xl tracking-widest"
+                                placeholder="000000"
+                                maxlength="6"
+                            >
+                        </div>
+                        <p class="text-gray-400 text-xs mt-2 text-center">Enter the 6-digit code from your authenticator app</p>
+                    </div>
+                    {% else %}
                     <!-- Username -->
                     <div>
                         <label class="block text-gray-300 text-sm font-bold mb-2">
@@ -134,6 +160,7 @@
                             </button>
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- Actions -->
                     <div class="flex items-center justify-between text-sm">

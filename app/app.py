@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session
+from flask_socketio import SocketIO, emit
 import psycopg2
 import time
 from config import Config
@@ -14,6 +15,20 @@ import re
 import psutil
 import threading
 import io
+import requests
+import pyotp
+
+# === TELEGRAM NOTIFICATION ===
+def send_telegram_notification(message):
+    token = app.config.get('TELEGRAM_BOT_TOKEN')
+    chat_id = app.config.get('TELEGRAM_CHAT_ID')
+    if not token or not chat_id:
+        return
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'})
+    except Exception as e:
+        print(f"Telegram error: {e}")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'radius-dashboard-secret-2024'
@@ -23,6 +38,9 @@ app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config.from_object(Config)
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # === BACKUP & RESTORE CONFIGURATION ===
 BACKUP_FOLDER = 'backups'
@@ -190,15 +208,28 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        mfa_code = request.form.get('mfa_code')
         
         user = execute_query("SELECT * FROM admin_users WHERE username = %s AND is_active = TRUE", (username,))
         
         if user and check_password_hash(user[0]['password_hash'], password):
+            # Check MFA
+            if user[0]['is_mfa_enabled']:
+                if not mfa_code:
+                    return render_template('login.html', mfa_required=True, username=username, password=password)
+                
+                totp = pyotp.TOTP(user[0]['mfa_secret'])
+                if not totp.verify(mfa_code):
+                    flash('Invalid MFA code', 'error')
+                    return render_template('login.html', mfa_required=True, username=username, password=password)
+            
             session['user_id'] = user[0]['id']
             session['username'] = user[0]['username']
             session['role'] = user[0]['role']
             
             execute_query("UPDATE admin_users SET last_login = NOW() WHERE id = %s", (user[0]['id'],), fetch=False)
+            
+            send_telegram_notification(f"🔔 <b>Admin Login</b>\nUser: {username}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             
             flash('Login successful!', 'success')
             return redirect(url_for('dashboard'))
@@ -218,6 +249,49 @@ def logout():
 @login_required
 def profile_page():
     return render_template('profile.html')
+
+@app.route('/api/mfa/setup', methods=['POST'])
+@login_required
+def api_mfa_setup():
+    try:
+        secret = pyotp.random_base32()
+        user = execute_query("SELECT username FROM admin_users WHERE id = %s", (session['user_id'],))[0]
+        provisioning_url = pyotp.totp.TOTP(secret).provisioning_uri(
+            name=user['username'], 
+            issuer_name="RADIUS Manager"
+        )
+        # We store secret temporarily in session for verification
+        session['temp_mfa_secret'] = secret
+        
+        return jsonify({
+            'success': True, 
+            'secret': secret,
+            'qr_code_url': f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={provisioning_url}"
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/mfa/verify', methods=['POST'])
+@login_required
+def api_mfa_verify():
+    try:
+        data = get_request_data()
+        code = data.get('code')
+        secret = session.get('temp_mfa_secret')
+        
+        if not secret:
+            return jsonify({'success': False, 'error': 'Session expired, please restart setup'})
+            
+        totp = pyotp.TOTP(secret)
+        if totp.verify(code):
+            execute_query("UPDATE admin_users SET mfa_secret = %s, is_mfa_enabled = TRUE WHERE id = %s", 
+                         (secret, session['user_id']), fetch=False)
+            session.pop('temp_mfa_secret', None)
+            return jsonify({'success': True, 'message': 'MFA enabled successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Invalid verification code'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/change-password', methods=['POST'])
 @login_required
@@ -275,8 +349,15 @@ def backup_page():
 @app.route('/api/stats')
 def api_stats():
     try:
-        total_users = execute_query("SELECT COUNT(*) as count FROM radcheck")[0]['count']
+        # Total users registered in the system
+        total_users = execute_query("SELECT COUNT(*) as count FROM radcheck WHERE attribute = 'Cleartext-Password'")[0]['count']
+        
+        # Total active connections (Live Sessions)
         active_sessions = execute_query("SELECT COUNT(*) as count FROM radacct WHERE acctstoptime IS NULL")[0]['count']
+        
+        # Unique users currently online
+        online_users = execute_query("SELECT COUNT(DISTINCT username) as count FROM radacct WHERE acctstoptime IS NULL")[0]['count']
+        
         today_auth = execute_query("SELECT COUNT(*) as count FROM radpostauth WHERE DATE(authdate) = CURRENT_DATE")[0]['count']
         
         try:
@@ -287,6 +368,7 @@ def api_stats():
         return jsonify({
             'total_users': total_users,
             'active_sessions': active_sessions,
+            'online_users': online_users,
             'today_auth': today_auth,
             'total_nas': total_nas
         })
@@ -370,7 +452,13 @@ def get_nas_status():
 @app.route('/api/users')
 def api_users():
     try:
-        users = execute_query("""
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+        
+        # Base query for data
+        data_query = """
             SELECT c.id, c.username, c.attribute, c.op, c.value as password,
                    (SELECT value FROM radreply r1 WHERE r1.username = c.username AND r1.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
                    (SELECT value FROM radreply r2 WHERE r2.username = c.username AND r2.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
@@ -380,9 +468,30 @@ def api_users():
                    (SELECT COUNT(*) FROM radacct a WHERE a.username = c.username AND a.acctstoptime IS NULL) as active_sessions
             FROM radcheck c
             WHERE c.attribute = 'Cleartext-Password'
-            ORDER BY c.username
-        """)
-        return jsonify(users)
+        """
+        
+        # Base query for count
+        count_query = "SELECT COUNT(*) as total FROM radcheck c WHERE c.attribute = 'Cleartext-Password'"
+        
+        params = []
+        if search:
+            data_query += " AND c.username ILIKE %s"
+            count_query += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+            
+        data_query += " ORDER BY c.username LIMIT %s OFFSET %s"
+        data_params = params + [limit, offset]
+        
+        users = execute_query(data_query, tuple(data_params))
+        total_count = execute_query(count_query, tuple(params))[0]['total']
+        
+        return jsonify({
+            'users': users,
+            'total': total_count,
+            'page': page,
+            'limit': limit,
+            'total_pages': (total_count + limit - 1) // limit
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -443,6 +552,7 @@ def api_add_user():
                     VALUES (%s, 'Mikrotik-Total-Limit', ':=', %s)
                 """, (data['username'], str(data_limit_bytes)), fetch=False)
         
+        send_telegram_notification(f"👤 <b>New User Created</b>\nUsername: {data['username']}\nIP: {data.get('ip_address', 'Dynamic')}\nRate: {data.get('rate_limit', 'Not set')}")
         return jsonify({'success': True, 'message': 'User added successfully'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -495,6 +605,7 @@ def api_delete_user(user_id):
             username = user[0]['username']
             execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
             execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+            send_telegram_notification(f"🗑️ <b>User Deleted</b>\nUsername: {username}")
             return jsonify({'success': True, 'message': 'User deleted successfully'})
         else:
             return jsonify({'success': False, 'error': 'User not found'}), 404
@@ -1002,6 +1113,37 @@ def api_restore_backup():
 
 # === AKHIRI KODE TAMBAHAN ===
 
+# === SOCKET IO EVENTS ===
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+    emit('status', {'data': 'Connected'})
+
+def background_metrics():
+    """Emit system metrics every 5 seconds"""
+    while True:
+        try:
+            metrics = api_system_metrics_data()
+            socketio.emit('system_metrics', metrics)
+        except Exception as e:
+            print(f"Error in background metrics: {e}")
+        socketio.sleep(5)
+
+def api_system_metrics_data():
+    """Helper to get system metrics without request context"""
+    cpu_percent = psutil.cpu_percent()
+    memory = psutil.virtual_memory()
+    return {
+        'cpu_percent': round(cpu_percent, 1),
+        'memory_percent': round(memory.percent, 1),
+        'db_connections': 0, # Simplified for now
+        'db_max_connections': 100,
+        'disk_percent': 0
+    }
+
+# Start background thread always
+start_cleanup_thread()
+threading.Thread(target=background_metrics, daemon=True).start()
+
 if __name__ == '__main__':
-    start_cleanup_thread()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
