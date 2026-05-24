@@ -72,7 +72,7 @@
         <div class="stat-card-modern rounded-3xl p-6 shadow-xl">
             <div class="flex items-center justify-between mb-4">
                 <div class="w-16 h-16 icon-gradient-1 rounded-2xl flex items-center justify-center shadow-lg floating-icon">
-                    <i data-lucide="users" class="text-white text-2xl"></i>
+                    <i data-lucide="users" class="lucide-xl text-white"></i>
                 </div>
                 <div class="text-right">
                     <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Registered Users</p>
@@ -91,7 +91,7 @@
         <div class="stat-card-modern rounded-3xl p-6 shadow-xl">
             <div class="flex items-center justify-between mb-4">
                 <div class="w-16 h-16 icon-gradient-2 rounded-2xl flex items-center justify-center shadow-lg floating-icon" style="animation-delay: 0.5s">
-                    <i data-lucide="signal" class="text-white text-2xl"></i>
+                    <i data-lucide="signal" class="lucide-xl text-white"></i>
                 </div>
                 <div class="text-right">
                     <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Live Sessions</p>
@@ -110,7 +110,7 @@
         <div class="stat-card-modern rounded-3xl p-6 shadow-xl">
             <div class="flex items-center justify-between mb-4">
                 <div class="w-16 h-16 icon-gradient-3 rounded-2xl flex items-center justify-center shadow-lg floating-icon" style="animation-delay: 1s">
-                    <i data-lucide="key" class="text-white text-2xl"></i>
+                    <i data-lucide="key" class="lucide-xl text-white"></i>
                 </div>
                 <div class="text-right">
                     <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Auth Today</p>
@@ -129,7 +129,7 @@
         <div class="stat-card-modern rounded-3xl p-6 shadow-xl">
             <div class="flex items-center justify-between mb-4">
                 <div class="w-16 h-16 icon-gradient-4 rounded-2xl flex items-center justify-center shadow-lg floating-icon" style="animation-delay: 1.5s">
-                    <i data-lucide="server" class="text-white text-2xl"></i>
+                    <i data-lucide="server" class="lucide-xl text-white"></i>
                 </div>
                 <div class="text-right">
                     <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">NAS Devices</p>
@@ -152,7 +152,7 @@
             <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center">
                     <div class="w-12 h-12 icon-gradient-5 rounded-xl flex items-center justify-center mr-3 shadow-md">
-                        <i data-lucide="chart-line" class="text-white"></i>
+                        <i data-lucide="line-chart" class="lucide text-white"></i>
                     </div>
                     <div>
                         <h3 class="text-xl font-bold text-gray-800">Authentication Activity</h3>
@@ -160,7 +160,7 @@
                     </div>
                 </div>
                 <button onclick="refreshActivityChart()" class="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-xl transition-all duration-200">
-                    <i data-lucide="refresh-ccw" class="text-gray-600"></i>
+                    <i data-lucide="refresh-ccw" class="lucide text-gray-600"></i>
                 </button>
             </div>
             <div id="authActivityChart" style="height: 320px;"></div>
@@ -171,7 +171,7 @@
             <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center">
                     <div class="w-12 h-12 icon-gradient-6 rounded-xl flex items-center justify-center mr-3 shadow-md">
-                        <i data-lucide="pie-chart" class="text-white"></i>
+                        <i data-lucide="pie-chart" class="lucide text-white"></i>
                     </div>
                     <div>
                         <h3 class="text-xl font-bold text-gray-800">Sessions by NAS</h3>
@@ -179,20 +179,18 @@
                     </div>
                 </div>
                 <button onclick="refreshSessionsChart()" class="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-xl transition-all duration-200">
-                    <i data-lucide="refresh-ccw" class="text-gray-600"></i>
+                    <i data-lucide="refresh-ccw" class="lucide text-gray-600"></i>
                 </button>
             </div>
             <div id="sessionsPieChart" style="height: 320px;"></div>
         </div>
     </div>
 
-    <!-- Recent Activity & Performance -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Recent Activity -->
-        <div class="modern-card p-6 rounded-3xl">
-            <div class="flex items-center mb-6">
+    <!-- Recent Activity -->
+    <div class="modern-card p-6 rounded-3xl">
+        <div class="flex items-center mb-6">
                 <div class="w-12 h-12 icon-gradient-1 rounded-xl flex items-center justify-center mr-3 shadow-md">
-                    <i data-lucide="history" class="text-white"></i>
+                    <i data-lucide="history" class="lucide text-white"></i>
                 </div>
                 <div>
                     <h3 class="text-xl font-bold text-gray-800">Recent Activity</h3>
@@ -205,61 +203,6 @@
                     <span class="text-sm text-gray-500">Loading activity...</span>
                 </div>
             </div>
-        </div>
-
-        <!-- System Performance -->
-        <div class="modern-card p-6 rounded-3xl">
-            <div class="flex items-center mb-6">
-                <div class="w-12 h-12 icon-gradient-3 rounded-xl flex items-center justify-center mr-3 shadow-md">
-                    <i data-lucide="gauge" class="text-white"></i>
-                </div>
-                <div>
-                    <h3 class="text-xl font-bold text-gray-800">System Performance</h3>
-                    <p class="text-sm text-gray-500">Real-time metrics</p>
-                </div>
-            </div>
-            <div class="space-y-6">
-                <div data-metric="cpu">
-                    <div class="flex justify-between mb-3">
-                        <span class="text-sm font-semibold text-gray-700">CPU Usage</span>
-                        <span class="text-sm font-bold text-gray-800 metric-value">0%</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div class="h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-1000 metric-bar" style="width: 0%"></div>
-                    </div>
-                </div>
-                
-                <div data-metric="memory">
-                    <div class="flex justify-between mb-3">
-                        <span class="text-sm font-semibold text-gray-700">Memory Usage</span>
-                        <span class="text-sm font-bold text-gray-800 metric-value">0%</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div class="h-3 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 transition-all duration-1000 metric-bar" style="width: 0%"></div>
-                    </div>
-                </div>
-                
-                <div data-metric="db">
-                    <div class="flex justify-between mb-3">
-                        <span class="text-sm font-semibold text-gray-700">Database Connections</span>
-                        <span class="text-sm font-bold text-gray-800 metric-value">0 / 100</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div class="h-3 rounded-full bg-gradient-to-r from-purple-400 to-violet-500 transition-all duration-1000 metric-bar" style="width: 0%"></div>
-                    </div>
-                </div>
-                
-                <div data-metric="disk">
-                    <div class="flex justify-between mb-3">
-                        <span class="text-sm font-semibold text-gray-700">Network Bandwidth</span>
-                        <span class="text-sm font-bold text-gray-800 metric-value">0%</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div class="h-3 rounded-full bg-gradient-to-r from-pink-400 to-rose-500 transition-all duration-1000 metric-bar" style="width: 0%"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}
@@ -323,10 +266,11 @@ async function createAuthActivityChart() {
         const result = await response.json();
         
         const chartDom = document.getElementById('authActivityChart');
+        const isDark = document.documentElement.classList.contains('dark');
         
         // PERBAIKAN: Init chart sekali saja, update data untuk refresh berikutnya
         if (!authActivityChart) {
-            authActivityChart = echarts.init(chartDom);
+            authActivityChart = echarts.init(chartDom, isDark ? 'dark' : null);
         }
         
         const option = {
@@ -388,10 +332,11 @@ async function createSessionsPieChart() {
         const result = await response.json();
         
         const chartDom = document.getElementById('sessionsPieChart');
+        const isDark = document.documentElement.classList.contains('dark');
         
         // PERBAIKAN: Init chart sekali saja
         if (!sessionsPieChart) {
-            sessionsPieChart = echarts.init(chartDom);
+            sessionsPieChart = echarts.init(chartDom, isDark ? 'dark' : null);
         }
         
         const data = (result.labels || []).map((label, index) => ({
@@ -487,28 +432,6 @@ async function loadRecentActivity() {
     }
 }
 
-async function loadPerformanceMetrics() {
-    try {
-        const metrics = await apiCall('/api/system-metrics');
-        updateMetric('cpu', metrics.cpu_percent, `${metrics.cpu_percent}%`);
-        updateMetric('memory', metrics.memory_percent, `${metrics.memory_percent}%`);
-        const dbPercent = (metrics.db_connections / metrics.db_max_connections) * 100;
-        updateMetric('db', dbPercent, `${metrics.db_connections} / ${metrics.db_max_connections}`);
-        updateMetric('disk', metrics.disk_percent, `${metrics.disk_percent}%`);
-    } catch (error) {
-        console.error('Error loading performance metrics:', error);
-    }
-}
-
-function updateMetric(metricName, percent, valueText) {
-    const element = document.querySelector(`[data-metric="${metricName}"]`);
-    if (!element) return;
-    const valueEl = element.querySelector('.metric-value');
-    const barEl = element.querySelector('.metric-bar');
-    if (valueEl) valueEl.textContent = valueText;
-    if (barEl) barEl.style.width = `${percent}%`;
-}
-
 function refreshActivityChart() {
     createAuthActivityChart();
     showNotification('Chart refreshed', 'success');
@@ -533,29 +456,12 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Pastikan ikon di stat cards ter-render (karena stat cards sekarang menggunakan data-lucide juga)
     lucide.createIcons();
-    
-    // Initialize Socket.io
-    const socket = io();
-    
-    socket.on('connect', () => {
-        console.log('Connected to server via WebSocket');
-    });
-    
-    socket.on('system_metrics', (data) => {
-        updateMetric('cpu', data.cpu_percent, `${data.cpu_percent}%`);
-        updateMetric('memory', data.memory_percent, `${data.memory_percent}%`);
-        if (data.db_connections) {
-            updateMetric('db', (data.db_connections / data.db_max_connections) * 100, `${data.db_connections} / ${data.db_max_connections}`);
-        }
-    });
 
     loadStats();
     createAuthActivityChart();
     createSessionsPieChart();
-    loadRecentActivity();
-    
+    loadRecentActivity();    
     // Auto refresh setiap 30 detik untuk stats & charts
     setInterval(refreshAllData, 30000);
 });
@@ -564,5 +470,17 @@ window.addEventListener('beforeunload', () => {
     if (authActivityChart) authActivityChart.dispose();
     if (sessionsPieChart) sessionsPieChart.dispose();
 });
+
+// Re-init charts when dark mode toggles
+let _lastDarkMode = document.documentElement.classList.contains('dark');
+new MutationObserver(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+    if (isDark === _lastDarkMode) return;
+    _lastDarkMode = isDark;
+    if (authActivityChart) { authActivityChart.dispose(); authActivityChart = null; }
+    if (sessionsPieChart) { sessionsPieChart.dispose(); sessionsPieChart = null; }
+    createAuthActivityChart();
+    createSessionsPieChart();
+}).observe(document.documentElement, { attributeFilter: ['class'] });
 </script>
 {% endblock %}

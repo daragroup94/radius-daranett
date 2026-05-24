@@ -6,8 +6,8 @@
 
 {% block extra_css %}
 <style>
-    .icon-gradient-nas { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-    .icon-gradient-add { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .icon-gradient-nas { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .icon-gradient-add { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 </style>
 {% endblock %}
 
@@ -24,7 +24,7 @@
                     <p class="text-sm text-gray-500 mt-1">Manage all your NAS devices and configurations</p>
                 </div>
             </div>
-            <button onclick="openAddNasModal()" class="modern-btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl flex items-center space-x-2 font-semibold shadow-lg">
+            <button onclick="openAddNasModal()" class="modern-btn text-white px-6 py-3 rounded-xl flex items-center space-x-2 font-semibold shadow-lg" style="background:linear-gradient(to right,#667eea,#764ba2);">
                 <i class="fas fa-plus-circle text-xl"></i>
                 <span>Add New NAS</span>
             </button>
@@ -133,17 +133,105 @@
                     <i class="fas fa-times mr-2"></i>Cancel
                 </button>
                 <button type="submit" 
-                        class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl transition-all font-semibold shadow-lg">
+                        class="flex-1 text-white px-6 py-3 rounded-xl transition-all font-semibold shadow-lg" style="background:linear-gradient(to right,#667eea,#764ba2);">
                     <i class="fas fa-plus-circle mr-2"></i>Add NAS Device
                 </button>
             </div>
         </form>
     </div>
 </div>
+
+<!-- Delete NAS Confirm Modal -->
+<div id="deleteNasModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="modern-card rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-white/20">
+        <div class="flex items-center mb-4">
+            <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
+                <i class="fas fa-trash text-white text-lg"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 dark:text-white">Delete NAS</h3>
+        </div>
+        <p class="text-gray-600 dark:text-gray-300 mb-6">Hapus NAS <strong id="deleteNasName" class="text-red-600"></strong>? Tindakan ini tidak dapat dibatalkan.</p>
+        <div class="flex space-x-3">
+            <button onclick="closeDeleteNasModal()" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all">Batal</button>
+            <button onclick="confirmDeleteNas()" class="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-semibold transition-all">Hapus</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit NAS Modal -->
+<div id="editNasModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
+    <div class="modern-card rounded-3xl shadow-2xl p-8 w-full max-w-2xl mx-4 border-2 border-white/20">
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center">
+                <div class="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center mr-3 shadow-md">
+                    <i class="fas fa-edit text-white text-xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-800">Edit NAS Device</h3>
+            </div>
+            <button onclick="closeEditNasModal()" class="w-10 h-10 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-xl transition-all duration-200 flex items-center justify-center">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <form id="editNasForm" class="space-y-6">
+            <input type="hidden" id="editNasId">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fas fa-network-wired text-blue-500 mr-2"></i>NAS Name/IP *</label>
+                    <input type="text" id="editNasName" required class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 font-medium transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fas fa-tag text-green-500 mr-2"></i>Short Name *</label>
+                    <input type="text" id="editShortname" required class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 font-medium transition-all">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fas fa-cog text-purple-500 mr-2"></i>Device Type</label>
+                    <select id="editType" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 font-medium transition-all">
+                        <option value="other">Other</option>
+                        <option value="mikrotik">MikroTik</option>
+                        <option value="cisco">Cisco</option>
+                        <option value="linux">Linux</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fas fa-ethernet text-orange-500 mr-2"></i>RADIUS Port</label>
+                    <input type="number" id="editPorts" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 font-medium transition-all">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fas fa-key text-red-500 mr-2"></i>Shared Secret *</label>
+                <input type="text" id="editSecret" required class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 font-medium transition-all">
+            </div>
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2"><i class="fas fa-comment text-indigo-500 mr-2"></i>Description</label>
+                <input type="text" id="editDescription" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 font-medium transition-all">
+            </div>
+            <div class="flex space-x-4 pt-6 border-t-2 border-gray-200">
+                <button type="button" onclick="closeEditNasModal()" class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 transition-all font-semibold">
+                    <i class="fas fa-times mr-2"></i>Cancel
+                </button>
+                <button type="submit" class="flex-1 text-white px-6 py-3 rounded-xl transition-all font-semibold shadow-lg" style="background:linear-gradient(to right,#f59e0b,#ef4444);">
+                    <i class="fas fa-save mr-2"></i>Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+    function toggleSecret(id, secret) {
+        const el = document.getElementById('secret-' + id);
+        if (el.textContent === '••••••••') {
+            el.textContent = secret;
+        } else {
+            el.textContent = '••••••••';
+        }
+    }
+
     async function loadNAS() {
         console.log('Loading NAS devices...');
         try {
@@ -188,13 +276,20 @@
                 <div class="bg-white rounded-2xl p-6 border border-blue-100 hover:border-blue-300 hover:shadow-md transition-[transform,box-shadow,border-color] duration-300 transform hover:-translate-y-0.5" style="contain: content;">
                     <div class="flex justify-between items-start">
                         <div class="flex items-center space-x-5 flex-1">
-                            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0">
+                            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0 relative">
                                 <i class="fas fa-server text-white text-2xl"></i>
+                                <span id="status-dot-${nas.id}" class="absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-gray-300" title="Checking..."></span>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <div class="flex items-center space-x-3 mb-3">
+                                <div class="flex items-center space-x-3 mb-3 flex-wrap gap-y-1">
                                     <h4 class="font-bold text-gray-800 text-xl truncate">${nas.nasname}</h4>
                                     <span class="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full flex-shrink-0">${nas.shortname}</span>
+                                    <span id="status-badge-${nas.id}" class="text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 bg-gray-100 text-gray-500">
+                                        <i class="fas fa-circle-notch fa-spin mr-1"></i>Checking...
+                                    </span>
+                                    <span class="bg-green-50 text-green-700 text-xs font-bold px-3 py-1 rounded-full flex-shrink-0">
+                                        <i class="fas fa-users mr-1"></i>${nas.session_count || 0} sessions
+                                    </span>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4 text-sm">
                                     <div class="flex items-center text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
@@ -210,7 +305,10 @@
                                     <div class="flex items-center text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 col-span-2">
                                         <i class="fas fa-key text-red-500 mr-2 w-4"></i>
                                         <span class="font-medium">Secret:</span>
-                                        <code class="ml-2 bg-gray-800 text-green-400 px-3 py-1 rounded text-xs font-mono flex-1">${nas.secret}</code>
+                                        <code class="ml-2 bg-gray-100 text-blue-700 px-3 py-1 rounded text-xs font-mono flex-1 border border-gray-200" id="secret-${nas.id}">••••••••</code>
+                                        <button onclick="toggleSecret(${nas.id}, '${nas.secret.replace(/'/g, "\\'")}')" class="ml-2 text-xs text-gray-400 hover:text-blue-600 transition-colors" title="Show/Hide secret">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
                                     </div>
                                     <div class="flex items-center text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 col-span-2">
                                         <i class="fas fa-fingerprint text-orange-500 mr-2 w-4"></i>
@@ -228,11 +326,24 @@
                                 ` : ''}
                             </div>
                         </div>
-                        <button onclick="deleteNAS(${nas.id})" 
-                                class="ml-4 w-12 h-12 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded-xl flex items-center justify-center transition-colors duration-300 shadow-sm hover:shadow-md flex-shrink-0" 
-                                title="Delete NAS">
-                            <i class="fas fa-trash text-lg"></i>
-                        </button>
+                        <div class="ml-4 flex flex-col space-y-2 flex-shrink-0">
+                            <button onclick="testConnection(${nas.id}, '${nas.nasname.replace(/'/g, "\\'")}')"
+                                    id="test-btn-${nas.id}"
+                                    class="w-12 h-12 bg-blue-100 hover:bg-blue-500 text-blue-600 hover:text-white rounded-xl flex items-center justify-center transition-colors duration-300 shadow-sm hover:shadow-md"
+                                    title="Test Connection">
+                                <i class="fas fa-plug text-lg"></i>
+                            </button>
+                            <button onclick="openEditNasModal(${nas.id}, '${nas.nasname.replace(/'/g, "\\'")}', '${nas.shortname.replace(/'/g, "\\'")}', '${(nas.type||'other')}', ${nas.ports||1812}, '${nas.secret.replace(/'/g, "\\'")}', '${(nas.description||'').replace(/'/g, "\\'")}')"
+                                    class="w-12 h-12 bg-yellow-100 hover:bg-yellow-500 text-yellow-600 hover:text-white rounded-xl flex items-center justify-center transition-colors duration-300 shadow-sm hover:shadow-md"
+                                    title="Edit NAS">
+                                <i class="fas fa-edit text-lg"></i>
+                            </button>
+                            <button onclick="deleteNAS(${nas.id}, '${nas.nasname.replace(/'/g, "\\'")}')"
+                                    class="w-12 h-12 bg-red-100 hover:bg-red-500 text-red-600 hover:text-white rounded-xl flex items-center justify-center transition-colors duration-300 shadow-sm hover:shadow-md"
+                                    title="Delete NAS">
+                                <i class="fas fa-trash text-lg"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -249,6 +360,52 @@
                     </button>
                 </div>
             `;
+        }
+    }
+
+    async function loadStatusBadges() {
+        try {
+            const data = await apiCall('/api/nas/status');
+            if (!data.success) return;
+            data.nas_status.forEach(nas => {
+                const badge = document.getElementById('status-badge-' + nas.id);
+                const dot = document.getElementById('status-dot-' + nas.id);
+                if (!badge) return;
+                if (nas.status === 'online') {
+                    badge.className = 'text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 bg-green-100 text-green-700';
+                    badge.innerHTML = '<i class="fas fa-circle mr-1 text-green-500"></i>Online';
+                    if (dot) dot.className = 'absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-green-500';
+                } else {
+                    badge.className = 'text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 bg-red-100 text-red-700';
+                    badge.innerHTML = '<i class="fas fa-circle mr-1 text-red-400"></i>Offline';
+                    if (dot) dot.className = 'absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-red-500';
+                }
+            });
+        } catch (e) { console.error('Status check error:', e); }
+    }
+
+    async function testConnection(nasId, nasName) {
+        const btn = document.getElementById('test-btn-' + nasId);
+        const badge = document.getElementById('status-badge-' + nasId);
+        const dot = document.getElementById('status-dot-' + nasId);
+        if (btn) { btn.innerHTML = '<i class="fas fa-circle-notch fa-spin text-lg"></i>'; btn.disabled = true; }
+        try {
+            const data = await apiCall('/api/nas/status');
+            if (data.success) {
+                const found = data.nas_status.find(n => n.id === nasId);
+                if (found) {
+                    const online = found.status === 'online';
+                    if (badge) {
+                        badge.className = `text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 ${online ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
+                        badge.innerHTML = `<i class="fas fa-circle mr-1 ${online ? 'text-green-500' : 'text-red-400'}"></i>${online ? 'Online' : 'Offline'}`;
+                    }
+                    if (dot) dot.className = `absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${online ? 'bg-green-500' : 'bg-red-500'}`;
+                    showNotification(`${nasName}: ${online ? '✅ Online' : '❌ Offline'}`, online ? 'success' : 'error');
+                }
+            }
+        } catch (e) { showNotification('Test connection failed: ' + e.message, 'error'); }
+        finally {
+            if (btn) { btn.innerHTML = '<i class="fas fa-plug text-lg"></i>'; btn.disabled = false; }
         }
     }
 
@@ -294,14 +451,24 @@
         }
     });
 
-    async function deleteNAS(nasId) {
-        if (!confirm('Are you sure you want to delete this NAS device?\n\nThis action cannot be undone.')) return;
+    let _deleteNasId = null;
 
+    function deleteNAS(nasId, nasName) {
+        _deleteNasId = nasId;
+        document.getElementById('deleteNasName').textContent = nasName;
+        document.getElementById('deleteNasModal').classList.remove('hidden');
+    }
+
+    function closeDeleteNasModal() {
+        _deleteNasId = null;
+        document.getElementById('deleteNasModal').classList.add('hidden');
+    }
+
+    async function confirmDeleteNas() {
+        if (!_deleteNasId) return;
+        closeDeleteNasModal();
         try {
-            const result = await apiCall('/api/nas/delete/' + nasId, {
-                method: 'DELETE'
-            });
-
+            const result = await apiCall('/api/nas/delete/' + _deleteNasId, { method: 'DELETE' });
             if (result.success) {
                 showNotification(result.message, 'success');
                 loadNAS();
@@ -313,8 +480,59 @@
         }
     }
 
+    function openEditNasModal(id, nasname, shortname, type, ports, secret, description) {
+        document.getElementById('editNasId').value = id;
+        document.getElementById('editNasName').value = nasname;
+        document.getElementById('editShortname').value = shortname;
+        document.getElementById('editType').value = type;
+        document.getElementById('editPorts').value = ports;
+        document.getElementById('editSecret').value = secret;
+        document.getElementById('editDescription').value = description;
+        document.getElementById('editNasModal').classList.remove('hidden');
+    }
+
+    function closeEditNasModal() {
+        document.getElementById('editNasModal').classList.add('hidden');
+    }
+
+    document.getElementById('editNasForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const id = document.getElementById('editNasId').value;
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+        submitBtn.disabled = true;
+        try {
+            const data = {
+                nasname: document.getElementById('editNasName').value,
+                shortname: document.getElementById('editShortname').value,
+                type: document.getElementById('editType').value,
+                ports: parseInt(document.getElementById('editPorts').value),
+                secret: document.getElementById('editSecret').value,
+                description: document.getElementById('editDescription').value
+            };
+            const result = await apiCall('/api/nas/edit/' + id, { method: 'PUT', body: JSON.stringify(data) });
+            if (result.success) {
+                showNotification(result.message, 'success');
+                closeEditNasModal();
+                loadNAS().then(() => loadStatusBadges());
+            } else {
+                showNotification('Failed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showNotification('Network error: ' + error.message, 'error');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
     document.addEventListener('DOMContentLoaded', function() {
-        loadNAS();
+        loadNAS().then(() => loadStatusBadges());
+        // Auto-refresh status setiap 30 detik
+        setInterval(loadStatusBadges, 30000);
+        // Auto-refresh data setiap 60 detik
+        setInterval(() => loadNAS().then(() => loadStatusBadges()), 60000);
     });
 </script>
 {% endblock %}

@@ -22,15 +22,15 @@ sql {
         
         type {
             start {
-                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), 0, 0, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}')"
+                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), NOW(), 0, 0, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}') ON CONFLICT (acctuniqueid) DO UPDATE SET acctupdatetime = NOW()"
             }
             
             stop {
-                query = "UPDATE radacct SET acctstoptime = NOW(), acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0}, acctterminatecause = '%{Acct-Terminate-Cause}' WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}'"
+                query = "UPDATE radacct SET acctstoptime = NOW(), acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0}, acctterminatecause = '%{Acct-Terminate-Cause}', acctupdatetime = NOW() WHERE acctuniqueid = '%{Acct-Unique-Session-Id}'"
             }
             
             interim-update {
-                query = "UPDATE radacct SET acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0} WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}'"
+                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', NOW(), %{%{Acct-Session-Time}:-0}, %{%{Acct-Input-Octets}:-0}, %{%{Acct-Output-Octets}:-0}, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}') ON CONFLICT (acctuniqueid) DO UPDATE SET acctsessiontime = EXCLUDED.acctsessiontime, acctinputoctets = EXCLUDED.acctinputoctets, acctoutputoctets = EXCLUDED.acctoutputoctets, acctupdatetime = NOW()"
             }
         }
     }

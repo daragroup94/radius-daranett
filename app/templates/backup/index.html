@@ -389,9 +389,6 @@ function downloadBackup(filename) {
 function showRestoreModal(filename) {
     document.getElementById('restoreFilename').textContent = filename;
     document.getElementById('restoreModal').classList.remove('hidden');
-    
-    // Initialize Lucide icons for modal
-    lucide.createIcons();
 }
 
 function hideRestoreModal() {
@@ -448,9 +445,6 @@ async function deleteBackup(filename) {
 
 function uploadBackup() {
     document.getElementById('uploadModal').classList.remove('hidden');
-    
-    // Initialize Lucide icons for modal
-    lucide.createIcons();
 }
 
 function hideUploadModal() {
@@ -492,47 +486,6 @@ function formatBytes(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-xl shadow-lg z-50 flex items-center space-x-2 transform transition-all duration-300 translate-x-full`;
-    
-    const colors = {
-        success: 'bg-green-500 text-white',
-        error: 'bg-red-500 text-white',
-        info: 'bg-blue-500 text-white',
-        warning: 'bg-yellow-500 text-white'
-    };
-    
-    notification.classList.add(...colors[type].split(' '));
-    
-    const icons = {
-        success: 'check-circle',
-        error: 'alert-circle',
-        info: 'info',
-        warning: 'alert-triangle'
-    };
-    
-    notification.innerHTML = `
-        <i data-lucide="${icons[type]}" class="lucide"></i>
-        <span class="font-semibold">${message}</span>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Initialize Lucide icon for notification
-    lucide.createIcons();
-    
-    setTimeout(() => {
-        notification.classList.remove('translate-x-full');
-        notification.classList.add('translate-x-0');
-    }, 100);
-    
-    setTimeout(() => {
-        notification.classList.add('translate-x-full');
-        setTimeout(() => {
-            document.body.removeChild(notification);
-        }, 300);
-    }, 5000);
-}
+
 </script>
 {% endblock %}

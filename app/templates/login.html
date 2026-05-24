@@ -86,6 +86,7 @@
                 </div>
 
                 <form method="POST" action="/login" id="loginForm" class="space-y-5 sm:space-y-6">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     {% if mfa_required %}
                     <input type="hidden" name="username" value="{{ username }}">
                     <input type="hidden" name="password" value="{{ password }}">

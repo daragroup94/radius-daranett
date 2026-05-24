@@ -79,7 +79,7 @@ preacct {
 }
 
 accounting {
-    detail
+    
     unix
     sql
     exec

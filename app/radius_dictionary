@@ -1,0 +1,10 @@
+ATTRIBUTE	User-Name		1	string
+ATTRIBUTE	NAS-IP-Address		4	ipaddr
+ATTRIBUTE	Acct-Session-Id		44	string
+ATTRIBUTE	Event-Timestamp		55	date
+ATTRIBUTE	Message-Authenticator	80	octets
+
+VENDOR		Mikrotik		14988
+BEGIN-VENDOR	Mikrotik
+ATTRIBUTE	Mikrotik-Rate-Limit	8	string
+END-VENDOR	Mikrotik

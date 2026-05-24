@@ -21,103 +21,115 @@
 {% block content %}
 <div class="fade-in">
     <div class="modern-card rounded-3xl p-8 shadow-xl">
-        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 space-y-4 lg:space-y-0">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div class="flex items-center">
-                <div class="w-16 h-16 icon-gradient-sessions rounded-2xl flex items-center justify-center mr-4 shadow-lg floating-icon">
-                    <i class="fas fa-signal text-white text-3xl"></i>
+                <div class="w-12 h-12 icon-gradient-sessions rounded-xl flex items-center justify-center mr-3 shadow-lg floating-icon">
+                    <i class="fas fa-signal text-white text-xl"></i>
                 </div>
                 <div>
-                    <h3 class="text-2xl font-bold text-gray-800 dark:text-white">Active PPPoE Sessions</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Real-time connection monitoring with detailed information</p>
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white">Active PPPoE Sessions</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Real-time connection monitoring</p>
                 </div>
             </div>
-            <div class="flex space-x-3">
-                <button onclick="loadSessions()" class="modern-btn bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-5 py-3 rounded-xl flex items-center space-x-2 font-semibold shadow-lg">
-                    <i class="fas fa-sync-alt"></i>
-                    <span>Refresh</span>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="loadSessions()" class="text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                    <i class="fas fa-sync-alt"></i><span>Refresh</span>
                 </button>
-                <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="modern-btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-5 py-3 rounded-xl flex items-center space-x-2 font-semibold shadow-lg">
-                    <i class="fas fa-play"></i>
-                    <span>Auto Refresh</span>
+                <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#10b981,#059669);">
+                    <i class="fas fa-play"></i><span>Auto</span>
+                </button>
+                <button onclick="disconnectAllDuplicates()" id="disconnectDupBtn" class="hidden text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
+                    <i class="fas fa-user-times"></i><span>Putus Semua Ganda</span>
+                </button>
+                <button onclick="cleanupSessions()" class="text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#f97316,#ef4444);">
+                    <i class="fas fa-broom"></i><span>Cleanup</span>
                 </button>
             </div>
         </div>
 
         <!-- Session Statistics Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="stat-card-modern rounded-2xl p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 shadow-lg">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+            <div class="rounded-xl p-4 bg-blue-50 border border-blue-200">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-bold text-blue-700 uppercase tracking-wider mb-2">Total Sessions</p>
-                        <p id="totalSessions" class="text-4xl font-black text-blue-900">0</p>
+                        <p class="text-xs font-bold text-blue-600 uppercase tracking-wider">Sessions</p>
+                        <p id="totalSessions" class="text-2xl font-black text-blue-900">0</p>
                     </div>
-                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i class="fas fa-users text-white text-2xl"></i>
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                        <i class="fas fa-users text-white text-sm"></i>
                     </div>
                 </div>
             </div>
-            
-            <div class="stat-card-modern rounded-2xl p-6 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-lg">
+            <div class="rounded-xl p-4 bg-red-50 border border-red-200 cursor-pointer hover:bg-red-100 transition-colors" onclick="toggleDuplicateFilter()">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-bold text-green-700 uppercase tracking-wider mb-2">Total Download</p>
-                        <p id="totalDownload" class="text-3xl font-black text-green-900">0 GB</p>
+                        <p class="text-xs font-bold text-red-600 uppercase tracking-wider">Ganda</p>
+                        <p id="totalDuplicates" class="text-2xl font-black text-red-900">0</p>
                     </div>
-                    <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i class="fas fa-download text-white text-2xl"></i>
+                    <div class="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-clone text-white text-sm"></i>
                     </div>
                 </div>
             </div>
-            
-            <div class="stat-card-modern rounded-2xl p-6 bg-gradient-to-br from-purple-50 to-violet-50 border-2 border-purple-200 shadow-lg">
+            <div class="rounded-xl p-4 bg-green-50 border border-green-200">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-bold text-purple-700 uppercase tracking-wider mb-2">Total Upload</p>
-                        <p id="totalUpload" class="text-3xl font-black text-purple-900">0 GB</p>
+                        <p class="text-xs font-bold text-green-600 uppercase tracking-wider">Download</p>
+                        <p id="totalDownload" class="text-2xl font-black text-green-900">0 B</p>
                     </div>
-                    <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i class="fas fa-upload text-white text-2xl"></i>
+                    <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-download text-white text-sm"></i>
                     </div>
                 </div>
             </div>
-            
-            <div class="stat-card-modern rounded-2xl p-6 bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 shadow-lg">
+            <div class="rounded-xl p-4 bg-purple-50 border border-purple-200">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-bold text-orange-700 uppercase tracking-wider mb-2">Avg Duration</p>
-                        <p id="avgDuration" class="text-3xl font-black text-orange-900">0h 0m</p>
+                        <p class="text-xs font-bold text-purple-600 uppercase tracking-wider">Upload</p>
+                        <p id="totalUpload" class="text-2xl font-black text-purple-900">0 B</p>
                     </div>
-                    <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i class="fas fa-clock text-white text-2xl"></i>
+                    <div class="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-upload text-white text-sm"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="rounded-xl p-4 bg-orange-50 border border-orange-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-orange-600 uppercase tracking-wider">Avg Duration</p>
+                        <p id="avgDuration" class="text-2xl font-black text-orange-900">0h 0m</p>
+                    </div>
+                    <div class="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-clock text-white text-sm"></i>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Filter & Search -->
-        <div class="bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl p-6 mb-8 border-2 border-gray-200 shadow-lg">
-            <div class="flex flex-wrap items-center gap-4">
-                <div class="flex-1 min-w-[250px]">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">
-                        <i class="fas fa-search mr-2"></i>Search Username
-                    </label>
-                    <input type="text" id="searchInput" placeholder="Type to search..." 
-                           class="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 font-medium transition-all"
-                           onkeyup="filterSessions()">
+        <div class="flex flex-wrap gap-3 mb-5">
+            <div class="relative flex-1 min-w-[200px]">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400 text-xs"></i>
                 </div>
-                <div class="min-w-[200px]">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">
-                        <i class="fas fa-sort mr-2"></i>Sort By
-                    </label>
-                    <select id="sortBy" onchange="sortSessions()" class="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 font-medium transition-all">
-                        <option value="duration_desc">Duration (Longest)</option>
-                        <option value="duration_asc">Duration (Shortest)</option>
-                        <option value="download_desc">Download (Highest)</option>
-                        <option value="upload_desc">Upload (Highest)</option>
-                        <option value="username_asc">Username (A-Z)</option>
-                    </select>
-                </div>
+                <input type="text" id="searchInput" placeholder="Cari username..." 
+                       class="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-gray-800 text-sm transition-all"
+                       onkeyup="filterSessions()">
             </div>
+            <select id="filterNas" onchange="filterSessions()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 text-sm focus:ring-2 focus:ring-indigo-400">
+                <option value="">Semua NAS</option>
+            </select>
+            <select id="filterDuplicate" onchange="filterSessions()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 text-sm focus:ring-2 focus:ring-red-400">
+                <option value="">Semua Session</option>
+                <option value="duplicate">Ganda Only</option>
+            </select>
+            <select id="sortBy" onchange="sortSessions()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 text-sm focus:ring-2 focus:ring-indigo-400">
+                <option value="duration_desc">Duration (Terlama)</option>
+                <option value="duration_asc">Duration (Tercepat)</option>
+                <option value="download_desc">Download (Terbesar)</option>
+                <option value="upload_desc">Upload (Terbesar)</option>
+                <option value="username_asc">Username (A-Z)</option>
+            </select>
         </div>
 
         <!-- Sessions List -->
@@ -138,12 +150,16 @@
 {% block scripts %}
 <script>
     let allSessions = [];
+    let duplicateUsernames = new Set();
     let autoRefreshInterval = null;
     let isAutoRefresh = false;
 
     async function loadSessions() {
         try {
-            const data = await apiCall('/api/sessions');
+            const [data, dupes] = await Promise.all([
+                apiCall('/api/sessions'),
+                apiCall('/api/sessions/duplicates')
+            ]);
             const sessionsList = document.getElementById('sessionsList');
             
             if (data.error) {
@@ -163,6 +179,15 @@
             }
 
             allSessions = data;
+            duplicateUsernames = new Set((dupes || []).map(d => d.username));
+
+            // Tampilkan/sembunyikan tombol putus semua ganda
+            const dupBtn = document.getElementById('disconnectDupBtn');
+            if (duplicateUsernames.size > 0) {
+                dupBtn.classList.remove('hidden');
+            } else {
+                dupBtn.classList.add('hidden');
+            }
 
             if (data.length === 0) {
                 sessionsList.innerHTML = `
@@ -174,11 +199,11 @@
                         <p class="text-gray-500">All PPPoE connections are currently idle</p>
                     </div>
                 `;
-                updateStatistics(data);
+                updateStatistics(data, dupes || []);
                 return;
             }
 
-            updateStatistics(data);
+            updateStatistics(data, dupes || []);
             displaySessions(data);
 
         } catch (error) {
@@ -198,121 +223,49 @@
         sessionsList.innerHTML = sessions.map((session, index) => {
             const duration = formatDuration(session.acctsessiontime || 0);
             const startTime = new Date(session.acctstarttime).toLocaleString('id-ID', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
             });
+            const isDuplicate = duplicateUsernames.has(session.username);
             
             return `
-                <div class="bg-white rounded-2xl p-6 border border-blue-200 hover:border-blue-400 hover:shadow-md transition-[transform,box-shadow,border-color] duration-300 transform hover:-translate-y-0.5" style="contain: content;">
-                    <!-- Header -->
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="flex items-center space-x-4">
-                            <div class="relative">
-                                <div class="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-md">
-                                    <i class="fas fa-user text-white text-xl"></i>
+                <div class="bg-white rounded-xl p-3 border ${isDuplicate ? 'border-red-300 bg-red-50' : 'border-gray-100'} hover:border-indigo-300 hover:shadow-sm transition-all duration-200" style="contain: content;">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                            <div class="relative flex-shrink-0">
+                                <div class="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm" style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                                    <i class="fas fa-user text-white text-sm"></i>
                                 </div>
-                                <div class="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white pulse-ring"></div>
+                                <div class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white pulse-ring"></div>
                             </div>
-                            <div>
-                                <h4 class="font-black text-gray-800 text-2xl">${session.username}</h4>
-                                <p class="text-xs text-gray-500 font-medium mt-1">Session #${index + 1} • ${session.acctsessionid}</p>
-                            </div>
-                        </div>
-                        <span class="bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs px-4 py-2 rounded-full font-bold shadow-md flex items-center space-x-2">
-                            <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                            <span>LIVE</span>
-                        </span>
-                    </div>
-                    
-                    <!-- Network Info Grid -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-                                <i class="fas fa-server text-blue-500 mr-2"></i>NAS IP
-                            </p>
-                            <p class="font-mono text-sm font-bold text-gray-800">${session.nasipaddress}</p>
-                        </div>
-                        
-                        <div class="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-                                <i class="fas fa-network-wired text-green-500 mr-2"></i>Client IP
-                            </p>
-                            <p class="font-mono text-sm font-bold ${session.framedipaddress ? 'text-blue-600' : 'text-gray-400'}">${session.framedipaddress || 'Dynamic'}</p>
-                        </div>
-                        
-                        <div class="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-                                <i class="fas fa-ethernet text-purple-500 mr-2"></i>NAS Port
-                            </p>
-                            <p class="text-sm font-bold text-gray-800">${session.nasportid || 'N/A'}</p>
-                        </div>
-                        
-                        <div class="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200">
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center">
-                                <i class="fas fa-sitemap text-orange-500 mr-2"></i>Port Type
-                            </p>
-                            <p class="text-sm font-bold text-gray-800">${session.nasporttype || 'Virtual'}</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Time Info Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-blue-50 rounded-xl p-4 shadow-sm border border-blue-100">
-                            <p class="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2 flex items-center">
-                                <i class="fas fa-calendar-alt mr-2"></i>Start Time
-                            </p>
-                            <p class="text-sm font-bold text-gray-800">${startTime}</p>
-                        </div>
-                        
-                        <div class="bg-purple-50 rounded-xl p-4 shadow-sm border border-purple-100">
-                            <p class="text-xs font-bold text-purple-700 uppercase tracking-wider mb-2 flex items-center">
-                                <i class="fas fa-hourglass-half mr-2"></i>Duration
-                            </p>
-                            <p class="text-sm font-bold text-purple-600">${duration}</p>
-                        </div>
-                        
-                        <div class="bg-green-50 rounded-xl p-4 shadow-sm border border-green-100">
-                            <p class="text-xs font-bold text-green-700 uppercase tracking-wider mb-2 flex items-center">
-                                <i class="fas fa-layer-group mr-2"></i>Protocol
-                            </p>
-                            <p class="text-sm font-bold text-gray-800">${session.framedprotocol || 'PPP'}</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Data Usage -->
-                    ${(session.acctinputoctets || session.acctoutputoctets) ? `
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-5 rounded-2xl shadow-md">
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-sm font-bold text-white uppercase tracking-wider">Download</span>
-                                    <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                                        <i class="fas fa-download text-white"></i>
-                                    </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    <h4 class="font-bold text-gray-800 text-sm truncate">${session.username}</h4>
+                                    <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 flex-shrink-0">
+                                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>LIVE
+                                    </span>
+                                    ${isDuplicate ? '<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0"><i class="fas fa-clone mr-1"></i>GANDA</span>' : ''}
                                 </div>
-                                <p class="text-3xl font-black text-white mb-1">${formatBytes(session.acctinputoctets || 0)}</p>
-                                <p class="text-xs text-blue-200 font-medium">${formatBytesShort(session.acctinputoctets || 0)}</p>
-                            </div>
-                            <div class="bg-gradient-to-br from-purple-500 to-violet-600 p-5 rounded-2xl shadow-md">
-                                <div class="flex items-center justify-between mb-3">
-                                    <span class="text-sm font-bold text-white uppercase tracking-wider">Upload</span>
-                                    <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                                        <i class="fas fa-upload text-white"></i>
-                                    </div>
+                                <div class="flex flex-wrap gap-3 text-xs text-gray-500">
+                                    <span title="NAS IP"><i class="fas fa-server text-blue-400 mr-1"></i>${session.nasipaddress}</span>
+                                    <span title="Client IP"><i class="fas fa-network-wired text-green-400 mr-1"></i>${session.framedipaddress || 'Dynamic'}</span>
+                                    <span title="Duration"><i class="fas fa-clock text-purple-400 mr-1"></i><span class="session-timer font-mono font-bold text-purple-600" data-start="${session.acctstarttime}">${duration}</span></span>
+                                    <span title="Start"><i class="fas fa-calendar-alt text-orange-400 mr-1"></i>${startTime}</span>
+                                    ${session.acctinputoctets ? `<span title="DL/UL"><i class="fas fa-download text-indigo-400 mr-1"></i>${formatBytes(session.acctinputoctets)} / <i class="fas fa-upload text-pink-400 mr-1"></i>${formatBytes(session.acctoutputoctets || 0)}</span>` : ''}
                                 </div>
-                                <p class="text-3xl font-black text-white mb-1">${formatBytes(session.acctoutputoctets || 0)}</p>
-                                <p class="text-xs text-purple-200 font-medium">${formatBytesShort(session.acctoutputoctets || 0)}</p>
                             </div>
                         </div>
-                    ` : ''}
+                        <button onclick="disconnectSession('${session.acctsessionid}', '${session.username}')"
+                                class="flex-shrink-0 w-8 h-8 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors flex items-center justify-center"
+                                title="Disconnect">
+                            <i class="fas fa-plug text-xs"></i>
+                        </button>
+                    </div>
                 </div>
             `;
         }).join('');
     }
 
-    function updateStatistics(sessions) {
+    function updateStatistics(sessions, dupes) {
         const totalSessions = sessions.length;
         let totalDownload = 0;
         let totalUpload = 0;
@@ -325,6 +278,7 @@
         });
 
         document.getElementById('totalSessions').textContent = totalSessions;
+        document.getElementById('totalDuplicates').textContent = (dupes || []).length;
         document.getElementById('totalDownload').textContent = formatBytes(totalDownload);
         document.getElementById('totalUpload').textContent = formatBytes(totalUpload);
         
@@ -364,11 +318,21 @@
     }
 
     function filterSessions() {
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        const filtered = allSessions.filter(session => 
-            session.username.toLowerCase().includes(searchTerm)
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const nas = document.getElementById('filterNas').value;
+        const dupFilter = document.getElementById('filterDuplicate').value;
+        const filtered = allSessions.filter(s =>
+            s.username.toLowerCase().includes(search) &&
+            (!nas || s.nasipaddress === nas) &&
+            (!dupFilter || (dupFilter === 'duplicate' && duplicateUsernames.has(s.username)))
         );
         displaySessions(filtered);
+    }
+
+    function toggleDuplicateFilter() {
+        const sel = document.getElementById('filterDuplicate');
+        sel.value = sel.value === 'duplicate' ? '' : 'duplicate';
+        filterSessions();
     }
 
     function sortSessions() {
@@ -398,24 +362,75 @@
 
     function toggleAutoRefresh() {
         const btn = document.getElementById('autoRefreshBtn');
-        
         if (isAutoRefresh) {
             clearInterval(autoRefreshInterval);
             isAutoRefresh = false;
-            btn.innerHTML = '<i class="fas fa-play"></i><span>Auto Refresh</span>';
-            btn.className = 'modern-btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-5 py-3 rounded-xl flex items-center space-x-2 font-semibold shadow-lg';
+            btn.innerHTML = '<i class="fas fa-play"></i><span>Auto</span>';
+            btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
             showNotification('Auto refresh stopped', 'info');
         } else {
             autoRefreshInterval = setInterval(loadSessions, 10000);
             isAutoRefresh = true;
-            btn.innerHTML = '<i class="fas fa-stop"></i><span>Stop Auto</span>';
-            btn.className = 'modern-btn bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white px-5 py-3 rounded-xl flex items-center space-x-2 font-semibold shadow-lg';
-            showNotification('Auto refresh active (every 10s)', 'success');
+            btn.innerHTML = '<i class="fas fa-stop"></i><span>Stop</span>';
+            btn.style.background = 'linear-gradient(135deg,#ef4444,#be123c)';
+            showNotification('Auto refresh aktif (10s)', 'success');
         }
+    }
+
+    async function cleanupSessions() {
+        if (!confirm('Hapus semua stale sessions (tidak ada update >30 menit)?\nSession PPPoE aktif tidak akan terpengaruh.')) return;
+        try {
+            const r = await fetch('/api/sessions/cleanup', {method: 'POST'});
+            const result = await r.json();
+            showNotification(result.message || result.error, result.success ? 'success' : 'error');
+            if (result.success) setTimeout(loadSessions, 500);
+        } catch(e) { showNotification(e.message, 'error'); }
+    }
+
+    async function disconnectSession(sessionId, username) {
+        if (!confirm(`Disconnect user "${username}"?\nThis will terminate their PPPoE connection immediately.`)) return;
+        try {
+            const r = await fetch(`/api/sessions/disconnect/${sessionId}`, {method: 'POST'});
+            const result = await r.json();
+            showNotification(result.message || result.error, result.success ? 'success' : 'error');
+            if (result.success) setTimeout(loadSessions, 1000);
+        } catch(e) { showNotification(e.message, 'error'); }
+    }
+
+    async function disconnectAllDuplicates() {
+        if (!confirm(`Putus semua session duplikat (${duplicateUsernames.size} username)?\nSession terbaru per user akan dipertahankan.`)) return;
+        try {
+            const r = await fetch('/api/sessions/duplicates/disconnect', {method: 'POST'});
+            const result = await r.json();
+            showNotification(result.message || result.error, result.success ? 'success' : 'error');
+            if (result.success) setTimeout(loadSessions, 1000);
+        } catch(e) { showNotification(e.message, 'error'); }
     }
 
     document.addEventListener('DOMContentLoaded', function() {
         loadSessions();
+        loadNasFilter();
+        // Timer real-time: update setiap detik
+        setInterval(() => {
+            document.querySelectorAll('.session-timer[data-start]').forEach(el => {
+                const start = new Date(el.dataset.start);
+                const secs = Math.floor((Date.now() - start.getTime()) / 1000);
+                el.textContent = formatDuration(secs > 0 ? secs : 0);
+            });
+        }, 1000);
     });
+
+    async function loadNasFilter() {
+        try {
+            const nas = await apiCall('/api/nas');
+            const sel = document.getElementById('filterNas');
+            (nas || []).forEach(n => {
+                const opt = document.createElement('option');
+                opt.value = n.nasname;
+                opt.textContent = n.shortname || n.nasname;
+                sel.appendChild(opt);
+            });
+        } catch(e) {}
+    }
 </script>
 {% endblock %}

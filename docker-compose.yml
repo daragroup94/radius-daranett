@@ -16,13 +16,13 @@ services:
       - "traefik.enable=true"
       # HTTP (Redirect to HTTPS)
       - "traefik.http.routers.radius.entrypoints=web"
-      - "traefik.http.routers.radius.rule=Host(`radius.access.daranett.com`)"
+      - "traefik.http.routers.radius.rule=Host(`radius.access.daragroup.cloud`)"
       - "traefik.http.routers.radius.middlewares=radius-https-redirect"
       - "traefik.http.middlewares.radius-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.radius-https-redirect.redirectscheme.permanent=true"
       # HTTPS (Secure)
       - "traefik.http.routers.radius-secure.entrypoints=websecure"
-      - "traefik.http.routers.radius-secure.rule=Host(`radius.access.daranett.com`)"
+      - "traefik.http.routers.radius-secure.rule=Host(`radius.access.daragroup.cloud`)"
       - "traefik.http.routers.radius-secure.tls=true"
       - "traefik.http.routers.radius-secure.tls.certresolver=cloudflare"
       - "traefik.http.routers.radius-secure.service=radius-service"
@@ -36,7 +36,8 @@ services:
       - DB_PASSWORD=radiuspass
       - DB_PORT=5432
       - SECRET_KEY=05052020fAk@#
-      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_ORIGINS=https://radius.access.daragroup.cloud
+      - REDIS_URL=redis://10.204.0.53:6379/0
       - FLASK_ENV=production
       - TZ=Asia/Jakarta
     # Volumes
@@ -45,10 +46,12 @@ services:
       - ./uploads:/app/static/uploads
       - ./logs:/app/logs
       - ./backups:/app/backups
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /usr/bin/docker:/usr/bin/docker:ro
     # Network
     networks:
       my-net:
-        ipv4_address: 172.100.10.126
+        ipv4_address: 10.204.0.51
     # Dependencies
     depends_on:
       postgres:
@@ -88,7 +91,7 @@ services:
     # Network
     networks:
       my-net:
-        ipv4_address: 172.100.10.116
+        ipv4_address: 10.204.0.52
     # Health Check
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U radius -d radius"]
@@ -114,7 +117,7 @@ services:
     # Network
     networks:
       my-net:
-        ipv4_address: 172.100.10.117
+        ipv4_address: 10.204.0.53
     # Command
     command: redis-server --appendonly yes --requirepass "" --maxmemory 256mb --maxmemory-policy allkeys-lru --replicaof no one
     # Health Check
@@ -147,16 +150,14 @@ services:
       - "1813:1813/udp"  # Accounting
     # Volumes
     volumes:
-      - ./clients.conf:/etc/freeradius/clients.conf:ro
-#      - ./clients.conf:/etc/freeradius/3.0/clients.conf:ro
+      - ./clients.conf:/etc/freeradius/3.0/clients.conf:ro
       - ./freeradius-config/mods-available/sql:/etc/freeradius/3.0/mods-available/sql:ro
-      - ./freeradius-config/mods-enabled/sql:/etc/freeradius/mods-enabled/sql:ro
-      - ./freeradius-config/sites-enabled/default:/etc/freeradius/sites-enabled/default:ro
+      - ./freeradius-config/sites-enabled/default:/etc/freeradius/3.0/sites-enabled/default:ro
       - ./freeradius-logs:/var/log/freeradius
     # Network
     networks:
       my-net:
-        ipv4_address: 172.100.10.118
+        ipv4_address: 10.204.0.54
     # Command (Debug mode - remove -X for production)
     command: freeradius -X -l stdout
     # Dependencies
@@ -176,13 +177,13 @@ services:
       - "traefik.enable=true"
       # HTTP (Redirect to HTTPS)
       - "traefik.http.routers.pgadmin.entrypoints=web"
-      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.access.daranett.com`)"
+      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.access.daragroup.cloud`)"
       - "traefik.http.routers.pgadmin.middlewares=pgadmin-https-redirect"
       - "traefik.http.middlewares.pgadmin-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.pgadmin-https-redirect.redirectscheme.permanent=true"
       # HTTPS (Secure)
       - "traefik.http.routers.pgadmin-secure.entrypoints=websecure"
-      - "traefik.http.routers.pgadmin-secure.rule=Host(`pgadmin.access.daranett.com`)"
+      - "traefik.http.routers.pgadmin-secure.rule=Host(`pgadmin.access.daragroup.cloud`)"
       - "traefik.http.routers.pgadmin-secure.tls=true"
       - "traefik.http.routers.pgadmin-secure.tls.certresolver=cloudflare"
       - "traefik.http.routers.pgadmin-secure.service=pgadmin-service"
@@ -201,7 +202,7 @@ services:
     # Network
     networks:
       my-net:
-        ipv4_address: 172.100.10.119
+        ipv4_address: 10.204.0.55
     # Dependencies
     depends_on:
       postgres:

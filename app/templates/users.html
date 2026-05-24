@@ -6,8 +6,8 @@
 
 {% block extra_css %}
 <style>
-    .icon-gradient-users { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
-    .icon-gradient-add-user { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .icon-gradient-users { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .icon-gradient-add-user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     .icon-gradient-edit-user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 </style>
 {% endblock %}
@@ -16,35 +16,33 @@
 <div class="fade-in">
     <div class="modern-card rounded-3xl p-8 shadow-xl">
         <!-- Header dengan tombol Add User -->
-        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div class="flex items-center">
-                <div class="w-14 h-14 icon-gradient-users rounded-2xl flex items-center justify-center mr-4 shadow-lg floating-icon">
-                    <i class="fas fa-users text-white text-2xl"></i>
+                <div class="w-12 h-12 icon-gradient-users rounded-xl flex items-center justify-center mr-3 shadow-lg floating-icon">
+                    <i class="fas fa-users text-white text-xl"></i>
                 </div>
                 <div>
-                    <h3 class="text-xl font-bold text-gray-800">PPPoE Users Management</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Manage bandwidth, IP addresses, and user configurations</p>
+                    <h3 class="text-lg font-bold text-gray-800">PPPoE Users</h3>
+                    <p class="text-xs text-gray-500">Manage bandwidth & user configurations</p>
                 </div>
             </div>
             
-            <div class="flex flex-col sm:flex-row w-full lg:w-auto gap-3">
+            <div class="flex items-center gap-3 w-full sm:w-auto">
                 <!-- SEARCH BAR -->
-                <div class="relative flex-1 sm:min-w-[280px]">
-                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <i class="fas fa-search text-gray-400 text-sm"></i>
+                <div class="relative flex-1 sm:w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400 text-xs"></i>
                     </div>
                     <input type="text" id="userSearch" 
-                           class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-gray-800 text-sm font-medium transition-all shadow-sm" 
-                           placeholder="Search username...">
+                           class="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-gray-800 text-sm transition-all" 
+                           placeholder="Cari username...">
                 </div>
-
-                <!-- TOMBOL ADD USER - SANGAT TERLIHAT -->
+                <!-- TOMBOL ADD USER -->
                 <button onclick="openAddUserModal()" 
-                        class="bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 hover:from-emerald-600 hover:via-green-600 hover:to-teal-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 font-bold text-sm shadow-[0_8px_25px_rgba(16,185,129,0.25)] hover:shadow-[0_12px_35px_rgba(16,185,129,0.35)] transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-0.5 border border-white/20 backdrop-blur-sm whitespace-nowrap">
-                    <div class="bg-white/20 rounded-lg p-1">
-                        <i class="fas fa-user-plus text-lg"></i>
-                    </div>
-                    <span class="tracking-wide">Add New User</span>
+                        class="text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md transition-all hover:opacity-90 whitespace-nowrap"
+                        style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Add User</span>
                 </button>
             </div>
         </div>
@@ -250,7 +248,8 @@
                     Cancel
                 </button>
                 <button type="submit" 
-                        class="flex-[2] px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-100 transform hover:scale-[1.02]">
+                        class="flex-[2] px-4 py-3 text-white rounded-xl font-bold text-sm transition-all shadow-lg transform hover:scale-[1.02] hover:opacity-90"
+                        style="background:linear-gradient(135deg,#667eea,#764ba2);">
                     <i class="fas fa-user-plus mr-2"></i>Create User
                 </button>
             </div>
@@ -439,6 +438,148 @@
     </div>
 </div>
 
+<!-- Delete Confirm Modal -->
+<div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="modern-card rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-white/20">
+        <div class="flex items-center mb-4">
+            <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
+                <i class="fas fa-trash text-white text-lg"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 dark:text-white">Delete User</h3>
+        </div>
+        <p class="text-gray-600 dark:text-gray-300 mb-6">Hapus user <strong id="deleteUsername" class="text-red-600"></strong>? Tindakan ini tidak dapat dibatalkan.</p>
+        <div class="flex space-x-3">
+            <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all">Batal</button>
+            <button onclick="confirmDelete()" class="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-semibold transition-all">Hapus</button>
+        </div>
+    </div>
+</div>
+
+<!-- Device Info Modal (GenieACS) -->
+<div id="deviceInfoModal" class="fixed inset-0 flex items-center justify-center hidden z-50 p-4" style="backdrop-filter:blur(6px);background:rgba(15,23,42,0.7)">
+    <div class="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl" style="background:#0f172a;border:1px solid rgba(255,255,255,0.08)">
+
+        <!-- Header -->
+        <div class="px-5 py-4 flex justify-between items-center" style="border-bottom:1px solid rgba(255,255,255,0.07)">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                    <i class="fas fa-satellite-dish text-white text-sm"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-white">ACS Device Info</p>
+                    <p id="deviceInfoUsername" class="text-xs font-mono" style="color:#94a3b8"></p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('deviceInfoModal').classList.add('hidden')"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                    style="background:rgba(255,255,255,0.06);color:#64748b"
+                    onmouseover="this.style.background='rgba(239,68,68,0.15)';this.style.color='#f87171'"
+                    onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#64748b'">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        </div>
+
+        <div class="p-5 max-h-[80vh] overflow-y-auto" style="scrollbar-width:thin;scrollbar-color:#334155 transparent">
+            <!-- Loading -->
+            <div id="deviceInfoLoading" class="text-center py-14">
+                <i class="fas fa-spinner fa-spin text-3xl mb-3" style="color:#6366f1"></i>
+                <p class="text-sm" style="color:#64748b">Menghubungi GenieACS...</p>
+            </div>
+
+            <!-- Not found -->
+            <div id="deviceInfoNotFound" class="hidden text-center py-14">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:rgba(255,255,255,0.05)">
+                    <i class="fas fa-unlink text-2xl" style="color:#334155"></i>
+                </div>
+                <p class="text-sm font-semibold text-white mb-1">Device tidak ditemukan</p>
+                <p id="deviceInfoNotFoundMsg" class="text-xs" style="color:#64748b"></p>
+            </div>
+
+            <!-- Data -->
+            <div id="deviceInfoData" class="hidden space-y-3">
+
+                <!-- RX Power hero card -->
+                <div id="di_rx_card" class="rounded-2xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,0.15)">
+                            <i class="fas fa-signal text-white text-lg"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium mb-0.5" style="color:rgba(255,255,255,0.6)">RX Power</p>
+                            <p id="di_rx_power" class="text-2xl font-black text-white leading-none"></p>
+                        </div>
+                    </div>
+                    <span id="di_rx_badge" class="text-xs font-bold px-3 py-1.5 rounded-xl" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.2)"></span>
+                </div>
+
+                <!-- Device identity row -->
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Manufacturer</p>
+                        <p id="di_manufacturer" class="text-xs font-bold text-white truncate"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Model</p>
+                        <p id="di_model" class="text-xs font-bold text-white truncate"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">PON Mode</p>
+                        <p id="di_pon_mode" class="text-xs font-bold text-white"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="col-span-2 rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Serial Number</p>
+                        <p id="di_serial" class="text-xs font-bold text-white font-mono truncate"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Suhu</p>
+                        <p id="di_temperature" class="text-xs font-bold text-white"></p>
+                    </div>
+                </div>
+
+                <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                    <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Firmware</p>
+                    <p id="di_firmware" class="text-xs font-bold text-white font-mono"></p>
+                </div>
+
+                <!-- Divider -->
+                <div style="border-top:1px solid rgba(255,255,255,0.06)"></div>
+
+                <!-- Connection info -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="rounded-xl p-3" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1" style="color:#34d399">
+                            <i class="fas fa-network-wired"></i> PPPoE IP
+                        </p>
+                        <p id="di_pppoe_ip" class="text-xs font-bold text-white font-mono"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1" style="color:#34d399">
+                            <i class="fas fa-clock"></i> PPP Uptime
+                        </p>
+                        <p id="di_ppp_uptime" class="text-xs font-bold text-white"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1" style="color:#475569">
+                            <i class="fas fa-power-off"></i> Device Uptime
+                        </p>
+                        <p id="di_device_uptime" class="text-xs font-bold text-white"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1" style="color:#475569">
+                            <i class="fas fa-sync"></i> Last Inform
+                        </p>
+                        <p id="di_last_inform" class="text-xs font-bold text-white"></p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -525,10 +666,10 @@
     // === FUNGSI UTAMA: editUser dan loadUsers ===
     async function editUser(username) {
         try {
-            const response = await fetch('/api/users');
-            if (!response.ok) throw new Error('Failed to fetch users');
-            const users = await response.json();
-            const user = users.find(u => u.username === username);
+            const response = await fetch(`/api/users?search=${encodeURIComponent(username)}&limit=1`);
+            if (!response.ok) throw new Error('Failed to fetch user');
+            const result = await response.json();
+            const user = (result.users || []).find(u => u.username === username);
             
             if (!user) {
                 showNotification('User not found!', 'error');
@@ -661,51 +802,36 @@
 
             let html = '';
             users.forEach(user => {
-                const statusBadge = user.active_sessions > 0 
-                    ? '<span class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center"><span class="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></span>Active</span>'
-                    : '<span class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">Inactive</span>';
-                
-                html += `
-                    <div class="bg-white rounded-2xl p-4 border border-gray-100 hover:border-green-400 hover:shadow-md transition-[transform,box-shadow,border-color] duration-300 transform hover:-translate-y-0.5" style="contain: content;">
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center space-x-4 flex-1">
-                                <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-                                    <i class="fas fa-user text-white text-xl"></i>
-                                </div>
-                                <div class="flex-1">
-                                    <div class="flex items-center space-x-3 mb-1">
-                                        <h4 class="font-bold text-gray-800 text-lg">${user.username}</h4>
-                                        ${statusBadge}
-                                    </div>
-                                    <div class="flex flex-wrap gap-4 text-xs">
-                                        <div class="flex items-center text-gray-600">
-                                            <i class="fas fa-network-wired text-blue-500 mr-1.5 w-4 text-center"></i>
-                                            <span class="font-medium">IP:</span>
-                                            <span class="ml-1 font-bold text-gray-800">${user.ip_address || 'Dynamic'}</span>
-                                        </div>
-                                        <div class="flex items-center text-gray-600">
-                                            <i class="fas fa-tachometer-alt text-purple-500 mr-1.5 w-4 text-center"></i>
-                                            <span class="font-medium">Rate:</span>
-                                            <code class="ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-purple-700 font-mono font-bold">${user.rate_limit || 'Not set'}</code>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex space-x-2 ml-4">
-                                <button onclick="editUser('${user.username}')" 
-                                        class="w-9 h-9 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg transition-colors" 
-                                        title="Edit">
-                                    <i class="fas fa-edit text-sm"></i>
-                                </button>
-                                <button onclick="deleteUser(${user.id}, '${user.username}')" 
-                                        class="w-9 h-9 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors" 
-                                        title="Delete">
-                                    <i class="fas fa-trash text-sm"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                const isOnline = user.active_sessions > 0;
+                const statusBadge = isOnline
+                    ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 flex-shrink-0"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>Online</span>'
+                    : '<span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0">Offline</span>';
+                const throttleBtns = isOnline
+                    ? '<button onclick="throttleUser(\'' + user.username + '\')" class="w-8 h-8 bg-yellow-50 hover:bg-yellow-500 text-yellow-600 hover:text-white rounded-lg transition-colors" title="Throttle"><i class="fas fa-tachometer-alt text-xs"></i></button>'
+                    + '<button onclick="unthrottleUser(\'' + user.username + '\')" class="w-8 h-8 bg-green-50 hover:bg-green-500 text-green-600 hover:text-white rounded-lg transition-colors" title="Unthrottle"><i class="fas fa-rocket text-xs"></i></button>'
+                    : '';
+                const userId = user.id;
+                const uname = user.username;
+
+                html += '<div class="bg-white rounded-xl p-3 border border-gray-100 hover:border-indigo-300 hover:shadow-sm transition-all duration-200">'
+                    + '<div class="flex justify-between items-center">'
+                    + '<div class="flex items-center gap-3 flex-1 min-w-0">'
+                    + '<div class="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0" style="background:linear-gradient(135deg,#667eea,#764ba2);"><i class="fas fa-user text-white text-sm"></i></div>'
+                    + '<div class="flex-1 min-w-0">'
+                    + '<div class="flex items-center gap-2 mb-0.5">'
+                    + '<h4 class="font-bold text-gray-800 text-sm truncate">' + uname + '</h4>'
+                    + statusBadge
+                    + '</div>'
+                    + '<div class="flex flex-wrap gap-3 text-xs text-gray-500">'
+                    + '<span><i class="fas fa-network-wired text-blue-400 mr-1"></i>' + (user.ip_address || 'Dynamic') + '</span>'
+                    + '<span><i class="fas fa-tachometer-alt text-purple-400 mr-1"></i><code class="text-purple-600 font-mono">' + (user.rate_limit || 'Not set') + '</code></span>'
+                    + '</div></div></div>'
+                    + '<div class="flex gap-1.5 ml-3 flex-shrink-0">'
+                    + '<button onclick="showDeviceInfo(\'' + uname + '\')" class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs transition-all hover:opacity-80" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);" title="Device Info"><i class="fas fa-satellite-dish"></i></button>'
+                    + '<button onclick="editUser(\'' + uname + '\')" class="w-8 h-8 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg transition-colors" title="Edit"><i class="fas fa-edit text-xs"></i></button>'
+                    + throttleBtns
+                    + '<button onclick="deleteUser(' + userId + ', \'' + uname + '\')" class="w-8 h-8 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors" title="Delete"><i class="fas fa-trash text-xs"></i></button>'
+                    + '</div></div></div>';
             });
             usersList.innerHTML = html;
         } catch (error) {
@@ -720,13 +846,49 @@
         }
     }
 
-    async function deleteUser(userId, username) {
-        if (!confirm(`Delete user "${username}"?`)) return;
-        
+    async function throttleUser(username) {
+        const rate = prompt(`Throttle "${username}" to speed (e.g. 512k/512k, 1M/1M):`, '512k/512k');
+        if (!rate) return;
         try {
-            const response = await fetch(`/api/users/delete/${userId}`, { method: 'DELETE' });
+            const r = await fetch(`/api/users/throttle/${username}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({rate_limit: rate})
+            });
+            const result = await r.json();
+            showNotification(result.message || result.error, result.success ? 'warning' : 'error');
+        } catch(e) { showNotification(e.message, 'error'); }
+    }
+
+    async function unthrottleUser(username) {
+        try {
+            const r = await fetch(`/api/users/unthrottle/${username}`, {method: 'POST'});
+            const result = await r.json();
+            showNotification(result.message || result.error, result.success ? 'success' : 'error');
+        } catch(e) { showNotification(e.message, 'error'); }
+    }
+
+    let _deleteUsername = null;
+
+    function deleteUser(userId, username) {
+        _deleteUsername = username;
+        document.getElementById('deleteUsername').textContent = username;
+        document.getElementById('deleteConfirmModal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+        _deleteUsername = null;
+        document.getElementById('deleteConfirmModal').classList.add('hidden');
+    }
+
+    async function confirmDelete() {
+        if (!_deleteUsername) return;
+        const username = _deleteUsername;
+        closeDeleteModal();
+        try {
+            const response = await fetch(`/api/users/delete/by-username/${encodeURIComponent(username)}`, { method: 'DELETE' });
+            if (response.status === 401) { window.location.href = '/login'; return; }
             const result = await response.json();
-            
             if (result.success) {
                 showNotification('User deleted successfully!', 'success');
                 loadUsers();
@@ -738,44 +900,57 @@
         }
     }
 
-    function showNotification(message, type) {
-        const notification = document.createElement('div');
-        notification.className = `fixed top-4 right-4 px-6 py-3 rounded-xl shadow-lg z-50 flex items-center space-x-2 transform transition-all duration-300 translate-x-full`;
-        
-        const colors = {
-            success: 'bg-green-500 text-white',
-            error: 'bg-red-500 text-white',
-            info: 'bg-blue-500 text-white',
-            warning: 'bg-yellow-500 text-white'
-        };
-        
-        notification.classList.add(...colors[type].split(' '));
-        
-        const icons = {
-            success: 'fa-check-circle',
-            error: 'fa-exclamation-circle',
-            info: 'fa-info-circle',
-            warning: 'fa-exclamation-triangle'
-        };
-        
-        notification.innerHTML = `
-            <i class="fas ${icons[type]}"></i>
-            <span class="font-semibold">${message}</span>
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.classList.remove('translate-x-full');
-            notification.classList.add('translate-x-0');
-        }, 100);
-        
-        setTimeout(() => {
-            notification.classList.add('translate-x-full');
-            setTimeout(() => {
-                document.body.removeChild(notification);
-            }, 300);
-        }, 3000);
+    // === DEVICE INFO (GenieACS) ===
+    async function showDeviceInfo(username) {
+        document.getElementById('deviceInfoModal').classList.remove('hidden');
+        document.getElementById('deviceInfoUsername').textContent = username;
+        document.getElementById('deviceInfoLoading').classList.remove('hidden');
+        document.getElementById('deviceInfoNotFound').classList.add('hidden');
+        document.getElementById('deviceInfoData').classList.add('hidden');
+
+        try {
+            const resp = await fetch(`/api/users/${encodeURIComponent(username)}/device`);
+            const data = await resp.json();
+
+            document.getElementById('deviceInfoLoading').classList.add('hidden');
+
+            if (!data.found) {
+                document.getElementById('deviceInfoNotFoundMsg').textContent = data.message || 'Device not found';
+                document.getElementById('deviceInfoNotFound').classList.remove('hidden');
+                return;
+            }
+
+            // RX Power card color
+            const rxCard = document.getElementById('di_rx_card');
+            const rxBadge = document.getElementById('di_rx_badge');
+            const rxStyles = {
+                good:    { bg: 'linear-gradient(135deg,#059669,#0d9488)', badge: '✓ Sinyal Bagus' },
+                warning: { bg: 'linear-gradient(135deg,#d97706,#ea580c)', badge: '⚠ Sinyal Lemah' },
+                bad:     { bg: 'linear-gradient(135deg,#dc2626,#be123c)', badge: '✗ Sinyal Buruk' },
+                unknown: { bg: 'linear-gradient(135deg,#334155,#475569)', badge: '— N/A' },
+            };
+            const s = rxStyles[data.rx_status] || rxStyles.unknown;
+            rxCard.style.background = s.bg;
+            rxBadge.textContent = s.badge;
+
+            document.getElementById('di_rx_power').textContent = data.rx_power !== 'N/A' ? `${data.rx_power} dBm` : 'N/A';
+            document.getElementById('di_manufacturer').textContent = data.manufacturer;
+            document.getElementById('di_model').textContent = data.model;
+            document.getElementById('di_serial').textContent = data.serial;
+            document.getElementById('di_pon_mode').textContent = data.pon_mode;
+            document.getElementById('di_temperature').textContent = data.temperature !== 'N/A' ? `${data.temperature} °C` : 'N/A';
+            document.getElementById('di_firmware').textContent = data.firmware || '-';
+            document.getElementById('di_pppoe_ip').textContent = data.pppoe_ip || '-';
+            document.getElementById('di_device_uptime').textContent = data.device_uptime;
+            document.getElementById('di_ppp_uptime').textContent = data.ppp_uptime;
+            document.getElementById('di_last_inform').textContent = data.last_inform ? new Date(data.last_inform).toLocaleString('id-ID') : '-';
+
+            document.getElementById('deviceInfoData').classList.remove('hidden');
+        } catch (e) {
+            document.getElementById('deviceInfoLoading').classList.add('hidden');
+            document.getElementById('deviceInfoNotFoundMsg').textContent = 'Error: ' + e.message;
+            document.getElementById('deviceInfoNotFound').classList.remove('hidden');
+        }
     }
 
     // === EVENT LISTENERS ===

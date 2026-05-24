@@ -11,4 +11,7 @@ flask-socketio==5.3.6
 eventlet==0.33.3
 pyotp==2.9.0
 python-dotenv==1.0.0
+pyrad==2.5.4
 requests==2.31.0
+Flask-Limiter==3.5.0
+Flask-WTF==1.2.1

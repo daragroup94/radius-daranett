@@ -4,10 +4,16 @@
 {% block page_title %}Authentication Logs{% endblock %}
 {% block page_subtitle %}RADIUS Authentication History & Events{% endblock %}
 
+{% block extra_css %}
+<style>
+    .icon-gradient-5 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="fade-in">
     <div class="modern-card rounded-3xl p-8">
-        <div class="flex justify-between items-center mb-8">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
             <div class="flex items-center">
                 <div class="w-14 h-14 icon-gradient-5 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
                     <i class="fas fa-file-alt text-white text-2xl"></i>
@@ -17,151 +23,144 @@
                     <p class="text-sm text-gray-500 mt-1">Real-time authentication monitoring</p>
                 </div>
             </div>
-            <button onclick="loadLogs()" class="modern-btn bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl flex items-center space-x-2 font-semibold">
-                <i class="fas fa-sync-alt"></i>
-                <span>Refresh Logs</span>
-            </button>
+            <div class="flex flex-wrap gap-3 w-full lg:w-auto">
+                <!-- Search -->
+                <div class="relative flex-1 min-w-[200px]">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <input type="text" id="logSearch" placeholder="Search username..."
+                           class="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <!-- Filter -->
+                <select id="replyFilter" onchange="currentPage=1;loadLogs()"
+                        class="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Status</option>
+                    <option value="Access-Accept">Accept</option>
+                    <option value="Access-Reject">Reject</option>
+                </select>
+                <!-- Refresh -->
+                <button onclick="currentPage=1;loadLogs()"
+                        class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-semibold text-sm">
+                    <i class="fas fa-sync-alt"></i>Refresh
+                </button>
+            </div>
         </div>
 
-        <div id="logsList" class="space-y-4">
+        <div id="logsList" class="space-y-3">
             <div class="text-center py-16">
-                <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-                <p class="text-gray-600 font-semibold text-lg">Loading authentication logs...</p>
-                <p class="text-gray-400 text-sm mt-2">Please wait while we fetch the data</p>
+                <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-gray-500">Loading logs...</p>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div id="paginationControls" class="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
+            <p class="text-sm text-gray-500">
+                Total: <span id="totalLogs" class="font-bold text-gray-800">0</span> entries
+            </p>
+            <div class="flex gap-2">
+                <button onclick="changePage(currentPage-1)" id="prevPage"
+                        class="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span id="pageInfo" class="px-4 py-2 text-sm text-gray-600 font-medium"></span>
+                <button onclick="changePage(currentPage+1)" id="nextPage"
+                        class="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<style>
-.icon-gradient-5 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
-</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    const colorMap = {
-        green: {
-            bg: 'from-green-50 to-emerald-50',
-            border: 'border-green-200',
-            icon: 'bg-green-500',
-            badge: 'bg-green-100 text-green-700'
-        },
-        red: {
-            bg: 'from-red-50 to-rose-50',
-            border: 'border-red-200',
-            icon: 'bg-red-500',
-            badge: 'bg-red-100 text-red-700'
-        },
-        yellow: {
-            bg: 'from-yellow-50 to-amber-50',
-            border: 'border-yellow-200',
-            icon: 'bg-yellow-500',
-            badge: 'bg-yellow-100 text-yellow-700'
-        }
-    };
+    let currentPage = 1;
+    let searchTimeout;
 
-    function loadLogs() {
-        console.log('Refreshing logs...');
-        const logsList = document.getElementById('logsList');
-        
-        logsList.innerHTML = `
-            <div class="text-center py-16">
-                <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-                <p class="text-gray-600 font-semibold text-lg">Loading authentication logs...</p>
-            </div>
-        `;
+    document.getElementById('logSearch').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => { currentPage = 1; loadLogs(); }, 300);
+    });
 
-        fetch('/api/logs')
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    logsList.innerHTML = `
-                        <div class="text-center py-16">
-                            <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-exclamation-triangle text-red-600 text-3xl"></i>
-                            </div>
-                            <p class="text-red-600 font-bold text-xl mb-2">Error Loading Logs</p>
-                            <p class="text-gray-600">${data.error}</p>
-                            <button onclick="loadLogs()" class="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-semibold">
-                                Try Again
-                            </button>
-                        </div>
-                    `;
-                    return;
-                }
-
-                if (data.length === 0) {
-                    logsList.innerHTML = `
-                        <div class="text-center py-16">
-                            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <i class="fas fa-file-alt text-gray-400 text-3xl"></i>
-                            </div>
-                            <p class="text-gray-700 font-bold text-xl mb-2">No Logs Found</p>
-                            <p class="text-gray-500">No authentication logs available at this moment</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                let html = '';
-                data.forEach(log => {
-                    let icon, color;
-                    
-                    if (log.reply === 'Access-Accept') {
-                        icon = 'check-circle';
-                        color = 'green';
-                    } else if (log.reply === 'Access-Reject') {
-                        icon = 'times-circle';
-                        color = 'red';
-                    } else {
-                        icon = 'question-circle';
-                        color = 'yellow';
-                    }
-                    
-                    const theme = colorMap[color];
-                    
-                    html += `
-                    <div class="bg-gradient-to-r ${theme.bg} rounded-2xl p-5 border-2 ${theme.border} hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
-                        <div class="flex items-center space-x-4">
-                            <div class="w-14 h-14 ${theme.icon} rounded-xl flex items-center justify-center shadow-md">
-                                <i class="fas fa-${icon} text-white text-xl"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center space-x-3 mb-2">
-                                    <span class="font-bold text-gray-800 text-lg">${log.username}</span>
-                                    <span class="px-3 py-1 rounded-full text-xs font-bold ${theme.badge}">
-                                        ${log.reply || 'Access-Request'}
-                                    </span>
-                                </div>
-                                <div class="flex items-center text-sm text-gray-600">
-                                    <i class="fas fa-clock mr-2"></i>
-                                    <span class="font-medium">${new Date(log.authdate).toLocaleString()}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    `;
-                });
-                
-                logsList.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                logsList.innerHTML = `
-                    <div class="text-center py-16">
-                        <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
-                        <p class="text-red-600 font-bold text-xl">Failed to load logs</p>
-                        <button onclick="loadLogs()" class="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-semibold">
-                            Retry
-                        </button>
-                    </div>
-                `;
-            });
+    function changePage(page) {
+        if (page < 1) return;
+        currentPage = page;
+        loadLogs();
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        loadLogs();
-    });
+    async function loadLogs() {
+        const logsList = document.getElementById('logsList');
+        const search = document.getElementById('logSearch').value;
+        const reply = document.getElementById('replyFilter').value;
+
+        logsList.innerHTML = `<div class="text-center py-10"><div class="animate-spin rounded-full h-10 w-10 border-b-4 border-blue-600 mx-auto"></div></div>`;
+
+        try {
+            const url = new URL('/api/logs', window.location.origin);
+            url.searchParams.set('page', currentPage);
+            url.searchParams.set('limit', 50);
+            if (search) url.searchParams.set('search', search);
+            if (reply) url.searchParams.set('reply', reply);
+
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (data.error) {
+                logsList.innerHTML = `<div class="text-center py-10 text-red-500"><i class="fas fa-exclamation-triangle text-3xl mb-3"></i><p class="font-bold">${data.error}</p></div>`;
+                return;
+            }
+
+            document.getElementById('totalLogs').textContent = data.total || 0;
+            document.getElementById('pageInfo').textContent = `Page ${data.page} of ${data.total_pages || 1}`;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= (data.total_pages || 1);
+
+            const logs = data.logs || [];
+            if (logs.length === 0) {
+                logsList.innerHTML = `<div class="text-center py-10 text-gray-400"><i class="fas fa-file-alt text-3xl mb-3"></i><p>No logs found</p></div>`;
+                return;
+            }
+
+            logsList.innerHTML = logs.map(log => {
+                const isAccept = log.reply === 'Access-Accept';
+                const isReject = log.reply === 'Access-Reject';
+                const color = isAccept ? 'green' : isReject ? 'red' : 'yellow';
+                const icon = isAccept ? 'check-circle' : isReject ? 'times-circle' : 'question-circle';
+                const themes = {
+                    green: { bg: 'from-green-50 to-emerald-50', border: 'border-green-200', icon: 'bg-green-500', badge: 'bg-green-100 text-green-700' },
+                    red:   { bg: 'from-red-50 to-rose-50',     border: 'border-red-200',   icon: 'bg-red-500',   badge: 'bg-red-100 text-red-700'   },
+                    yellow:{ bg: 'from-yellow-50 to-amber-50', border: 'border-yellow-200',icon: 'bg-yellow-500',badge: 'bg-yellow-100 text-yellow-700'}
+                };
+                const t = themes[color];
+
+                return `
+                <div class="bg-gradient-to-r ${t.bg} rounded-2xl p-4 border ${t.border} hover:shadow-md transition-all">
+                    <div class="flex items-center gap-4">
+                        <div class="w-11 h-11 ${t.icon} rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                            <i class="fas fa-${icon} text-white text-lg"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                <span class="font-bold text-gray-800">${log.username}</span>
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${t.badge}">${log.reply || 'Unknown'}</span>
+                            </div>
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                                <span><i class="fas fa-clock mr-1"></i>${log.authdate}</span>
+                                ${log.callingstationid ? `<span><i class="fas fa-laptop mr-1"></i>${log.callingstationid}</span>` : ''}
+                                ${log.calledstationid ? `<span><i class="fas fa-server mr-1"></i>${log.calledstationid}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+        } catch (e) {
+            logsList.innerHTML = `<div class="text-center py-10 text-red-500"><i class="fas fa-exclamation-triangle text-3xl mb-3"></i><p class="font-bold">${e.message}</p></div>`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadLogs);
 </script>
 {% endblock %}

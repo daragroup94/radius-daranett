@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session
 from flask_socketio import SocketIO, emit
 import psycopg2
+from psycopg2 import pool as psycopg2_pool
 import time
 from config import Config
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -17,33 +18,89 @@ import threading
 import io
 import requests
 import pyotp
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect, CSRFError
 
 # === TELEGRAM NOTIFICATION ===
-def send_telegram_notification(message):
-    token = app.config.get('TELEGRAM_BOT_TOKEN')
-    chat_id = app.config.get('TELEGRAM_CHAT_ID')
+def _send_telegram_worker(message):
+    token, chat_id = '', ''
+    env_path = '/app/.telegram.env'
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith('TELEGRAM_BOT_TOKEN='):
+                    token = line.strip().split('=', 1)[1]
+                elif line.startswith('TELEGRAM_CHAT_ID='):
+                    chat_id = line.strip().split('=', 1)[1]
     if not token or not chat_id:
         return
     try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(url, json={'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'})
+        import json as _json
+        payload = _json.dumps({'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'})
+        subprocess.run(
+            ['curl', '-s', '-m', '10', '-X', 'POST',
+             f'https://api.telegram.org/bot{token}/sendMessage',
+             '-H', 'Content-Type: application/json',
+             '-d', payload],
+            capture_output=True, timeout=12
+        )
     except Exception as e:
         print(f"Telegram error: {e}")
 
+def send_telegram_notification(message):
+    import threading
+    threading.Thread(target=_send_telegram_worker, args=(message,), daemon=True).start()
+
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'radius-dashboard-secret-2024'
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_PERMANENT'] = True
-app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config.from_object(Config)
 
+# Load persisted Telegram settings (saved via UI)
+_telegram_env = '/app/.telegram.env'
+if os.path.exists(_telegram_env):
+    with open(_telegram_env) as _f:
+        for _line in _f:
+            if '=' in _line:
+                _k, _v = _line.strip().split('=', 1)
+                app.config[_k] = _v
+
 # Initialize SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+_allowed_origins = os.getenv('ALLOWED_ORIGINS', '*')
+socketio = SocketIO(app, cors_allowed_origins=_allowed_origins if _allowed_origins == '*' else _allowed_origins.split(','), async_mode='eventlet')
+
+# Initialize Rate Limiter (Redis-backed, shared across gunicorn workers)
+_redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri=_redis_url)
+
+# Initialize CSRF Protection
+# API routes (/api/*) are exempt — they're protected by @login_required + session cookie
+app.config['WTF_CSRF_CHECK_DEFAULT'] = False
+csrf = CSRFProtect(app)
+
+@app.after_request
+def add_no_cache(response):
+    if 'text/html' in response.content_type:
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+    return response
+
+@app.before_request
+def csrf_protect():
+    # Only enforce CSRF on state-changing form submissions (non-API)
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        if not request.path.startswith('/api/'):
+            csrf.protect()
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    return jsonify({'success': False, 'error': 'CSRF token missing or invalid'}), 400
 
 # === BACKUP & RESTORE CONFIGURATION ===
-BACKUP_FOLDER = 'backups'
+BACKUP_FOLDER = os.getenv('BACKUP_FOLDER', '/app/backups')
 ALLOWED_BACKUP_EXTENSIONS = {'sql', 'backup'}
 
 def ensure_backup_folder():
@@ -69,38 +126,52 @@ def login_required(f):
     @functools.wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
+            if request.path.startswith('/api/'):
+                return jsonify({'success': False, 'error': 'Session expired'}), 401
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
 # === DATABASE CONNECTION ===
+# === DATABASE CONNECTION POOL ===
+_db_pool = None
+
+def get_db_pool():
+    global _db_pool
+    if _db_pool is None:
+        _db_pool = psycopg2_pool.ThreadedConnectionPool(
+            minconn=3, maxconn=10,
+            host=app.config['DB_HOST'],
+            database=app.config['DB_NAME'],
+            user=app.config['DB_USER'],
+            password=app.config['DB_PASSWORD'],
+            port=app.config['DB_PORT']
+        )
+    return _db_pool
+
 def get_db_connection():
-    return psycopg2.connect(
-        host=app.config['DB_HOST'],
-        database=app.config['DB_NAME'],
-        user=app.config['DB_USER'],
-        password=app.config['DB_PASSWORD'],
-        port=app.config['DB_PORT']
-    )
+    return get_db_pool().getconn()
 
 def execute_query(query, params=None, fetch=True):
-    conn = get_db_connection()
-    cur = conn.cursor()
+    pool = get_db_pool()
+    conn = pool.getconn()
     try:
+        cur = conn.cursor()
         cur.execute(query, params)
         if fetch:
             result = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
+            cur.close()
             return [dict(zip(columns, row)) for row in result]
         else:
             conn.commit()
+            cur.close()
             return True
     except Exception as e:
         conn.rollback()
         raise e
     finally:
-        cur.close()
-        conn.close()
+        pool.putconn(conn)
 
 # === HELPER FUNCTIONS ===
 def get_request_data():
@@ -169,41 +240,12 @@ def ping_nas(ip_address):
         return "error"
 
 
-# === BACKGROUND CLEANUP THREAD ===
-def cleanup_stale_sessions():
-    """Background task to clean up stale sessions"""
-    while True:
-        try:
-            execute_query("""
-                DELETE FROM radacct 
-                WHERE acctstoptime IS NULL 
-                AND acctstarttime < NOW() - INTERVAL '2 hours'
-            """, fetch=False)
-            
-            execute_query("""
-                DELETE FROM radacct
-                WHERE radacctid NOT IN (
-                    SELECT DISTINCT ON (username) radacctid
-                    FROM radacct
-                    WHERE acctstoptime IS NULL
-                    ORDER BY username, acctstarttime DESC
-                )
-                AND acctstoptime IS NULL
-            """, fetch=False)
-            
-            print(f"[{datetime.now()}] Cleaned up stale sessions")
-        except Exception as e:
-            print(f"[ERROR] Failed to clean sessions: {str(e)}")
-        
-        time.sleep(3600)  # Run every hour
-
-def start_cleanup_thread():
-    cleanup_thread = threading.Thread(target=cleanup_stale_sessions, daemon=True)
-    cleanup_thread.start()
-    print("Background session cleanup thread started")
+# Background cleanup thread dihapus - berbahaya karena menghapus session PPPoE aktif
+# yang bisa online berhari-hari. Gunakan /api/sessions/fix-stale untuk mark stale secara manual.
 
 # === AUTHENTICATION ROUTES ===
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login():
     if request.method == 'POST':
         username = request.form['username']
@@ -235,6 +277,24 @@ def login():
             return redirect(url_for('dashboard'))
         else:
             flash('Invalid username or password', 'error')
+            # Brute force detection: track failed attempts per IP via Redis
+            try:
+                import redis as redis_lib
+                r = redis_lib.from_url(_redis_url)
+                ip = request.remote_addr
+                key = f'failed_login:{ip}'
+                attempts = r.incr(key)
+                r.expire(key, 600)  # reset setelah 10 menit
+                if attempts == 5:
+                    send_telegram_notification(
+                        f"⚠️ <b>Brute Force Detected</b>\n"
+                        f"IP: <code>{ip}</code>\n"
+                        f"Username dicoba: <code>{username}</code>\n"
+                        f"Gagal: {attempts}x dalam 10 menit\n"
+                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+            except Exception as e:
+                print(f"Brute force tracking error: {e}")
     
     return render_template('login.html')
 
@@ -293,6 +353,73 @@ def api_mfa_verify():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/api/telegram/settings', methods=['GET'])
+@login_required
+def api_telegram_settings_get():
+    return jsonify({
+        'bot_token': app.config.get('TELEGRAM_BOT_TOKEN', ''),
+        'chat_id': app.config.get('TELEGRAM_CHAT_ID', '')
+    })
+
+@app.route('/api/telegram/settings', methods=['POST'])
+@login_required
+def api_telegram_settings_save():
+    try:
+        data = get_request_data()
+        bot_token = data.get('bot_token', '').strip()
+        chat_id = data.get('chat_id', '').strip()
+
+        # Update runtime config
+        app.config['TELEGRAM_BOT_TOKEN'] = bot_token
+        app.config['TELEGRAM_CHAT_ID'] = chat_id
+
+        # Persist to .env file so it survives gunicorn reload
+        env_path = '/app/.telegram.env'
+        with open(env_path, 'w') as f:
+            f.write(f"TELEGRAM_BOT_TOKEN={bot_token}\n")
+            f.write(f"TELEGRAM_CHAT_ID={chat_id}\n")
+
+        return jsonify({'success': True, 'message': 'Telegram settings saved'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/telegram/test', methods=['POST'])
+@login_required
+def api_telegram_test():
+    import json as _json
+
+    env_path = '/app/.telegram.env'
+    token, chat_id = '', ''
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith('TELEGRAM_BOT_TOKEN='):
+                    token = line.strip().split('=', 1)[1]
+                elif line.startswith('TELEGRAM_CHAT_ID='):
+                    chat_id = line.strip().split('=', 1)[1]
+
+    if not token or not chat_id:
+        return jsonify({'success': False, 'error': 'Bot Token atau Chat ID belum dikonfigurasi'}), 400
+
+    try:
+        msg = f"✅ <b>Test Notification</b>\nRADIUS Manager terhubung ke Telegram!\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        payload = _json.dumps({'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'})
+        # Gunakan curl via subprocess untuk bypass eventlet monkey-patch sepenuhnya
+        result = subprocess.run(
+            ['curl', '-s', '-m', '10', '-X', 'POST',
+             f'https://api.telegram.org/bot{token}/sendMessage',
+             '-H', 'Content-Type: application/json',
+             '-d', payload],
+            capture_output=True, text=True, timeout=12
+        )
+        resp = _json.loads(result.stdout)
+        if resp.get('ok'):
+            return jsonify({'success': True, 'message': 'Pesan test berhasil dikirim ke Telegram!'})
+        else:
+            return jsonify({'success': False, 'error': f"Telegram: {resp.get('description', 'Unknown error')}"}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/change-password', methods=['POST'])
 @login_required
 def api_change_password():
@@ -347,18 +474,23 @@ def backup_page():
 
 # === API ROUTES ===
 @app.route('/api/stats')
+@login_required
 def api_stats():
     try:
         # Total users registered in the system
         total_users = execute_query("SELECT COUNT(*) as count FROM radcheck WHERE attribute = 'Cleartext-Password'")[0]['count']
         
-        # Total active connections (Live Sessions)
-        active_sessions = execute_query("SELECT COUNT(*) as count FROM radacct WHERE acctstoptime IS NULL")[0]['count']
+        # Session aktif = acctstoptime IS NULL
+        active_sessions = execute_query("""
+            SELECT COUNT(*) as count FROM radacct WHERE acctstoptime IS NULL
+        """)[0]['count']
         
         # Unique users currently online
-        online_users = execute_query("SELECT COUNT(DISTINCT username) as count FROM radacct WHERE acctstoptime IS NULL")[0]['count']
+        online_users = execute_query("""
+            SELECT COUNT(DISTINCT username) as count FROM radacct WHERE acctstoptime IS NULL
+        """)[0]['count']
         
-        today_auth = execute_query("SELECT COUNT(*) as count FROM radpostauth WHERE DATE(authdate) = CURRENT_DATE")[0]['count']
+        today_auth = execute_query("SELECT COUNT(*) as count FROM radpostauth WHERE DATE(authdate AT TIME ZONE 'Asia/Jakarta') = CURRENT_DATE")[0]['count']
         
         try:
             total_nas = execute_query("SELECT COUNT(*) as count FROM nas")[0]['count']
@@ -377,9 +509,17 @@ def api_stats():
 
 # === NAS API ROUTES ===
 @app.route('/api/nas')
+@login_required
 def api_nas():
     try:
-        nas_list = execute_query("SELECT * FROM nas ORDER BY id")
+        nas_list = execute_query("""
+            SELECT n.*,
+                   COUNT(r.acctsessionid) as session_count
+            FROM nas n
+            LEFT JOIN radacct r ON HOST(r.nasipaddress) = n.nasname AND r.acctstoptime IS NULL
+            GROUP BY n.id
+            ORDER BY n.id
+        """)
         return jsonify(nas_list)
     except Exception as e:
         if 'relation "nas" does not exist' in str(e):
@@ -387,6 +527,7 @@ def api_nas():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/nas/add', methods=['POST'])
+@login_required
 def api_add_nas():
     try:
         data = get_request_data()
@@ -405,14 +546,33 @@ def api_add_nas():
             """, (data['nasname'], data['shortname'], data['type'], data['ports'], data['secret'],
                   data.get('server', ''), data.get('community', ''), data.get('description', '')), fetch=False)
         
+        send_telegram_notification(f"🖥️ <b>NAS Added</b>\nName: {data['nasname']}\nShort: {data['shortname']}\nType: {data['type']}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         return jsonify({'success': True, 'message': 'NAS added successfully'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/nas/edit/<int:nas_id>', methods=['PUT'])
+@login_required
+def api_edit_nas(nas_id):
+    try:
+        data = get_request_data()
+        execute_query("""
+            UPDATE nas SET nasname=%s, shortname=%s, type=%s, ports=%s, secret=%s, description=%s
+            WHERE id=%s
+        """, (data['nasname'], data['shortname'], data['type'], int(data['ports']),
+              data['secret'], data.get('description', ''), nas_id), fetch=False)
+        return jsonify({'success': True, 'message': 'NAS updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/nas/delete/<int:nas_id>', methods=['DELETE'])
+@login_required
 def api_delete_nas(nas_id):
     try:
+        nas_info = execute_query("SELECT nasname, shortname FROM nas WHERE id = %s", (nas_id,))
         execute_query("DELETE FROM nas WHERE id = %s", (nas_id,), fetch=False)
+        if nas_info:
+            send_telegram_notification(f"🗑️ <b>NAS Deleted</b>\nName: {nas_info[0]['nasname']}\nShort: {nas_info[0]['shortname']}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         return jsonify({'success': True, 'message': 'NAS deleted successfully'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -450,6 +610,7 @@ def get_nas_status():
 
 # === USER API ROUTES ===
 @app.route('/api/users')
+@login_required
 def api_users():
     try:
         search = request.args.get('search', '')
@@ -496,6 +657,7 @@ def api_users():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/add', methods=['POST'])
+@login_required
 def api_add_user():
     try:
         data = get_request_data()
@@ -558,46 +720,136 @@ def api_add_user():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/users/update/<username>', methods=['PUT'])
+@login_required
 def api_update_user(username):
     try:
         data = get_request_data()
-        
-        if data.get('ip_address'):
+
+        if data.get('ip_address') is not None:
             execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Framed-IP-Address'", (username,), fetch=False)
-            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)", 
-                         (username, data['ip_address']), fetch=False)
-        
-        if data.get('rate_limit'):
+            if data['ip_address']:
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)",
+                             (username, data['ip_address']), fetch=False)
+
+        if data.get('rate_limit') is not None:
             execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Mikrotik-Rate-Limit'", (username,), fetch=False)
-            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)", 
-                         (username, data['rate_limit']), fetch=False)
-        
-        if data.get('session_timeout'):
+            if data['rate_limit']:
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)",
+                             (username, data['rate_limit']), fetch=False)
+
+        if data.get('session_timeout') is not None:
             execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Session-Timeout'", (username,), fetch=False)
-            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Session-Timeout', ':=', %s)", 
-                         (username, data['session_timeout']), fetch=False)
-        
-        if data.get('idle_timeout'):
+            if data['session_timeout']:
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Session-Timeout', ':=', %s)",
+                             (username, data['session_timeout']), fetch=False)
+
+        if data.get('idle_timeout') is not None:
             execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Idle-Timeout'", (username,), fetch=False)
-            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Idle-Timeout', ':=', %s)", 
-                         (username, data['idle_timeout']), fetch=False)
-        
+            if data['idle_timeout']:
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Idle-Timeout', ':=', %s)",
+                             (username, data['idle_timeout']), fetch=False)
+
         if data.get('data_limit'):
             data_limit_bytes = convert_data_limit_to_bytes(data['data_limit'])
             if data_limit_bytes:
                 execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Mikrotik-Total-Limit'", (username,), fetch=False)
-                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Total-Limit', ':=', %s)", 
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Total-Limit', ':=', %s)",
                              (username, str(data_limit_bytes)), fetch=False)
-        
+
         if data.get('password'):
-            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'", 
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'",
                          (data['password'], username), fetch=False)
-        
-        return jsonify({'success': True, 'message': 'User updated successfully'})
+
+        # Kirim CoA-Request jika rate_limit berubah dan user sedang online
+        coa_total = 0
+        if data.get('rate_limit'):
+            active_sessions = execute_query("""
+                SELECT acctsessionid, nasipaddress FROM radacct
+                WHERE username = %s AND acctstoptime IS NULL
+            """, (username,))
+            for s in active_sessions:
+                nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+                secret = nas[0]['secret'] if nas else 'radiussecret'
+                send_coa_update_async(s['nasipaddress'], s['acctsessionid'], secret, data['rate_limit'])
+                coa_total += 1
+
+        msg = 'User updated successfully'
+        if coa_total > 0:
+            msg += f' | CoA sent to {coa_total} active session(s)'
+        elif data.get('rate_limit'):
+            msg += ' | User not online, CoA not sent'
+
+        return jsonify({'success': True, 'message': msg})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/throttle/<username>', methods=['POST'])
+@login_required
+def api_throttle_user(username):
+    """Throttle user ke bandwidth rendah via CoA tanpa disconnect"""
+    try:
+        data = get_request_data()
+        rate_limit = data.get('rate_limit', '512k/512k')  # default throttle 512kbps
+
+        active_sessions = execute_query("""
+            SELECT acctsessionid, nasipaddress FROM radacct
+            WHERE username = %s AND acctstoptime IS NULL
+        """, (username,))
+
+        if not active_sessions:
+            return jsonify({'success': False, 'error': 'User not online'}), 404
+
+        coa_sent = 0
+        for s in active_sessions:
+            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+            secret = nas[0]['secret'] if nas else 'radiussecret'
+            if send_coa_update(s['nasipaddress'], s['acctsessionid'], secret, rate_limit):
+                coa_sent += 1
+
+        return jsonify({
+            'success': True,
+            'message': f'Throttled to {rate_limit} | {coa_sent}/{len(active_sessions)} sessions updated'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/unthrottle/<username>', methods=['POST'])
+@login_required
+def api_unthrottle_user(username):
+    """Restore bandwidth user ke rate_limit asli via CoA"""
+    try:
+        rate_limit = execute_query("""
+            SELECT value FROM radreply WHERE username = %s AND attribute = 'Mikrotik-Rate-Limit'
+        """, (username,))
+
+        if not rate_limit:
+            return jsonify({'success': False, 'error': 'No rate limit configured for this user'}), 404
+
+        original_rate = rate_limit[0]['value']
+        active_sessions = execute_query("""
+            SELECT acctsessionid, nasipaddress FROM radacct
+            WHERE username = %s AND acctstoptime IS NULL
+        """, (username,))
+
+        if not active_sessions:
+            return jsonify({'success': False, 'error': 'User not online'}), 404
+
+        coa_sent = 0
+        for s in active_sessions:
+            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+            secret = nas[0]['secret'] if nas else 'radiussecret'
+            if send_coa_update(s['nasipaddress'], s['acctsessionid'], secret, original_rate):
+                coa_sent += 1
+
+        return jsonify({
+            'success': True,
+            'message': f'Restored to {original_rate} | {coa_sent}/{len(active_sessions)} sessions updated'
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/users/delete/<int:user_id>', methods=['DELETE'])
+@login_required
 def api_delete_user(user_id):
     try:
         user = execute_query("SELECT username FROM radcheck WHERE id = %s", (user_id,))
@@ -612,15 +864,31 @@ def api_delete_user(user_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/users/delete/by-username/<username>', methods=['DELETE'])
+@login_required
+def api_delete_user_by_username(username):
+    try:
+        user = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if user:
+            execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+            execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+            send_telegram_notification(f"🗑️ <b>User Deleted</b>\nUsername: {username}")
+            return jsonify({'success': True, 'message': 'User deleted successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # === SESSION API ROUTES ===
 @app.route('/api/sessions')
+@login_required
 def api_sessions():
     try:
         sessions = execute_query("""
             SELECT DISTINCT ON (username, acctsessionid)
                    radacctid, acctsessionid, acctuniqueid, username,
                    nasipaddress, nasportid, nasporttype, acctstarttime,
-                   acctsessiontime, acctinputoctets, acctoutputoctets,
+                   acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets,
                    calledstationid, callingstationid, framedipaddress,
                    framedprotocol, servicetype, connectinfo_start,
                    CASE WHEN acctstoptime IS NULL THEN 'active' ELSE 'inactive' END as status
@@ -637,38 +905,105 @@ def api_sessions():
 @login_required
 def api_cleanup_sessions():
     try:
-        execute_query("""
+        # Hanya hapus session yang benar-benar stale:
+        # acctstoptime IS NULL DAN tidak ada interim-update dalam 30 menit terakhir
+        # (bukan berdasarkan acctstarttime - user PPPoE bisa online berhari-hari)
+        deleted = execute_query("""
             DELETE FROM radacct 
             WHERE acctstoptime IS NULL 
-            AND acctstarttime < NOW() - INTERVAL '2 hours'
-        """, fetch=False)
+            AND acctupdatetime < NOW() - INTERVAL '30 minutes'
+            RETURNING radacctid
+        """)
         
-        execute_query("""
-            DELETE FROM radacct
-            WHERE radacctid NOT IN (
-                SELECT DISTINCT ON (username) radacctid
-                FROM radacct
-                WHERE acctstoptime IS NULL
-                ORDER BY username, acctstarttime DESC
-            )
-            AND acctstoptime IS NULL
-        """, fetch=False)
-        
-        return jsonify({'success': True, 'message': 'Stale sessions cleaned up successfully'})
+        count = len(deleted) if deleted else 0
+        return jsonify({'success': True, 'message': f'{count} stale sessions cleaned up (no update for 30+ minutes)'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sessions/fix-stale', methods=['POST'])
+@login_required
+def api_fix_stale_sessions():
+    """Mark session stale (set acctstoptime) jika tidak ada interim-update dalam 15 menit.
+    Lebih aman dari delete - data tetap ada untuk audit."""
+    try:
+        threshold = int(request.json.get('minutes', 15)) if request.is_json else 15
+        threshold = max(5, min(threshold, 1440))  # clamp 5 menit - 24 jam
+        updated = execute_query("""
+            UPDATE radacct 
+            SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
+            WHERE acctstoptime IS NULL 
+            AND acctupdatetime < NOW() - (INTERVAL '1 minute' * %s)
+            RETURNING radacctid, username
+        """, (threshold,))
+        
+        count = len(updated) if updated else 0
+        return jsonify({'success': True, 'message': f'{count} stale sessions marked as disconnected', 'count': count})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def _send_coa_packet(nas_ip, secret, packet_type, attributes):
+    """Kirim CoA/Disconnect packet via radclient di freeradius container"""
+    try:
+        # Gunakan newline-separated dengan nilai di-quote agar nilai yang mengandung spasi
+        # (seperti Mikrotik-Rate-Limit burst format) tidak diparsing sebagai attribute baru
+        attr_lines = '\n'.join(f'{k} = "{v}"' for k, v in attributes.items())
+        result = subprocess.run(
+            ['docker', 'exec', 'freeradius-server', 'sh', '-c',
+             f"printf '{attr_lines}\\n' | radclient -t 3 -r 1 {nas_ip}:3799 {packet_type} {secret}"],
+            capture_output=True, text=True, timeout=6
+        )
+        return result.stdout
+    except Exception as e:
+        print(f"CoA error ({nas_ip}): {e}")
+        return ''
+
+def send_coa_disconnect(nas_ip, session_id, nas_secret):
+    out = _send_coa_packet(nas_ip, nas_secret, 'disconnect', {
+        'Acct-Session-Id': session_id, 'NAS-IP-Address': nas_ip
+    })
+    return 'Disconnect-ACK' in out
+
+def send_coa_update(nas_ip, session_id, nas_secret, rate_limit):
+    out = _send_coa_packet(nas_ip, nas_secret, 'coa', {
+        'Acct-Session-Id': session_id, 'NAS-IP-Address': nas_ip,
+        'Mikrotik-Rate-Limit': rate_limit
+    })
+    return 'CoA-ACK' in out
+
+def send_coa_update_async(nas_ip, session_id, nas_secret, rate_limit):
+    """Kirim CoA di background thread agar tidak block response"""
+    t = threading.Thread(target=send_coa_update, args=(nas_ip, session_id, nas_secret, rate_limit), daemon=True)
+    t.start()
 
 @app.route('/api/sessions/disconnect/<session_id>', methods=['POST'])
 @login_required
 def api_disconnect_session(session_id):
     try:
+        session_data = execute_query("""
+            SELECT acctsessionid, nasipaddress FROM radacct 
+            WHERE acctsessionid = %s AND acctstoptime IS NULL
+        """, (session_id,))
+
+        if not session_data:
+            return jsonify({'success': False, 'error': 'Session not found'}), 404
+
+        nas_ip = session_data[0]['nasipaddress']
+        nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (nas_ip,))
+        secret = nas[0]['secret'] if nas else 'radiussecret'
+
+        # Kirim CoA Disconnect ke MikroTik
+        coa_sent = send_coa_disconnect(nas_ip, session_id, secret)
+
+        # Update database
         execute_query("""
             UPDATE radacct 
             SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
             WHERE acctsessionid = %s
         """, (session_id,), fetch=False)
-        
-        return jsonify({'success': True, 'message': 'Session disconnected successfully'})
+
+        msg = 'Session disconnected (CoA sent to NAS)' if coa_sent else 'Session marked disconnected (CoA failed, user may still be online)'
+        send_telegram_notification(f"🔌 <b>Session Disconnected</b>\nUsername: {session_data[0].get('username', '-')}\nNAS: {nas_ip}\nBy: {session.get('username','admin')}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        return jsonify({'success': True, 'message': msg, 'coa_sent': coa_sent})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -677,38 +1012,131 @@ def api_disconnect_session(session_id):
 def api_disconnect_user_sessions(username):
     try:
         sessions = execute_query("""
-            SELECT acctsessionid FROM radacct 
+            SELECT acctsessionid, nasipaddress FROM radacct 
             WHERE username = %s AND acctstoptime IS NULL
         """, (username,))
-        
-        for session in sessions:
+
+        coa_success = 0
+        for s in sessions:
+            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+            secret = nas[0]['secret'] if nas else 'radiussecret'
+            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret):
+                coa_success += 1
             execute_query("""
                 UPDATE radacct 
                 SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
                 WHERE acctsessionid = %s
-            """, (session['acctsessionid'],), fetch=False)
-        
-        return jsonify({'success': True, 'message': f'Disconnected {len(sessions)} sessions for {username}'})
+            """, (s['acctsessionid'],), fetch=False)
+
+        return jsonify({
+            'success': True,
+            'message': f'Disconnected {len(sessions)} sessions for {username} ({coa_success} CoA sent)'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sessions/duplicates')
+@login_required
+def api_sessions_duplicates():
+    try:
+        dupes = execute_query("""
+            SELECT username, COUNT(*) as session_count,
+                   array_agg(acctsessionid ORDER BY acctstarttime DESC) as session_ids,
+                   array_agg(nasipaddress ORDER BY acctstarttime DESC) as nas_ips,
+                   array_agg(framedipaddress ORDER BY acctstarttime DESC) as framed_ips,
+                   array_agg(acctstarttime ORDER BY acctstarttime DESC) as start_times
+            FROM radacct
+            WHERE acctstoptime IS NULL
+            GROUP BY username
+            HAVING COUNT(*) > 1
+            ORDER BY session_count DESC, username
+        """)
+        return jsonify(dupes or [])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/duplicates/disconnect', methods=['POST'])
+@login_required
+def api_disconnect_duplicates():
+    """Disconnect semua session duplikat, sisakan yang terbaru per username."""
+    try:
+        dupes = execute_query("""
+            WITH ranked AS (
+                SELECT acctsessionid, nasipaddress, username,
+                       ROW_NUMBER() OVER (PARTITION BY username ORDER BY acctstarttime DESC) AS rn
+                FROM radacct WHERE acctstoptime IS NULL
+            )
+            SELECT acctsessionid, nasipaddress, username FROM ranked WHERE rn > 1
+        """)
+        if not dupes:
+            return jsonify({'success': True, 'message': 'Tidak ada session duplikat', 'count': 0})
+
+        coa_success = 0
+        for s in dupes:
+            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+            secret = nas[0]['secret'] if nas else 'radiussecret'
+            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret):
+                coa_success += 1
+            execute_query("""
+                UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
+                WHERE acctsessionid = %s
+            """, (s['acctsessionid'],), fetch=False)
+
+        return jsonify({
+            'success': True,
+            'message': f'{len(dupes)} session duplikat di-disconnect ({coa_success} CoA sent)',
+            'count': len(dupes)
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/logs')
+@login_required
 def api_logs():
     try:
-        logs = execute_query("""
-            SELECT id, username, reply, authdate, pass, 
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))
+        search = request.args.get('search', '')
+        reply_filter = request.args.get('reply', '')
+        offset = (page - 1) * limit
+
+        where_clauses = []
+        params = []
+
+        if search:
+            where_clauses.append("username ILIKE %s")
+            params.append(f'%{search}%')
+        if reply_filter:
+            where_clauses.append("reply = %s")
+            params.append(reply_filter)
+
+        where_sql = ('WHERE ' + ' AND '.join(where_clauses)) if where_clauses else ''
+
+        logs = execute_query(f"""
+            SELECT id, username, reply,
+                   TO_CHAR(authdate AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') as authdate,
                    calledstationid, callingstationid
             FROM radpostauth
+            {where_sql}
             ORDER BY authdate DESC
-            LIMIT 50
-        """)
-        return jsonify(logs)
+            LIMIT %s OFFSET %s
+        """, tuple(params + [limit, offset]))
+
+        total = execute_query(f"SELECT COUNT(*) as total FROM radpostauth {where_sql}", tuple(params))[0]['total']
+
+        return jsonify({
+            'logs': logs,
+            'total': total,
+            'page': page,
+            'total_pages': (total + limit - 1) // limit
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 # === DASHBOARD API ROUTES - FIXED ===
 
 @app.route('/api/auth-activity')
+@login_required
 def api_auth_activity():
     """Get authentication activity for the last 30 minutes - FIXED COUNTING"""
     try:
@@ -740,6 +1168,7 @@ def api_auth_activity():
         return jsonify({'labels': [], 'data': []})
 
 @app.route('/api/sessions-by-nas')
+@login_required
 def api_sessions_by_nas():
     """Get session distribution by NAS device - FIXED with HOST() function"""
     try:
@@ -768,6 +1197,7 @@ def api_sessions_by_nas():
         return jsonify({'labels': ['Error'], 'data': [0]})
 
 @app.route('/api/recent-activity')
+@login_required
 def api_recent_activity():
     """Get recent authentication activity - FIXED TIMEZONE ISSUE"""
     try:
@@ -822,6 +1252,7 @@ def api_recent_activity():
         return jsonify([])
 
 @app.route('/api/system-metrics')
+@login_required
 def api_system_metrics():
     """Get system performance metrics"""
     try:
@@ -867,6 +1298,64 @@ def api_system_metrics():
 # === BACKUP API ROUTES (shortened for space) ===
 # ... (include all backup routes from original code)
 
+@app.route('/api/users/<username>/device')
+@login_required
+def api_user_device(username):
+    """Query GenieACS NBI untuk info device berdasarkan pppoeUsername"""
+    try:
+        GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+        query = f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}'
+        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber'
+        resp = requests.get(
+            f'{GENIEACS_NBI}/devices',
+            params={'query': query, 'projection': projection},
+            timeout=5
+        )
+        devices = resp.json()
+        if not devices:
+            return jsonify({'found': False, 'message': 'Device not found in GenieACS'})
+
+        d = devices[0]
+        vp = d.get('VirtualParameters', {})
+        di = d.get('DeviceInfo', {})
+        dev_id = d.get('_deviceId', {})
+
+        def val(obj):
+            return obj.get('_value', 'N/A') if isinstance(obj, dict) else 'N/A'
+
+        rx = val(vp.get('RXPower', {}))
+        try:
+            rx_float = float(rx)
+            if rx_float >= -15:
+                rx_status = 'good'
+            elif rx_float >= -25:
+                rx_status = 'warning'
+            else:
+                rx_status = 'bad'
+        except (ValueError, TypeError):
+            rx_status = 'unknown'
+
+        return jsonify({
+            'found': True,
+            'serial': val(vp.get('getSerialNumber', {})) or dev_id.get('_SerialNumber', 'N/A'),
+            'manufacturer': dev_id.get('_Manufacturer', 'N/A'),
+            'model': dev_id.get('_ProductClass', 'N/A'),
+            'firmware': val(di.get('SoftwareVersion', {})),
+            'rx_power': rx,
+            'rx_status': rx_status,
+            'pppoe_ip': val(vp.get('pppoeIP', {})),
+            'device_uptime': val(vp.get('getdeviceuptime', {})),
+            'ppp_uptime': val(vp.get('getpppuptime', {})),
+            'temperature': val(vp.get('gettemp', {})),
+            'pon_mode': val(vp.get('getponmode', {})),
+            'last_inform': d.get('_lastInform', 'N/A'),
+        })
+    except requests.exceptions.ConnectionError:
+        return jsonify({'found': False, 'message': 'GenieACS tidak dapat dihubungi'}), 503
+    except Exception as e:
+        return jsonify({'found': False, 'message': str(e)}), 500
+
+
 @app.route('/health')
 def health():
     return 'OK'
@@ -879,6 +1368,7 @@ import io
 # === BACKUP API ROUTES (LENGKAP) ===
 
 @app.route('/api/backup/list')
+@login_required
 def api_list_backups():
     """List all available backup files"""
     try:
@@ -913,6 +1403,7 @@ def api_list_backups():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/backup/create', methods=['POST'])
+@login_required
 def api_create_backup():
     """Create a new database backup"""
     try:
@@ -930,7 +1421,7 @@ def api_create_backup():
         db_password = app.config['DB_PASSWORD']
         db_port = app.config['DB_PORT']
         
-        # Create pg_dump command
+        # Create pg_dump command - hanya tabel user dan NAS, exclude session/log
         cmd = [
             'pg_dump',
             f'--host={db_host}',
@@ -940,14 +1431,10 @@ def api_create_backup():
             '--no-password',
             '--clean',
             '--if-exists',
-            '--inserts',
-            '--column-inserts',
-            '--attribute-inserts',
-            '--disable-dollar-quoting',
-            '--disable-triggers',
-            '--no-tablespaces',
-            '--no-unlogged',
-            '--format=custom',
+            '--format=plain',
+            '--table=radcheck',
+            '--table=radreply',
+            '--table=nas',
             '--file=' + filepath
         ]
         
@@ -975,6 +1462,7 @@ def api_create_backup():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/backup/download/<filename>')
+@login_required
 def api_download_backup(filename):
     """Download a specific backup file"""
     try:
@@ -997,6 +1485,7 @@ def api_download_backup(filename):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/backup/delete/<filename>', methods=['DELETE'])
+@login_required
 def api_delete_backup(filename):
     """Delete a specific backup file"""
     try:
@@ -1020,6 +1509,7 @@ def api_delete_backup(filename):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/backup/upload', methods=['POST'])
+@login_required
 def api_upload_backup():
     """Upload a backup file"""
     try:
@@ -1053,6 +1543,7 @@ def api_upload_backup():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/backup/restore', methods=['POST'])
+@login_required
 def api_restore_backup():
     """Restore database from a backup file"""
     try:
@@ -1078,7 +1569,7 @@ def api_restore_backup():
         db_password = app.config['DB_PASSWORD']
         db_port = app.config['DB_PORT']
         
-        # Create psql command to restore from backup
+        # psql untuk restore format plain SQL
         cmd = [
             'psql',
             f'--host={db_host}',
@@ -1120,7 +1611,7 @@ def handle_connect():
     emit('status', {'data': 'Connected'})
 
 def background_metrics():
-    """Emit system metrics every 5 seconds"""
+    """Emit system metrics every 5 seconds via socketio background task"""
     while True:
         try:
             metrics = api_system_metrics_data()
@@ -1136,14 +1627,13 @@ def api_system_metrics_data():
     return {
         'cpu_percent': round(cpu_percent, 1),
         'memory_percent': round(memory.percent, 1),
-        'db_connections': 0, # Simplified for now
+        'db_connections': 0,
         'db_max_connections': 100,
         'disk_percent': 0
     }
 
-# Start background thread always
-start_cleanup_thread()
-threading.Thread(target=background_metrics, daemon=True).start()
+# Start background task using socketio (safe with eventlet)
+socketio.start_background_task(background_metrics)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

@@ -43,6 +43,8 @@ CREATE TABLE public.admin_users (
     full_name character varying(100),
     role character varying(20) DEFAULT 'operator'::character varying,
     is_active boolean DEFAULT true,
+    is_mfa_enabled boolean DEFAULT false,
+    mfa_secret character varying(32),
     last_login timestamp without time zone,
     created_at timestamp without time zone DEFAULT now()
 );

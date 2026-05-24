@@ -27,18 +27,13 @@ class Config:
     TESTING = False
     
     # Upload Configuration
-    UPLOAD_FOLDER = 'static/uploads/customers'
     MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # 2MB
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-    
+
     # Backup Configuration
     BACKUP_FOLDER = '/app/backups'
     MAX_BACKUP_SIZE = 100 * 1024 * 1024  # 100MB
     ALLOWED_BACKUP_EXTENSIONS = {'sql', 'backup'}
     
-    # Redis Configuration (optional)
-    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-
     # Telegram Notification Configuration
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
     TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '')
