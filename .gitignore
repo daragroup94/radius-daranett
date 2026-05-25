@@ -11,6 +11,7 @@ freeradius-logs/
 # Database & runtime data
 *.db
 *.sqlite3
+*.sql
 pgadmin-data/
 uploads/
 backups/
