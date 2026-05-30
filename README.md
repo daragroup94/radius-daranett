@@ -165,7 +165,7 @@ Sebagai gantinya, MikroTik RouterOS mengambil data limitasi (`rate_limit`) dan n
 4. Klik kolom **Lease Script** di bagian paling bawah tab DHCP.
 5. Tempelkan script di bawah ini ke dalam kolom **Lease Script**:
 
-### 📋 DHCP Lease Script (RouterOS v7 - Robust Edition)
+### 📋 DHCP Lease Script (RouterOS v7 - VPN IP Direct Edition)
 ```routeros
 :if ($leaseBound = 1) do={
     :delay 2s; # Tunggu lease stabil
@@ -179,21 +179,13 @@ Sebagai gantinya, MikroTik RouterOS mengambil data limitasi (`rate_limit`) dan n
     :for i from=1 to=$attempts do={
         :if (!$success) do={
             :do {
-                # Coba 1: Mengambil data menggunakan domain publik
-                :set res [/tool fetch url="https://radius.access.daragroup.cloud/api/ipoe/get-name/$leaseActMAC" check-certificate=no as-value output=user]
+                # Mengambil data langsung via IP VPN VPS (10.20.0.1) untuk menghindari resolving error
+                :set res [/tool fetch url="https://10.20.0.1/api/ipoe/get-name/$leaseActMAC" http-header-field="Host: radius.access.daragroup.cloud" check-certificate=no as-value output=user]
                 :set data ($res->"data")
                 :set success true
             } on-error={
-                # Coba 2 (Fallback): Jika domain gagal resolve, coba akses langsung via IP VPN VPS (10.20.0.1)
-                :do {
-                    :log warn "IPoE: Gagal resolusi domain, mencoba fallback via VPN IP..."
-                    :set res [/tool fetch url="https://10.20.0.1/api/ipoe/get-name/$leaseActMAC" http-header-field="Host: radius.access.daragroup.cloud" check-certificate=no as-value output=user]
-                    :set data ($res->"data")
-                    :set success true
-                } on-error={
-                    :log warn "IPoE: Percobaan ke-$i gagal untuk MAC $leaseActMAC. Mencoba lagi dalam $delayTime..."
-                    :delay $delayTime
-                }
+                :log warn "IPoE: Percobaan ke-$i gagal menghubungi IP NAS (10.20.0.1) untuk MAC $leaseActMAC. Mencoba lagi dalam $delayTime..."
+                :delay $delayTime
             }
         }
     }
@@ -214,7 +206,7 @@ Sebagai gantinya, MikroTik RouterOS mengambil data limitasi (`rate_limit`) dan n
             }
         }
     } else={
-        :log error "Gagal memproses limitasi IPoE dari RADIUS Dashboard untuk MAC: $leaseActMAC (Koneksi gagal setelah $attempts percobaan)"
+        :log error "Gagal memproses limitasi IPoE dari RADIUS Dashboard untuk MAC: $leaseActMAC (Koneksi ke IP NAS gagal setelah $attempts percobaan)"
     }
 } else={
     # Saat client terputus (leaseBound = 0), hapus static queue secara otomatis
