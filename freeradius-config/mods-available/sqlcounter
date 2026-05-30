@@ -1,0 +1,20 @@
+sqlcounter noresetcounter {
+    sql_module_instance = sql
+    dialect = postgresql
+
+    counter_name = Max-All-Session-Time
+    check_name = Max-All-Session
+    reply_name = Session-Timeout
+
+    key = User-Name
+    reset = never
+
+    # Hitung total waktu sesi yang sudah selesai (acctstoptime IS NOT NULL)
+    # Sesi yang masih aktif (acctstoptime IS NULL) dihitung dari acctstarttime
+    query = "SELECT COALESCE( \
+        (SELECT SUM(AcctSessionTime) FROM radacct \
+         WHERE UserName='%{${key}}' AND AcctStopTime IS NOT NULL), 0) + \
+        COALESCE( \
+        (SELECT SUM(EXTRACT(EPOCH FROM (NOW() - AcctStartTime))::bigint) FROM radacct \
+         WHERE UserName='%{${key}}' AND AcctStopTime IS NULL), 0)"
+}

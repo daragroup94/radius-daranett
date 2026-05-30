@@ -1,0 +1,73 @@
+server hotspot {
+
+listen {
+    type = auth
+    ipaddr = *
+    port = 21812
+    limit {
+        max_connections = 16
+        lifetime = 0
+        idle_timeout = 30
+    }
+}
+
+listen {
+    ipaddr = *
+    port = 21813
+    type = acct
+    limit {
+    }
+}
+
+authorize {
+    # Tolak jika format MAC address (bukan username voucher)
+    if ("%{User-Name}" =~ /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$/) {
+        reject
+    }
+
+    preprocess
+    chap
+
+    # Query ke hotspot_vouchers:
+    # - Cek voucher ada, belum dihapus
+    # - Cek belum expired (wallclock)
+    # - Cek MAC lock
+    sql_hotspot
+
+    if (notfound) {
+        reject
+    }
+
+    pap
+}
+
+authenticate {
+    Auth-Type PAP {
+        pap
+    }
+    Auth-Type CHAP {
+        chap
+    }
+}
+
+preacct {
+    preprocess
+    acct_unique
+}
+
+accounting {
+    sql_hotspot
+    attr_filter.accounting_response
+}
+
+post-auth {
+    # Set first_login + lock MAC saat Accounting-Start
+    # (dilakukan di accounting start query)
+    sql_hotspot
+
+    Post-Auth-Type REJECT {
+        attr_filter.access_reject
+    }
+}
+
+}

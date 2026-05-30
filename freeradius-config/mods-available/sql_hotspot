@@ -1,0 +1,92 @@
+sql sql_hotspot {
+    dialect = "postgresql"
+    driver = "rlm_sql_postgresql"
+
+    server = "postgres"
+    port = 5432
+    login = "radius"
+    password = "radiuspass"
+    radius_db = "radius"
+
+    sql_user_name = "%{User-Name}"
+
+    # Cek password voucher - hanya return jika voucher valid:
+    # 1. Ada di tabel, belum dihapus
+    # 2. Belum expired (first_login NULL = belum pernah login, atau expires_at > NOW())
+    # 3. MAC cocok (locked_mac NULL = belum dilock, atau sama dengan Calling-Station-Id)
+    authorize_check_query = "\
+        SELECT id, username, 'Cleartext-Password' AS attribute, password AS value, ':=' AS op \
+        FROM hotspot_vouchers \
+        WHERE username = '%{SQL-User-Name}' \
+          AND deleted_at IS NULL \
+          AND (expires_at IS NULL OR expires_at > NOW()) \
+          AND (locked_mac IS NULL OR locked_mac = '' OR LOWER(locked_mac) = LOWER('%{Calling-Station-Id}'))"
+
+    # Reply attributes: Session-Timeout (sisa waktu) dan rate limit
+    authorize_reply_query = "\
+        SELECT id, username, attribute, value, op FROM ( \
+            SELECT \
+                id, \
+                username, \
+                'Session-Timeout' AS attribute, \
+                CASE \
+                    WHEN first_login IS NULL THEN duration_seconds::TEXT \
+                    ELSE GREATEST(0, EXTRACT(EPOCH FROM (expires_at - NOW()))::INTEGER)::TEXT \
+                END AS value, \
+                ':=' AS op \
+            FROM hotspot_vouchers \
+            WHERE username = '%{SQL-User-Name}' AND deleted_at IS NULL \
+            UNION ALL \
+            SELECT \
+                id, \
+                username, \
+                'Mikrotik-Rate-Limit' AS attribute, \
+                rate_limit AS value, \
+                ':=' AS op \
+            FROM hotspot_vouchers \
+            WHERE username = '%{SQL-User-Name}' AND deleted_at IS NULL AND rate_limit != '' \
+        ) t"
+
+    accounting {
+        reference = "%{tolower:type.%{Acct-Status-Type}.query}"
+
+        type {
+            start {
+                query = "\
+                    INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) \
+                    VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), NOW(), 0, 0, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}') \
+                    ON CONFLICT (acctuniqueid) DO UPDATE SET acctupdatetime = NOW()"
+            }
+
+            stop {
+                query = "UPDATE radacct SET acctstoptime = NOW(), acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0}, acctterminatecause = '%{Acct-Terminate-Cause}', acctupdatetime = NOW() WHERE acctuniqueid = '%{Acct-Unique-Session-Id}'"
+            }
+
+            interim-update {
+                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', NOW(), %{%{Acct-Session-Time}:-0}, %{%{Acct-Input-Octets}:-0}, %{%{Acct-Output-Octets}:-0}, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}') ON CONFLICT (acctuniqueid) DO UPDATE SET acctsessiontime = EXCLUDED.acctsessiontime, acctinputoctets = EXCLUDED.acctinputoctets, acctoutputoctets = EXCLUDED.acctoutputoctets, acctupdatetime = NOW()"
+            }
+        }
+    }
+
+    post-auth {
+        reference = ".query"
+        query = "\
+            UPDATE hotspot_vouchers SET \
+                first_login = COALESCE(first_login, NOW()), \
+                expires_at = CASE WHEN first_login IS NULL THEN NOW() + (duration_seconds || ' seconds')::INTERVAL ELSE expires_at END, \
+                locked_mac = COALESCE(NULLIF(locked_mac, ''), NULLIF(LOWER('%{Calling-Station-Id}'), '')) \
+            WHERE username = '%{SQL-User-Name}' AND deleted_at IS NULL; \
+            INSERT INTO radpostauth (username, pass, reply, authdate, calledstationid, callingstationid) \
+            VALUES ('%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', NOW(), '%{Called-Station-Id}', '%{Calling-Station-Id}')"
+    }
+
+    pool {
+        start = 3
+        min = 2
+        max = 8
+        spare = 2
+        uses = 0
+        lifetime = 0
+        idle_timeout = 60
+    }
+}

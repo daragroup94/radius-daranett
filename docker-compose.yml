@@ -3,6 +3,8 @@
 # Complete FreeRADIUS with Dashboard & PostgreSQL
 # ============================================
 
+# Secrets dikelola di file .env (jangan commit ke git)
+
 services:
   # ==========================================
   # RADIUS DASHBOARD (Flask Application)
@@ -28,18 +30,20 @@ services:
       - "traefik.http.routers.radius-secure.service=radius-service"
       # Service Configuration
       - "traefik.http.services.radius-service.loadbalancer.server.port=5000"
-    # Environment Variables
+    # Environment Variables (dari .env)
     environment:
-      - DB_HOST=postgres
-      - DB_NAME=radius
-      - DB_USER=radius
-      - DB_PASSWORD=radiuspass
-      - DB_PORT=5432
-      - SECRET_KEY=05052020fAk@#
-      - ALLOWED_ORIGINS=https://radius.access.daragroup.cloud
-      - REDIS_URL=redis://10.204.0.53:6379/0
-      - FLASK_ENV=production
-      - TZ=Asia/Jakarta
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PORT=${DB_PORT}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - REDIS_URL=${REDIS_URL}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - FLASK_ENV=${FLASK_ENV}
+      - TZ=${TZ}
     # Volumes
     volumes:
       - ./app:/app
@@ -48,6 +52,9 @@ services:
       - ./backups:/app/backups
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /usr/bin/docker:/usr/bin/docker:ro
+    # Allow adding routes to reach NAS subnets
+    cap_add:
+      - NET_ADMIN
     # Network
     networks:
       my-net:
@@ -76,11 +83,11 @@ services:
     restart: unless-stopped
     # Environment Variables
     environment:
-      POSTGRES_DB: radius
-      POSTGRES_USER: radius
-      POSTGRES_PASSWORD: radiuspass
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_INITDB_ARGS: "-E UTF8"
-      TZ: Asia/Jakarta
+      TZ: ${TZ}
     # Ports (Optional - comment if not needed)
 #    ports:
 #      - "5432:5432"
@@ -119,10 +126,10 @@ services:
       my-net:
         ipv4_address: 10.204.0.53
     # Command
-    command: redis-server --appendonly yes --requirepass "" --maxmemory 256mb --maxmemory-policy allkeys-lru --replicaof no one
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru --replicaof no one
     # Health Check
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -138,28 +145,42 @@ services:
     restart: unless-stopped
     # Environment Variables
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: radius
-      DB_USER: radius
-      DB_PASS: radiuspass
-      TZ: Asia/Jakarta
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASSWORD}
+      TZ: ${TZ}
     # Ports
     ports:
-      - "1812:1812/udp"  # Authentication
-      - "1813:1813/udp"  # Accounting
+      - "1812:1812/udp"    # Authentication PPPoE
+      - "1813:1813/udp"    # Accounting PPPoE
+      - "11812:11812/udp"  # Authentication IPoE
+      - "11813:11813/udp"  # Accounting IPoE
+      - "3799:3799/udp"    # CoA / Disconnect-Message
+      - "21812:21812/udp"  # Authentication Hotspot
+      - "21813:21813/udp"  # Accounting Hotspot
+      - "31812:31812/udp"  # Authentication VPN
+      - "31813:31813/udp"  # Accounting VPN
     # Volumes
     volumes:
       - ./clients.conf:/etc/freeradius/3.0/clients.conf:ro
       - ./freeradius-config/mods-available/sql:/etc/freeradius/3.0/mods-available/sql:ro
+      - ./freeradius-config/mods-available/sqlcounter:/etc/freeradius/3.0/mods-available/sqlcounter:ro
+      - ./freeradius-config/mods-enabled/sqlcounter:/etc/freeradius/3.0/mods-enabled/sqlcounter:ro
       - ./freeradius-config/sites-enabled/default:/etc/freeradius/3.0/sites-enabled/default:ro
+      - ./freeradius-config/sites-enabled/ipoe:/etc/freeradius/3.0/sites-enabled/ipoe:ro
+      - ./freeradius-config/sites-enabled/hotspot:/etc/freeradius/3.0/sites-enabled/hotspot:ro
+      - ./freeradius-config/sites-enabled/vpn:/etc/freeradius/3.0/sites-enabled/vpn:ro
+      - ./freeradius-config/mods-available/sql_hotspot:/etc/freeradius/3.0/mods-available/sql_hotspot:ro
+      - ./freeradius-config/dictionary:/etc/freeradius/3.0/dictionary:ro
       - ./freeradius-logs:/var/log/freeradius
     # Network
     networks:
       my-net:
         ipv4_address: 10.204.0.54
     # Command (Debug mode - remove -X for production)
-    command: freeradius -X -l stdout
+    command: freeradius -f -l stdout
     # Dependencies
     depends_on:
       postgres:
@@ -191,11 +212,11 @@ services:
       - "traefik.http.services.pgadmin-service.loadbalancer.server.port=80"
     # Environment Variables
     environment:
-      PGADMIN_DEFAULT_EMAIL: daranett@daranett.cloud
-      PGADMIN_DEFAULT_PASSWORD: 10041994fAk@#
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: 'True'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-      TZ: Asia/Jakarta
+      TZ: ${TZ}
     # Volumes
     volumes:
       - pgadmin_data:/var/lib/pgadmin

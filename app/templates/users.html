@@ -2,53 +2,133 @@
 
 {% block title %}Users - RADIUS Manager{% endblock %}
 {% block page_title %}PPPoE Users{% endblock %}
-{% block page_subtitle %}Manage PPPoE Users & Bandwidth Limits{% endblock %}
+{% block page_subtitle %}Manage PPPoE Customer Users & Bandwidth Limits{% endblock %}
 
 {% block extra_css %}
 <style>
-    .icon-gradient-users { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .icon-gradient-add-user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .icon-gradient-edit-user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    /* Premium Font Styling */
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
+    }
+    
+    /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
+    .icon-wrapper-noc {
+        width: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 1rem !important; /* 16px */
+        flex-shrink: 0 !important;
+    }
+    .icon-noc {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    .icon-gradient-users { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; }
+    .icon-gradient-add-user { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; }
+    .icon-gradient-edit-user { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; }
+    
+    /* Floating icon animation */
+    .floating-icon { 
+        animation: float 3.5s ease-in-out infinite;
+        will-change: transform;
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <div class="modern-card rounded-3xl p-8 shadow-xl">
-        <!-- Header dengan tombol Add User -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div class="flex items-center">
-                <div class="w-12 h-12 icon-gradient-users rounded-xl flex items-center justify-center mr-3 shadow-lg floating-icon">
-                    <i class="fas fa-users text-white text-xl"></i>
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-users mr-4 shadow-lg shadow-purple-500/15 floating-icon">
+                <i data-lucide="wifi" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Pelanggan PPPoE</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola akun PPPoE pelanggan, batas kecepatan bandwidth, dan profil masa aktif.</p>
+            </div>
+        </div>
+        
+        <button onclick="openAddUserModal()" class="z-10 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] whitespace-nowrap">
+            <i data-lucide="user-plus" class="lucide w-5 h-5 text-white"></i>
+            <span>Tambah Pelanggan</span>
+        </button>
+    </div>
+
+    <!-- Stats Cards Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Total PPPoE Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-users shadow-md shadow-purple-500/10">
+                <i data-lucide="users" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Pelanggan PPPoE</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statPppoeTotal">—</p>
+            </div>
+        </div>
+        <!-- Online Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-nas shadow-md shadow-emerald-500/10">
+                <i data-lucide="activity" class="lucide icon-noc text-white"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sedang Online</p>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white font-outfit" id="statPppoeOnline">—</p>
+                    <p class="text-xs text-emerald-500 font-bold" id="statPppoeOnlinePct"></p>
                 </div>
-                <div>
-                    <h3 class="text-lg font-bold text-gray-800">PPPoE Users</h3>
-                    <p class="text-xs text-gray-500">Manage bandwidth & user configurations</p>
+                <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 mt-2 overflow-hidden">
+                    <div id="statPppoeOnlineBar" class="h-full rounded-full bg-emerald-500 transition-all duration-500" style="width:0%"></div>
                 </div>
+            </div>
+        </div>
+        <!-- Offline Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc bg-gradient-to-tr from-rose-500 to-red-600 shadow-md shadow-red-500/10">
+                <i data-lucide="power" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pelanggan Offline</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statPppoeOffline">—</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main List Card Container -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+        <!-- Sub-header dengan Search Bar saja -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-800 dark:text-white">Daftar Akun PPPoE</h3>
+                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Cari, edit, batasi kecepatan, atau hapus pelanggan.</p>
             </div>
             
             <div class="flex items-center gap-3 w-full sm:w-auto">
                 <!-- SEARCH BAR -->
                 <div class="relative flex-1 sm:w-64">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i class="fas fa-search text-gray-400 text-xs"></i>
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <i data-lucide="search" class="lucide w-4 h-4 text-slate-400"></i>
                     </div>
                     <input type="text" id="userSearch" 
-                           class="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-gray-800 text-sm transition-all" 
+                           class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-xs font-medium transition-all" 
                            placeholder="Cari username...">
                 </div>
-                <!-- TOMBOL ADD USER -->
-                <button onclick="openAddUserModal()" 
-                        class="text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md transition-all hover:opacity-90 whitespace-nowrap"
-                        style="background:linear-gradient(135deg,#667eea,#764ba2);">
-                    <i class="fas fa-user-plus"></i>
-                    <span>Add User</span>
-                </button>
             </div>
         </div>
 
         <!-- Users List -->
-        <div id="usersList" class="space-y-4" style="max-height: 70vh; overflow-y: auto; -webkit-overflow-scrolling: touch;">
+        <div id="usersList" class="w-full" style="max-height: 70vh; overflow-y: auto; -webkit-overflow-scrolling: touch;">
             <!-- Content will be loaded here -->
         </div>
 
@@ -775,7 +855,7 @@
             if (users.length === 0) {
                 if (searchQuery) {
                     usersList.innerHTML = `
-                        <div class="text-center py-20">
+                        <div class="col-span-full text-center py-20">
                             <div class="w-24 h-24 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
                                 <i class="fas fa-search text-gray-400 text-4xl"></i>
                             </div>
@@ -785,7 +865,7 @@
                     `;
                 } else {
                     usersList.innerHTML = `
-                        <div class="text-center py-20">
+                        <div class="col-span-full text-center py-20">
                             <div class="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
                                 <i class="fas fa-users text-gray-400 text-4xl"></i>
                             </div>
@@ -800,49 +880,82 @@
                 return;
             }
 
-            let html = '';
+            let html = `
+                <div class="overflow-x-auto min-w-full">
+                    <table class="w-full text-left border-collapse align-middle">
+                        <thead>
+                            <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
+                                <th class="pb-3 pt-1 px-4 font-extrabold">PELANGGAN</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold">STATUS</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold">ALAMAT IP</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold">RATE LIMIT</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold text-right">AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50 dark:divide-slate-750">
+            `;
             users.forEach(user => {
                 const isOnline = user.active_sessions > 0;
                 const statusBadge = isOnline
-                    ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 flex-shrink-0"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>Online</span>'
-                    : '<span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0">Offline</span>';
+                    ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>Online</span>'
+                    : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-500 border border-gray-100">Offline</span>';
                 const throttleBtns = isOnline
-                    ? '<button onclick="throttleUser(\'' + user.username + '\')" class="w-8 h-8 bg-yellow-50 hover:bg-yellow-500 text-yellow-600 hover:text-white rounded-lg transition-colors" title="Throttle"><i class="fas fa-tachometer-alt text-xs"></i></button>'
-                    + '<button onclick="unthrottleUser(\'' + user.username + '\')" class="w-8 h-8 bg-green-50 hover:bg-green-500 text-green-600 hover:text-white rounded-lg transition-colors" title="Unthrottle"><i class="fas fa-rocket text-xs"></i></button>'
+                    ? '<button onclick="throttleUser(\'' + user.username + '\')" class="w-8 h-8 bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Throttle"><i class="fas fa-tachometer-alt text-xs"></i></button>'
+                    + '<button onclick="unthrottleUser(\'' + user.username + '\')" class="w-8 h-8 bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Unthrottle"><i class="fas fa-rocket text-xs"></i></button>'
                     : '';
                 const userId = user.id;
                 const uname = user.username;
 
-                html += '<div class="bg-white rounded-xl p-3 border border-gray-100 hover:border-indigo-300 hover:shadow-sm transition-all duration-200">'
-                    + '<div class="flex justify-between items-center">'
-                    + '<div class="flex items-center gap-3 flex-1 min-w-0">'
-                    + '<div class="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0" style="background:linear-gradient(135deg,#667eea,#764ba2);"><i class="fas fa-user text-white text-sm"></i></div>'
-                    + '<div class="flex-1 min-w-0">'
-                    + '<div class="flex items-center gap-2 mb-0.5">'
-                    + '<h4 class="font-bold text-gray-800 text-sm truncate">' + uname + '</h4>'
-                    + statusBadge
+                html += '<tr class="hover:bg-slate-50/50 transition-colors">'
+                    + '<td class="py-3 px-4">'
+                    + '<div class="flex items-center gap-3">'
+                    + '<div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0" style="background:linear-gradient(135deg,#667eea,#764ba2);"><i class="fas fa-user text-white text-xs"></i></div>'
+                    + '<span class="font-bold text-slate-800 text-sm truncate">' + uname + '</span>'
                     + '</div>'
-                    + '<div class="flex flex-wrap gap-3 text-xs text-gray-500">'
-                    + '<span><i class="fas fa-network-wired text-blue-400 mr-1"></i>' + (user.ip_address || 'Dynamic') + '</span>'
-                    + '<span><i class="fas fa-tachometer-alt text-purple-400 mr-1"></i><code class="text-purple-600 font-mono">' + (user.rate_limit || 'Not set') + '</code></span>'
-                    + '</div></div></div>'
-                    + '<div class="flex gap-1.5 ml-3 flex-shrink-0">'
+                    + '</td>'
+                    + '<td class="py-3 px-4">' + statusBadge + '</td>'
+                    + '<td class="py-3 px-4"><span class="text-xs font-mono text-slate-550"><i class="fas fa-network-wired text-slate-400 mr-1.5"></i>' + (user.ip_address || 'Dynamic') + '</span></td>'
+                    + '<td class="py-3 px-4"><span class="text-xs font-mono text-indigo-650 bg-indigo-50/60 px-2 py-0.5 rounded border border-indigo-100/50"><i class="fas fa-tachometer-alt text-indigo-400 mr-1.5"></i>' + (user.rate_limit || 'Not set') + '</span></td>'
+                    + '<td class="py-3 px-4 text-right">'
+                    + '<div class="flex gap-1.5 justify-end">'
                     + '<button onclick="showDeviceInfo(\'' + uname + '\')" class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs transition-all hover:opacity-80" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);" title="Device Info"><i class="fas fa-satellite-dish"></i></button>'
-                    + '<button onclick="editUser(\'' + uname + '\')" class="w-8 h-8 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg transition-colors" title="Edit"><i class="fas fa-edit text-xs"></i></button>'
+                    + '<button onclick="editUser(\'' + uname + '\')" class="w-8 h-8 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Edit"><i class="fas fa-edit text-xs"></i></button>'
                     + throttleBtns
-                    + '<button onclick="deleteUser(' + userId + ', \'' + uname + '\')" class="w-8 h-8 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors" title="Delete"><i class="fas fa-trash text-xs"></i></button>'
-                    + '</div></div></div>';
+                    + '<button onclick="deleteUser(' + userId + ', \'' + uname + '\')" class="w-8 h-8 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Delete"><i class="fas fa-trash text-xs"></i></button>'
+                    + '</div>'
+                    + '</td>'
+                    + '</tr>';
             });
+            html += '</tbody></table></div>';
             usersList.innerHTML = html;
+            loadPppoeStats();
         } catch (error) {
             console.error('Error loading users:', error);
             usersList.innerHTML = `
-                <div class="text-center py-20">
+                <div class="col-span-full text-center py-20">
                     <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
                     <p class="text-gray-700 font-bold text-xl mb-2">Error Loading Users</p>
                     <p class="text-gray-500">${error.message}</p>
                 </div>
             `;
+        }
+    }
+
+    async function loadPppoeStats() {
+        try {
+            const res = await (await fetch('/api/stats')).json();
+            const total = res.pppoe_users || 0;
+            const online = res.pppoe_sessions || 0;
+            const offline = Math.max(0, total - online);
+            const pct = total ? Math.round((online / total) * 100) : 0;
+            
+            document.getElementById('statPppoeTotal').textContent = total;
+            document.getElementById('statPppoeOnline').textContent = online;
+            document.getElementById('statPppoeOnlinePct').textContent = pct + '%';
+            document.getElementById('statPppoeOnlineBar').style.width = pct + '%';
+            document.getElementById('statPppoeOffline').textContent = offline;
+        } catch (e) {
+            console.error('Error loading PPPoE stats:', e);
         }
     }
 
@@ -857,6 +970,7 @@
             });
             const result = await r.json();
             showNotification(result.message || result.error, result.success ? 'warning' : 'error');
+            if (result.success) loadUsers();
         } catch(e) { showNotification(e.message, 'error'); }
     }
 
@@ -865,6 +979,7 @@
             const r = await fetch(`/api/users/unthrottle/${username}`, {method: 'POST'});
             const result = await r.json();
             showNotification(result.message || result.error, result.success ? 'success' : 'error');
+            if (result.success) loadUsers();
         } catch(e) { showNotification(e.message, 'error'); }
     }
 

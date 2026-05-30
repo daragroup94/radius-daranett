@@ -33,3 +33,6 @@ venv/
 .DS_Store
 Thumbs.db
 app/.telegram.env
+
+# Scratch/Local Tools
+scratch/

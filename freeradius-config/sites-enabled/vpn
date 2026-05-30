@@ -1,0 +1,78 @@
+server vpn {
+
+listen {
+    type = auth
+    ipaddr = *
+    port = 31812
+    limit {
+          max_connections = 16
+          lifetime = 0
+          idle_timeout = 30
+    }
+}
+
+listen {
+    ipaddr = *
+    port = 31813
+    type = acct
+    limit {
+    }
+}
+
+authorize {
+    # Hanya izinkan jika user memiliki grup 'vpn' di database radusergroup
+    if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname = 'vpn' LIMIT 1}" != "vpn") {
+        reject
+    }
+
+    filter_username
+    preprocess
+    chap
+    mschap
+    digest
+    suffix
+    files
+    sql
+    pap
+}
+
+authenticate {
+    Auth-Type PAP {
+        pap
+    }
+    Auth-Type CHAP {
+        chap
+    }
+    Auth-Type MS-CHAP {
+        mschap
+    }
+    mschap
+    digest
+}
+
+preacct {
+    preprocess
+    acct_unique
+    suffix
+    files
+}
+
+accounting {
+    sql
+    attr_filter.accounting_response
+}
+
+session {
+    sql
+}
+
+post-auth {
+    sql
+
+    Post-Auth-Type REJECT {
+        sql
+        attr_filter.access_reject
+    }
+}
+
+}

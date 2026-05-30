@@ -6,213 +6,273 @@
 
 {% block extra_css %}
 <style>
-    .icon-gradient-user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .icon-gradient-key { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    /* Premium Font Styling */
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
+    }
+    
+    /* Stat Cards Hover & Shadows */
+    .stat-card-glow {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .stat-card-glow:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 30px rgba(0, 0, 0, 0.05);
+    }
+    .dark .stat-card-glow {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .dark .stat-card-glow:hover {
+        box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
+        border-color: rgba(99, 102, 241, 0.25);
+    }
+
+    /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
+    .icon-wrapper-noc {
+        width: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 1rem !important; /* 16px */
+        flex-shrink: 0 !important;
+    }
+    .icon-noc {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* Guaranteed Custom Gradients */
+    .icon-gradient-user { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%) !important; }
+    .icon-gradient-key { background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%) !important; }
+    
+    /* Floating icon animation */
+    .floating-icon { 
+        animation: float 3.5s ease-in-out infinite;
+        will-change: transform;
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-user mr-4 shadow-lg shadow-blue-500/15 floating-icon">
+                <i data-lucide="user" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Profil Pengguna</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola pengaturan akun Anda, ganti password, dan aktifkan autentikasi ganda.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         <!-- User Info Card -->
-        <div class="modern-card rounded-3xl p-8 shadow-xl">
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
             <div class="text-center mb-6">
-                <div class="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl relative overflow-hidden">
-                    <div class="absolute inset-0 shimmer"></div>
-                    <i class="fas fa-user text-white text-5xl relative z-10"></i>
-                    <div class="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 rounded-full border-4 border-white"></div>
+                <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg relative overflow-hidden">
+                    <i class="fas fa-user text-white text-3xl z-10"></i>
+                    <div class="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-4 border-white dark:border-slate-800"></div>
                 </div>
-                <h3 class="text-2xl font-bold text-gray-800 mb-2">{{ session.username }}</h3>
-                <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 capitalize shadow-md">
-                    <i class="fas fa-crown mr-2 text-yellow-500"></i>
+                <h3 class="text-lg font-bold text-slate-850 dark:text-white mb-2">{{ session.username }}</h3>
+                <span class="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 capitalize shadow-sm border border-blue-100 dark:border-blue-900/30">
+                    <i class="fas fa-crown mr-1.5 text-amber-500"></i>
                     {{ session.role }}
                 </span>
             </div>
 
-            <div class="space-y-4 pt-6 border-t-2 border-gray-100">
-                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Username</label>
-                    <p class="text-lg font-bold text-gray-800 flex items-center">
-                        <i class="fas fa-user text-blue-600 mr-3"></i>
+            <div class="space-y-4 pt-5 border-t border-slate-100 dark:border-slate-750">
+                <div class="bg-slate-50 dark:bg-slate-750/30 p-3.5 rounded-2xl border border-slate-150 dark:border-slate-700/60">
+                    <label class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Username</label>
+                    <p class="text-sm font-bold text-slate-800 dark:text-white flex items-center">
+                        <i class="fas fa-user text-blue-500 mr-2.5"></i>
                         {{ session.username }}
                     </p>
                 </div>
                 
-                <div class="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Role</label>
-                    <p class="text-lg font-bold text-gray-800 flex items-center">
-                        <i class="fas fa-shield-alt text-purple-600 mr-3"></i>
+                <div class="bg-slate-50 dark:bg-slate-750/30 p-3.5 rounded-2xl border border-slate-150 dark:border-slate-700/60">
+                    <label class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Role</label>
+                    <p class="text-sm font-bold text-slate-800 dark:text-white flex items-center">
+                        <i class="fas fa-shield-alt text-purple-500 mr-2.5"></i>
                         <span class="capitalize">{{ session.role }}</span>
                     </p>
                 </div>
                 
-                <div class="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">User ID</label>
-                    <p class="text-lg font-bold text-gray-800 flex items-center font-mono">
-                        <i class="fas fa-fingerprint text-green-600 mr-3"></i>
+                <div class="bg-slate-50 dark:bg-slate-750/30 p-3.5 rounded-2xl border border-slate-150 dark:border-slate-700/60">
+                    <label class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">User ID</label>
+                    <p class="text-sm font-bold text-slate-800 dark:text-white flex items-center font-mono">
+                        <i class="fas fa-fingerprint text-emerald-500 mr-2.5"></i>
                         #{{ session.user_id }}
                     </p>
                 </div>
             </div>
 
-            <div class="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-200">
+            <div class="mt-5 p-4 bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl border border-amber-250 dark:border-amber-700/30">
                 <div class="flex items-start">
-                    <div class="w-10 h-10 bg-yellow-500 rounded-xl flex items-center justify-center mr-3 flex-shrink-0">
-                        <i class="fas fa-lightbulb text-white"></i>
+                    <div class="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center mr-3 flex-shrink-0 text-white shadow-sm shadow-amber-500/10">
+                        <i class="fas fa-lightbulb text-xs"></i>
                     </div>
                     <div>
-                        <p class="text-sm font-bold text-gray-800 mb-1">Security Tip</p>
-                        <p class="text-xs text-gray-600">Change your password regularly to keep your account secure</p>
+                        <p class="text-xs font-bold text-slate-850 dark:text-white mb-0.5">Tips Keamanan</p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Ubah kata sandi Anda secara berkala untuk menjaga akun admin Anda tetap aman dan terlindungi.</p>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Change Password Card -->
-        <div class="modern-card rounded-3xl p-8 shadow-xl lg:col-span-2">
-            <div class="flex items-center mb-8">
-                <div class="w-16 h-16 icon-gradient-key rounded-2xl flex items-center justify-center mr-4 shadow-lg">
-                    <i class="fas fa-key text-white text-2xl"></i>
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-6">
+            <div class="flex items-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
+                <div class="icon-wrapper-noc icon-gradient-key mr-4 shadow-lg shadow-rose-500/15 floating-icon">
+                    <i data-lucide="key" class="lucide icon-noc text-white"></i>
                 </div>
                 <div>
-                    <h3 class="text-2xl font-bold text-gray-800">Change Password</h3>
-                    <p class="text-sm text-gray-500 mt-1">Update your account password</p>
+                    <h3 class="text-base font-bold text-slate-850 dark:text-white">Ganti Kata Sandi</h3>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 font-medium">Perbarui kata sandi akun admin Anda secara berkala.</p>
                 </div>
             </div>
 
             <form id="changePasswordForm">
-                <div class="space-y-6">
+                <div class="space-y-5">
                     <div>
-                        <label for="current_password" class="block text-sm font-bold text-gray-700 mb-3">
-                            <i class="fas fa-lock text-gray-600 mr-2"></i>
-                            Current Password
+                        <label for="current_password" class="block text-xs font-bold text-slate-655 dark:text-slate-400 mb-2">
+                            Password Saat Ini
                         </label>
                         <div class="relative">
                             <input type="password" id="current_password" name="current_password" required
-                                   class="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 font-medium transition-all"
-                                   placeholder="Enter current password">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <i class="fas fa-lock text-gray-400"></i>
+                                   class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                                   placeholder="Masukkan password saat ini">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                                <i class="fas fa-lock text-xs"></i>
                             </div>
                         </div>
                     </div>
 
                     <div>
-                        <label for="new_password" class="block text-sm font-bold text-gray-700 mb-3">
-                            <i class="fas fa-key text-blue-600 mr-2"></i>
-                            New Password
+                        <label for="new_password" class="block text-xs font-bold text-slate-655 dark:text-slate-400 mb-2">
+                            Password Baru
                         </label>
                         <div class="relative">
                             <input type="password" id="new_password" name="new_password" required
-                                   class="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 font-medium transition-all"
-                                   placeholder="Enter new password" minlength="6">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <i class="fas fa-key text-gray-400"></i>
+                                   class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                                   placeholder="Masukkan password baru" minlength="6">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                                <i class="fas fa-key text-xs"></i>
                             </div>
                         </div>
-                        <div class="mt-3 flex items-start bg-blue-50 p-3 rounded-xl border border-blue-200">
-                            <i class="fas fa-info-circle text-blue-600 mr-2 mt-0.5"></i>
-                            <p class="text-xs text-blue-800 font-medium">
-                                Password must be at least 6 characters long. Use a combination of letters, numbers, and symbols for better security.
+                        <div class="mt-2.5 flex items-start bg-blue-500/5 dark:bg-blue-500/10 p-3 rounded-2xl border border-blue-200 dark:border-blue-800/50">
+                            <i class="fas fa-info-circle text-blue-500 mr-2 mt-0.5 text-xs flex-shrink-0"></i>
+                            <p class="text-[11px] text-blue-650 dark:text-blue-400 font-medium leading-relaxed">
+                                Password harus minimal 6 karakter. Gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol untuk kekuatan terbaik.
                             </p>
                         </div>
                     </div>
 
                     <div>
-                        <label for="confirm_password" class="block text-sm font-bold text-gray-700 mb-3">
-                            <i class="fas fa-check-circle text-green-600 mr-2"></i>
-                            Confirm New Password
+                        <label for="confirm_password" class="block text-xs font-bold text-slate-655 dark:text-slate-400 mb-2">
+                            Konfirmasi Password Baru
                         </label>
                         <div class="relative">
                             <input type="password" id="confirm_password" name="confirm_password" required
-                                   class="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 font-medium transition-all"
-                                   placeholder="Confirm new password">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <i class="fas fa-check-circle text-gray-400"></i>
+                                   class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                                   placeholder="Konfirmasi password baru">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                                <i class="fas fa-check-circle text-xs"></i>
                             </div>
                         </div>
                     </div>
 
                     <!-- Password Strength Indicator -->
-                    <div id="passwordStrength" class="hidden">
+                    <div id="passwordStrength" class="hidden col-span-full">
                         <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm font-bold text-gray-700">Password Strength:</span>
-                            <span id="strengthText" class="text-sm font-bold"></span>
+                            <span class="text-xs font-bold text-slate-600 dark:text-slate-400">Kekuatan Password:</span>
+                            <span id="strengthText" class="text-xs font-bold"></span>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                            <div id="strengthBar" class="h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                            <div id="strengthBar" class="h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
                         </div>
                     </div>
 
                     <button type="submit" 
-                            class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-                        <i class="fas fa-shield-alt text-xl"></i>
-                        <span>Update Password</span>
+                            class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-3 px-5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-[1.01] flex items-center justify-center space-x-2">
+                        <i class="fas fa-shield-alt text-xs"></i>
+                        <span>Perbarui Password</span>
                     </button>
                 </div>
             </form>
 
             <!-- Security Status -->
-            <div class="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-emerald-900/20 dark:to-green-900/20 rounded-2xl border-2 border-green-200 dark:border-green-800">
+            <div class="mt-6 p-4 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-2xl border border-emerald-250 dark:border-emerald-700/50">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
-                        <div class="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center mr-4 shadow-md">
-                            <i class="fas fa-check-circle text-white text-xl"></i>
+                        <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center mr-3 shadow-md shadow-emerald-500/10 text-white flex-shrink-0">
+                            <i class="fas fa-check-circle text-base"></i>
                         </div>
                         <div>
-                            <p class="font-bold text-gray-800 dark:text-white text-lg">Account Security</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Your account is secure</p>
+                            <p class="font-bold text-slate-850 dark:text-white text-xs">Kombinasi Keamanan Akun</p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Akun Anda saat ini terlindungi dengan baik</p>
                         </div>
                     </div>
                     <div class="text-right">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-bold">Status</p>
-                        <p class="text-lg font-bold text-green-600 dark:text-green-400">Active</p>
+                        <p class="text-[9px] text-slate-455 dark:text-slate-500 uppercase tracking-wider font-bold">Status</p>
+                        <p class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">Aktif & Aman</p>
                     </div>
                 </div>
             </div>
 
             <!-- Two-Factor Authentication -->
-            <div class="mt-8 p-8 modern-card rounded-3xl border-2 border-blue-100 dark:border-blue-900/30">
-                <div class="flex items-center mb-6">
-                    <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
-                        <i class="fas fa-shield-alt text-white text-xl"></i>
+            <div class="mt-6 p-5 bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl">
+                <div class="flex items-center mb-5 pb-3 border-b border-slate-100 dark:border-slate-750">
+                    <div class="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-md text-white flex-shrink-0">
+                        <i class="fas fa-shield-alt text-sm"></i>
                     </div>
                     <div>
-                        <h3 class="text-xl font-bold text-gray-800 dark:text-white">Two-Factor Authentication (2FA)</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Add an extra layer of security to your account</p>
+                        <h3 class="text-sm font-bold text-slate-850 dark:text-white">Two-Factor Authentication (2FA)</h3>
+                        <p class="text-[11px] text-slate-400 dark:text-slate-500">Tingkatkan lapisan perlindungan ekstra untuk akun administrator Anda.</p>
                     </div>
                 </div>
 
-                <div id="mfaStatus" class="space-y-4">
-                    <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
-                        <div class="flex items-center justify-between">
-                            <p class="text-sm font-medium text-blue-800 dark:text-blue-300">Google Authenticator / Authy</p>
-                            <button onclick="setupMFA()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all">
-                                Enable MFA
+                <div id="mfaStatus" class="space-y-3">
+                    <div class="p-4 bg-blue-500/5 dark:bg-blue-500/10 rounded-2xl border border-blue-150 dark:border-blue-800/80">
+                        <div class="flex items-center justify-between flex-wrap gap-3">
+                            <p class="text-xs font-semibold text-slate-700 dark:text-slate-300">Aplikasi Google Authenticator / Authy / Microsoft Authenticator</p>
+                            <button onclick="setupMFA()" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
+                                Aktifkan 2FA
                             </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- MFA Setup Modal (Hidden by default) -->
-                <div id="mfaSetupModal" class="hidden mt-6 pt-6 border-t-2 border-gray-100 dark:border-slate-700">
+                <div id="mfaSetupModal" class="hidden mt-6 pt-5 border-t border-slate-100 dark:border-slate-750">
                     <div class="text-center">
-                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Scan the QR code below with your authenticator app</p>
-                        <div class="inline-block p-4 bg-white rounded-3xl shadow-inner mb-6">
-                            <img id="mfaQrCode" src="" alt="QR Code" class="w-48 h-48">
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Pindai QR code berikut dengan aplikasi Authenticator Anda:</p>
+                        <div class="inline-block p-4 bg-white rounded-3xl shadow-inner mb-4">
+                            <canvas id="mfaQrCode" class="w-44 h-44"></canvas>
                         </div>
-                        <div class="mb-6">
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Or enter manual code</p>
-                            <code id="mfaSecret" class="bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg font-mono text-blue-600 dark:text-blue-400 font-bold"></code>
+                        <div class="mb-4 bg-slate-50 dark:bg-slate-750/30 p-3 rounded-2xl border border-slate-150 dark:border-slate-700">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Atau masukkan kode rahasia secara manual</p>
+                            <code id="mfaSecret" class="px-3 py-1 rounded-lg font-mono text-xs text-blue-600 dark:text-blue-400 font-bold bg-white dark:bg-slate-800 select-all border border-slate-100 dark:border-slate-700"></code>
                         </div>
-                        <div class="max-w-xs mx-auto">
-                            <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Verify Code</label>
+                        <div class="max-w-xs mx-auto space-y-3">
+                            <label class="block text-xs font-bold text-slate-655 dark:text-slate-400">Verifikasi Kode 2FA</label>
                             <input type="text" id="mfaVerifyCode" maxlength="6" 
-                                   class="w-full text-center text-2xl tracking-widest font-bold px-4 py-3 bg-gray-50 dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                   class="w-full text-center text-xl tracking-widest font-bold px-4 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-800 dark:text-white" 
                                    placeholder="000000">
-                            <button onclick="verifyMFA()" class="w-full mt-4 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold transition-all">
-                                Verify & Enable
+                            <button onclick="verifyMFA()" class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white py-2.5 rounded-xl font-bold text-xs transition-all shadow-md">
+                                Verifikasi & Aktifkan
                             </button>
                         </div>
                     </div>
@@ -220,38 +280,38 @@
             </div>
 
             <!-- Telegram Notification Settings -->
-            <div class="mt-8 p-8 modern-card rounded-3xl border-2 border-blue-100 dark:border-blue-900/30">
-                <div class="flex items-center mb-6">
-                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center mr-4 shadow-lg" style="background:linear-gradient(135deg,#38bdf8,#2563eb);">
-                        <i class="fas fa-bell text-white text-2xl"></i>
+            <div class="mt-6 p-5 bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl">
+                <div class="flex items-center mb-5 pb-3 border-b border-slate-100 dark:border-slate-750">
+                    <div class="w-11 h-11 bg-gradient-to-br from-sky-450 to-blue-600 rounded-xl flex items-center justify-center mr-3 shadow-md text-white flex-shrink-0">
+                        <i class="fas fa-bell text-sm"></i>
                     </div>
                     <div>
-                        <h3 class="text-xl font-bold text-gray-800 dark:text-white">Telegram Notifications</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Alert login & brute force via Telegram bot</p>
+                        <h3 class="text-sm font-bold text-slate-855 dark:text-white">Notifikasi Telegram Bot</h3>
+                        <p class="text-[11px] text-slate-400 dark:text-slate-500">Dapatkan alert login dan brute force langsung di Telegram Anda.</p>
                     </div>
                 </div>
 
                 <form id="telegramForm" class="space-y-4">
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class="fas fa-robot text-sky-500 mr-2"></i>Bot Token
+                        <label class="block text-xs font-bold text-slate-655 dark:text-slate-400 mb-2">
+                            Bot Token Telegram
                         </label>
-                        <input type="text" id="tg_bot_token" placeholder="1234567890:ABCdef..."
-                               class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono text-sm">
+                        <input type="text" id="tg_bot_token" placeholder="Masukkan 1234567890:ABCdef..."
+                               class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 font-mono text-xs text-slate-800 dark:text-white">
                     </div>
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">
-                            <i class="fas fa-hashtag text-sky-500 mr-2"></i>Chat ID
+                        <label class="block text-xs font-bold text-slate-655 dark:text-slate-400 mb-2">
+                            Chat ID Penerima / Grup
                         </label>
-                        <input type="text" id="tg_chat_id" placeholder="-100xxxxxxxxxx atau @username"
-                               class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono text-sm">
+                        <input type="text" id="tg_chat_id" placeholder="Masukkan ID seperti -100xxxxxxxxxx"
+                               class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 font-mono text-xs text-slate-800 dark:text-white">
                     </div>
-                    <div class="flex space-x-3 pt-2">
-                        <button type="submit" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg">
-                            <i class="fas fa-save mr-2"></i>Simpan
+                    <div class="flex space-x-2.5 pt-2">
+                        <button type="submit" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white py-2.5 rounded-xl font-bold text-xs transition-all shadow-md">
+                            Simpan Pengaturan
                         </button>
-                        <button type="button" id="btnTestTelegram" onclick="testTelegram()" style="background:linear-gradient(to right,#0ea5e9,#2563eb);color:#fff;" class="flex-1 py-3 rounded-xl font-bold transition-all shadow-lg hover:opacity-90">
-                            <i class="fas fa-paper-plane mr-2"></i>Test Kirim
+                        <button type="button" id="btnTestTelegram" onclick="testTelegram()" class="flex-1 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white py-2.5 rounded-xl font-bold text-xs transition-all shadow-md">
+                            Kirim Test Alert
                         </button>
                     </div>
                 </form>
@@ -413,7 +473,12 @@
             const result = await response.json();
             
             if (result.success) {
-                document.getElementById('mfaQrCode').src = result.qr_code_url;
+                // Render QR code client-side menggunakan QRious
+                new QRious({
+                    element: document.getElementById('mfaQrCode'),
+                    value: result.provisioning_url,
+                    size: 200
+                });
                 document.getElementById('mfaSecret').textContent = result.secret;
                 document.getElementById('mfaSetupModal').classList.remove('hidden');
             } else {

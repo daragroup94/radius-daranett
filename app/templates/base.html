@@ -9,12 +9,9 @@
     <title>{% block title %}RADIUS Manager{% endblock %}</title>
 
     <script>
-        // Check for dark mode preference
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
+        // Lock Premium Light Mode Permanently
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
     </script>
 
     <!-- Tailwind CSS -->
@@ -29,6 +26,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <!-- ECharts Library -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- QRious Library for Secure Local QR Codes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,35 +50,135 @@
         .lucide-xl { width: 24px; height: 24px; }
 
         /* Dark Mode Support */
-        .dark body { background-color: #0f172a; color: #f1f5f9; }
-        .dark .sidebar { background-color: #1e293b; border-color: #334155; }
-        .dark .header-light { background: rgba(30, 41, 59, 0.98) !important; border-color: #334155 !important; }
-        .dark .header-light h1 { color: #f1f5f9 !important; }
-        .dark .header-light p { color: #94a3b8 !important; }
-        .dark .dashboard-card, .dark .stat-card, .dark .modern-card { 
-            background-color: #1e293b; border-color: #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+        .dark body, html.dark body { background-color: #0f172a !important; color: #f1f5f9 !important; }
+        .dark .sidebar, html.dark .sidebar { background-color: #1e293b !important; border-color: #334155 !important; }
+        .dark .main-content, html.dark .main-content { background-color: #0f172a !important; background: #0f172a !important; }
+        .dark .header-light, html.dark .header-light { background: rgba(30, 41, 59, 0.98) !important; border-color: #334155 !important; }
+        .dark .header-light h1, html.dark .header-light h1 { color: #f1f5f9 !important; }
+        .dark .header-light p, html.dark .header-light p { color: #94a3b8 !important; }
+        .dark .dashboard-card, .dark .stat-card, .dark .modern-card, html.dark .dashboard-card, html.dark .stat-card, html.dark .modern-card { 
+            background-color: #1e293b !important; border-color: #334155 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important; 
         }
-        .dark .nav-text { color: #94a3b8 !important; }
-        .dark .nav-item:hover .nav-text, .dark .nav-item.active .nav-text { color: #f1f5f9 !important; }
-        .dark .nav-item:hover { background: rgba(255, 255, 255, 0.05); }
-        .dark .nav-item.active { background: rgba(59, 130, 246, 0.15); }
-        .dark .card-title { color: #f1f5f9; }
-        .dark .card-value { color: #ffffff; }
-        .dark .border-slate-200 { border-color: #334155; }
-        .dark .bg-slate-100 { background-color: #0f172a; }
-        .dark .sidebar-user { background-color: #1e293b; border-color: #334155; }
-        .dark .table-light { background: #1e293b; }
-        .dark .table-light th { background: #0f172a; color: #94a3b8; border-color: #334155; }
-        .dark .table-light td { color: #cbd5e1; border-color: #334155; }
-        .dark .table-light tr:hover td { background: #1e293b; }
-        .dark .input-light { background: #0f172a; border-color: #334155; color: #f1f5f9; }
-        .dark .text-slate-500 { color: #94a3b8; }
-        .dark .text-slate-800 { color: #f1f5f9; }
+        .dark .nav-text, html.dark .nav-text { color: #94a3b8 !important; }
+        .dark .nav-item:hover .nav-text, .dark .nav-item.active .nav-text, html.dark .nav-item:hover .nav-text, html.dark .nav-item.active .nav-text { color: #f1f5f9 !important; }
+        .dark .nav-item:hover, html.dark .nav-item:hover { background: rgba(255, 255, 255, 0.05) !important; }
+        .dark .nav-item.active, html.dark .nav-item.active { background: rgba(59, 130, 246, 0.15) !important; }
+        .dark .card-title, html.dark .card-title { color: #f1f5f9 !important; }
+        .dark .card-value, html.dark .card-value { color: #ffffff !important; }
+        .dark .border-slate-200, html.dark .border-slate-200 { border-color: #334155 !important; }
+        .dark .bg-slate-100, html.dark .bg-slate-100 { background-color: #0f172a !important; }
+        .dark .sidebar-user, html.dark .sidebar-user { background-color: #1e293b !important; border-color: #334155 !important; }
+        .dark .table-light, html.dark .table-light { background: #1e293b !important; }
+        .dark .table-light th, html.dark .table-light th { background: #0f172a !important; color: #94a3b8 !important; border-color: #334155 !important; }
+        .dark .table-light td, html.dark .table-light td { color: #cbd5e1 !important; border-color: #334155 !important; }
+        .dark .table-light tr:hover td, html.dark .table-light tr:hover td { background: #1e293b !important; }
+        .dark .input-light, html.dark .input-light { background: #0f172a !important; border-color: #334155 !important; color: #f1f5f9 !important; }
+        .dark .text-slate-500, html.dark .text-slate-500 { color: #94a3b8 !important; }
+        .dark .text-slate-800, html.dark .text-slate-800 { color: #f1f5f9 !important; }
+
+        /* Force slate/gray dark texts to be light in dark mode */
+        html.dark .text-slate-880, html.dark .text-slate-850, html.dark .text-slate-800, html.dark .text-gray-800, html.dark .text-slate-900, html.dark .text-gray-900, html.dark .text-slate-700, html.dark .text-gray-700 {
+            color: #f1f5f9 !important;
+        }
+        html.dark .text-slate-655, html.dark .text-slate-600, html.dark .text-gray-600, html.dark .text-slate-500, html.dark .text-gray-500, html.dark .text-slate-550 {
+            color: #cbd5e1 !important;
+        }
+        html.dark .text-slate-400, html.dark .text-gray-400, html.dark .text-slate-450 {
+            color: #94a3b8 !important;
+        }
+
+        /* Bulletproof Form elements in Dark Mode */
+        html.dark input, html.dark select, html.dark textarea {
+            color: #ffffff !important;
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+        }
+        html.dark input::placeholder, html.dark textarea::placeholder {
+            color: #64748b !important;
+        }
+        
+        /* NOC Operations Header Gradient Override (Tailwind-Build Proof) */
+        .bg-gradient-to-r.from-slate-900.to-slate-800 {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+            color: #ffffff !important;
+        }
+        html.dark .bg-gradient-to-r.from-slate-900.to-slate-800, html.dark .bg-gradient-to-r.dark\:from-slate-950.dark\:to-slate-900 {
+            background: linear-gradient(135deg, #020617 0%, #0f172a 100%) !important;
+            color: #ffffff !important;
+        }
+
+        /* Premium Hex-Based Button Gradients (Tailwind-Build Proof) */
+        .btn-gradient-amber, .bg-gradient-to-r.from-amber-500.to-orange-600 {
+            background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important;
+            color: #ffffff !important;
+        }
+        .btn-gradient-amber:hover, .bg-gradient-to-r.from-amber-500.to-orange-600:hover {
+            background: linear-gradient(135deg, #ea580c 0%, #d97706 100%) !important;
+        }
+
+        .btn-gradient-emerald, .bg-gradient-to-r.from-emerald-500.to-teal-600 {
+            background: linear-gradient(135deg, #10b981 0%, #0d9488 100%) !important;
+            color: #ffffff !important;
+        }
+        .btn-gradient-emerald:hover, .bg-gradient-to-r.from-emerald-500.to-teal-600:hover {
+            background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
+        }
+
+        .btn-gradient-purple, .bg-gradient-to-r.from-purple-600.to-indigo-600 {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
+            color: #ffffff !important;
+        }
+        .btn-gradient-purple:hover, .bg-gradient-to-r.from-purple-600.to-indigo-600:hover {
+            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%) !important;
+        }
+
+        .btn-gradient-blue, .bg-gradient-to-r.from-blue-500.to-indigo-600, .bg-gradient-to-r.from-blue-50.to-indigo-600 {
+            background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%) !important;
+            color: #ffffff !important;
+        }
+        .btn-gradient-blue:hover, .bg-gradient-to-r.from-blue-500.to-indigo-600:hover, .bg-gradient-to-r.from-blue-50.to-indigo-600:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #4338ca 100%) !important;
+        }
+
+        .btn-gradient-pink, .bg-gradient-to-r.from-pink-500.to-rose-600 {
+            background: linear-gradient(135deg, #ec4899 0%, #e11d48 100%) !important;
+            color: #ffffff !important;
+        }
+        .btn-gradient-pink:hover, .bg-gradient-to-r.from-pink-500.to-rose-600:hover {
+            background: linear-gradient(135deg, #db2777 0%, #be123c 100%) !important;
+        }
+
+        /* Safe Status Badges Overrides (Tailwind-Build Proof) */
+        .bg-emerald-500\/10, .bg-emerald-500\/20, html.dark .bg-emerald-500\/10 {
+            background-color: rgba(16, 185, 129, 0.1) !important;
+        }
+        .text-emerald-600 {
+            color: #059669 !important;
+        }
+        html.dark .text-emerald-400 {
+            color: #34d399 !important;
+        }
+
+        .bg-red-500\/10, .bg-red-500\/20, .bg-rose-500\/10, html.dark .bg-red-500\/10 {
+            background-color: rgba(239, 68, 68, 0.1) !important;
+        }
+        .text-red-600, .text-rose-600 {
+            color: #dc2626 !important;
+        }
+        html.dark .text-red-400, html.dark .text-rose-400 {
+            color: #f87171 !important;
+        }
+
+        html.dark .bg-slate-750, html.dark .bg-slate-700 {
+            background-color: #334155 !important;
+        }
+        html.dark .text-slate-450, html.dark .text-slate-400 {
+            color: #94a3b8 !important;
+        }
         
         /* Animations - Optimized for performance */
         .fade-in {
             animation: fadeIn 0.4s ease-out;
-            will-change: opacity, transform;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -88,7 +187,6 @@
 
         .slide-in {
             animation: slideIn 0.3s ease-out;
-            will-change: transform, opacity;
         }
         @keyframes slideIn {
             from { transform: translateX(-10px); opacity: 0; }
@@ -100,7 +198,6 @@
             transition: transform 0.3s ease, width 0.3s ease;
             background: #ffffff;
             border-right: 1px solid #e2e8f0;
-            will-change: transform;
         }
         .sidebar.collapsed { width: 80px; }
         .sidebar.collapsed .nav-text,
@@ -171,6 +268,36 @@
         }
         .nav-item:hover .nav-icon-container { background: rgba(59, 130, 246, 0.1); }
         .nav-item.active .nav-icon-container { background: rgba(59, 130, 246, 0.12); }
+
+        /* Dropdown Submenu */
+        .nav-submenu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .nav-submenu.open { max-height: 300px; }
+        .nav-subitem {
+            border-radius: 10px;
+            margin: 1px 0;
+            transition: background 0.2s ease, transform 0.2s ease;
+            color: #64748b;
+        }
+        .nav-subitem:hover {
+            background: rgba(59, 130, 246, 0.06);
+            transform: translateX(4px);
+        }
+        .nav-subitem.active {
+            background: rgba(59, 130, 246, 0.1);
+            color: #1e40af;
+            font-weight: 600;
+        }
+        .nav-subicon { color: #94a3b8; transition: color 0.2s ease; }
+        .nav-subitem:hover .nav-subicon,
+        .nav-subitem.active .nav-subicon { color: #3b82f6; }
+        .dark .nav-subitem { color: #94a3b8; }
+        .dark .nav-subitem:hover { background: rgba(255,255,255,0.05); }
+        .dark .nav-subitem.active { background: rgba(59,130,246,0.15); color: #93c5fd; }
+        .sidebar.collapsed .nav-submenu { display: none; }
 
         /* Gradients */
         .gradient-primary {
@@ -313,6 +440,7 @@
         .icon-emerald { color: #10b981; }
         .icon-green { color: #22c55e; }
         .icon-amber { color: #f59e0b; }
+        .icon-orange { color: #f97316; }
         .icon-cyan { color: #06b6d4; }
         .icon-slate { color: #64748b; }
         .icon-indigo { color: #6366f1; }
@@ -449,13 +577,47 @@
                 <span class="tooltip">NAS Devices</span>
             </a>
 
-            <a href="/users" class="nav-item {% if request.path == '/users' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
+            <a href="/integrations" class="nav-item {% if request.path == '/integrations' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
                 <div class="nav-icon-container">
-                    <i data-lucide="users" class="lucide nav-icon icon-emerald"></i>
+                    <i data-lucide="plug" class="lucide nav-icon icon-orange"></i>
                 </div>
-                <span class="nav-text flex-1 font-medium text-sm">PPPoE Users</span>
-                <span class="tooltip">PPPoE Users</span>
+                <span class="nav-text flex-1 font-medium text-sm">Integrations</span>
+                <span class="tooltip">Integrations</span>
             </a>
+
+            <!-- Customer Users Dropdown -->
+            <div class="nav-dropdown-wrapper">
+                <button onclick="toggleCustomerMenu()" class="nav-item {% if request.path in ['/users', '/vpn-users', '/8021x-users', '/ipoe-users', '/hotspot-users'] %}active{% endif %} w-full flex items-center space-x-3 px-3 py-3 cursor-pointer group" id="customerMenuBtn">
+                    <div class="nav-icon-container">
+                        <i data-lucide="users" class="lucide nav-icon icon-emerald"></i>
+                    </div>
+                    <span class="nav-text flex-1 font-medium text-sm text-left">Customer Users</span>
+                    <i data-lucide="chevron-down" class="lucide nav-text w-4 h-4 transition-transform duration-200" id="customerMenuChevron"></i>
+                    <span class="tooltip">Customer Users</span>
+                </button>
+                <div id="customerSubmenu" class="nav-submenu {% if request.path in ['/users', '/vpn-users', '/8021x-users', '/ipoe-users', '/hotspot-users'] %}open{% endif %}">
+                    <a href="/users" class="nav-subitem {% if request.path == '/users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
+                        <i data-lucide="wifi" class="lucide w-4 h-4 nav-subicon"></i>
+                        <span class="nav-text text-sm">PPPoE</span>
+                    </a>
+                    <a href="/vpn-users" class="nav-subitem {% if request.path == '/vpn-users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
+                        <i data-lucide="shield" class="lucide w-4 h-4 nav-subicon"></i>
+                        <span class="nav-text text-sm">VPN Users</span>
+                    </a>
+                    <a href="/8021x-users" class="nav-subitem {% if request.path == '/8021x-users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
+                        <i data-lucide="lock" class="lucide w-4 h-4 nav-subicon"></i>
+                        <span class="nav-text text-sm">802.1X</span>
+                    </a>
+                    <a href="/ipoe-users" class="nav-subitem {% if request.path == '/ipoe-users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
+                        <i data-lucide="network" class="lucide w-4 h-4 nav-subicon"></i>
+                        <span class="nav-text text-sm">IPoE</span>
+                    </a>
+                    <a href="/hotspot-users" class="nav-subitem {% if request.path == '/hotspot-users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
+                        <i data-lucide="ticket" class="lucide w-4 h-4 nav-subicon"></i>
+                        <span class="nav-text text-sm">Hotspot</span>
+                    </a>
+                </div>
+            </div>
 
             <a href="/sessions" class="nav-item {% if request.path == '/sessions' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
                 <div class="nav-icon-container">
@@ -464,6 +626,7 @@
                 <span class="nav-text flex-1 font-medium text-sm">Active Sessions</span>
                 <span class="tooltip">Active Sessions</span>
             </a>
+
 
             <a href="/logs" class="nav-item {% if request.path == '/logs' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
                 <div class="nav-icon-container">
@@ -536,13 +699,6 @@
                     </div>
 
                     <div class="flex items-center space-x-1">
-                        <!-- Theme Toggle -->
-                        <button id="themeToggle" class="p-2.5 text-slate-500 hover:text-blue-600 transition-all duration-300 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-xl">
-                            <i data-lucide="moon" class="lucide dark:hidden"></i>
-                            <i data-lucide="sun" class="lucide hidden dark:block"></i>
-                        </button>
-
-
                     </div>
                 </div>
             </div>
@@ -584,6 +740,22 @@
             }
         }
         initLucideIcons();
+
+        // Customer Users dropdown toggle
+        function toggleCustomerMenu() {
+            const submenu = document.getElementById('customerSubmenu');
+            const chevron = document.getElementById('customerMenuChevron');
+            submenu.classList.toggle('open');
+            chevron.style.transform = submenu.classList.contains('open') ? 'rotate(180deg)' : '';
+        }
+        // Auto-open if on a customer submenu page
+        (function() {
+            const submenu = document.getElementById('customerSubmenu');
+            const chevron = document.getElementById('customerMenuChevron');
+            if (submenu && submenu.classList.contains('open')) {
+                chevron.style.transform = 'rotate(180deg)';
+            }
+        })();
 
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.getElementById('sidebarToggle');
@@ -658,26 +830,26 @@
                     headers: { 'Content-Type': 'application/json', ...options.headers },
                     ...options
                 });
-                return await response.json();
+                const contentType = response.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    if (response.status === 401 || response.redirected) {
+                        window.location.href = '/login';
+                        return { success: false, error: 'Session expired, redirecting to login...' };
+                    }
+                    return { success: false, error: `Server error (HTTP ${response.status})` };
+                }
+                const data = await response.json();
+                if (!response.ok && data.success === undefined) {
+                    return { success: false, error: data.error || data.message || `HTTP ${response.status}` };
+                }
+                return data;
             } catch (error) {
                 showNotification('Network error: ' + error.message, 'error');
                 return { success: false, error: error.message };
             }
         };
 
-        // Theme Toggle Logic
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => {
-                if (document.documentElement.classList.contains('dark')) {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                } else {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                }
-            });
-        }
+
 
         // Service Worker Registration
         if ('serviceWorker' in navigator) {

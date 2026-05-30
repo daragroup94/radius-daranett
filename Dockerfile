@@ -34,7 +34,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Install postgresql-client and curl for health checks
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends postgresql-client iputils-ping curl && \
+    apt-get install -y --no-install-recommends postgresql-client iputils-ping curl iproute2 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -44,7 +44,10 @@ COPY app/ ./
 # SALIN FILE CSS YANG SUDAH DI-BUILD DARI STAGE 1
 COPY --from=builder /app/static/css/output.css ./static/css/output.css
 
+# Entrypoint: tambah route ke subnet NAS lalu jalankan gunicorn
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 5000
 
-# PERBAIKAN: Tetap di /app, jangan pindah ke /app/app
-CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
+CMD ["/docker-entrypoint.sh"]

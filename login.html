@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="theme-color" content="#0b1020" />
+<title>Daranett Hotspot — Login & Paket Internet</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#070b1a;
+    --card:rgba(18,22,46,.62);
+    --card-bd:rgba(255,255,255,.08);
+    --text:#e8ecff;
+    --muted:#9aa3c7;
+    --brand:#7c5cff;
+    --brand2:#22d3ee;
+    --brand3:#ec4899;
+    --ok:#22c55e;
+    --warn:#f59e0b;
+    --err:#ef4444;
+    --radius:18px;
+  }
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+    color:var(--text);
+    background:
+      radial-gradient(1200px 700px at 85% -10%, rgba(124,92,255,.35), transparent 60%),
+      radial-gradient(900px 600px at -10% 20%, rgba(34,211,238,.28), transparent 60%),
+      radial-gradient(900px 700px at 50% 110%, rgba(236,72,153,.22), transparent 60%),
+      var(--bg);
+    min-height:100vh;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  .blob{position:fixed;filter:blur(80px);opacity:.55;border-radius:50%;z-index:0;pointer-events:none;animation:float 14s ease-in-out infinite}
+  .b1{width:520px;height:520px;background:#7c5cff;top:-160px;left:-120px}
+  .b2{width:460px;height:460px;background:#22d3ee;bottom:-160px;right:-120px;animation-delay:-4s}
+  .b3{width:380px;height:380px;background:#ec4899;top:40%;left:60%;animation-delay:-8s}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-30px) scale(1.08)}}
+
+  .nav{position:relative;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:18px 28px;flex-wrap:wrap;gap:10px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px;font-size:18px}
+  .logo{width:36px;height:36px;border-radius:10px;background:conic-gradient(from 220deg,#7c5cff,#22d3ee,#ec4899,#7c5cff);box-shadow:0 8px 24px rgba(124,92,255,.45);position:relative}
+  .logo::after{content:"";position:absolute;inset:6px;border-radius:6px;background:radial-gradient(circle at 30% 30%, #fff, transparent 55%), #0b1020;}
+  .brand b{background:linear-gradient(90deg,#a78bfa,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .nav-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--card-bd);font-size:13px;color:var(--muted);text-decoration:none}
+  .pill.green{color:#bbf7d0}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .pill.wa{background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border-color:transparent;font-weight:700}
+
+  .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1.05fr .95fr;gap:36px;max-width:1180px;margin:10px auto 60px;padding:24px}
+  @media (max-width:980px){.wrap{grid-template-columns:1fr;gap:24px}}
+
+  .hero h1{font-size:clamp(34px,5vw,54px);line-height:1.05;letter-spacing:-.02em;margin-bottom:16px}
+  .hero h1 em{font-style:normal;background:linear-gradient(90deg,#a78bfa,#22d3ee 60%,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{color:var(--muted);font-size:16px;max-width:520px;margin-bottom:22px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:520px;margin-bottom:26px}
+  .stat{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--card-bd)}
+  .stat b{display:block;font-size:22px}
+  .stat span{font-size:12px;color:var(--muted)}
+  .features{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:520px}
+  .feat{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--card-bd)}
+  .feat svg{flex:none;width:20px;height:20px;color:#22d3ee}
+  .feat b{font-size:13px}
+  .feat p{font-size:12px;color:var(--muted);margin-top:2px}
+
+  .card{position:relative;background:var(--card);backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);border:1px solid var(--card-bd);border-radius:var(--radius);padding:28px;box-shadow:0 30px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06)}
+  .card::before{content:"";position:absolute;inset:-1px;border-radius:calc(var(--radius)+1px);background:linear-gradient(140deg, rgba(124,92,255,.5), rgba(34,211,238,.0) 40%, rgba(236,72,153,.45));z-index:-1;filter:blur(10px);opacity:.45}
+  .card h2{font-size:24px;margin-bottom:4px}
+  .card .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+
+  .alert{display:none;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:14px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fecaca;font-size:13px}
+  .alert.show{display:flex}
+
+  .field{position:relative;margin-bottom:12px}
+  .field input{width:100%;padding:14px 14px 14px 44px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--card-bd);color:var(--text);font-size:15px;outline:none;transition:.2s border-color,.2s background}
+  .field input::placeholder{color:#7d86ad}
+  .field input:focus{border-color:rgba(124,92,255,.7);background:rgba(255,255,255,.07)}
+  .field svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:#9aa3c7}
+  .row{display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted);margin:6px 2px 14px;flex-wrap:wrap;gap:8px}
+  .row label{display:flex;align-items:center;gap:8px;cursor:pointer}
+  .row a{color:#a78bfa;text-decoration:none}
+
+  .btn{width:100%;padding:14px;border:none;border-radius:12px;cursor:pointer;font-weight:700;font-size:15px;color:#fff;letter-spacing:.2px;background:linear-gradient(135deg,#7c5cff,#22d3ee);box-shadow:0 14px 30px rgba(124,92,255,.35);transition:transform .15s ease, box-shadow .2s ease, filter .2s}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.05)}
+  .btn.ghost{background:transparent;border:1px solid var(--card-bd);color:var(--text);box-shadow:none;margin-top:10px;font-weight:600;text-decoration:none;display:block;text-align:center}
+  .divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:#6b7299;font-size:12px}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.08)}
+
+  .help{margin-top:14px;padding:12px;border-radius:12px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);font-size:13px;color:#bbf7d0;display:flex;gap:10px;align-items:flex-start}
+  .help svg{flex:none;width:18px;height:18px;color:#22c55e;margin-top:2px}
+  .help a{color:#86efac;font-weight:700;text-decoration:none}
+
+  .section-title{margin:42px 0 14px;text-align:center;padding:0 24px}
+  .section-title h3{font-size:30px;letter-spacing:-.01em}
+  .section-title h3 em{font-style:normal;background:linear-gradient(90deg,#a78bfa,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .section-title p{color:var(--muted);font-size:14px;margin-top:6px}
+
+  .packages{position:relative;z-index:2;max-width:1180px;margin:0 auto 40px;padding:0 24px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media (max-width:980px){.packages{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:560px){.packages{grid-template-columns:1fr}}
+  .pkg{position:relative;padding:22px;border-radius:18px;background:rgba(18,22,46,.55);border:1px solid var(--card-bd);backdrop-filter:blur(16px);transition:transform .2s ease, border-color .2s}
+  .pkg:hover{transform:translateY(-4px);border-color:rgba(124,92,255,.5)}
+  .pkg .tag{display:inline-block;font-size:11px;padding:4px 10px;border-radius:999px;background:rgba(124,92,255,.18);color:#c4b5fd;letter-spacing:.4px;text-transform:uppercase;font-weight:700}
+  .pkg.popular{border-color:rgba(34,211,238,.5);box-shadow:0 20px 50px rgba(34,211,238,.12)}
+  .pkg.popular .tag{background:linear-gradient(90deg,#22d3ee,#7c5cff);color:#fff}
+  .pkg h4{font-size:20px;margin:12px 0 6px}
+  .pkg .price{display:flex;align-items:baseline;gap:6px;margin-bottom:14px}
+  .pkg .price b{font-size:28px}
+  .pkg .price span{color:var(--muted);font-size:13px}
+  .pkg ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .pkg li{display:flex;gap:8px;font-size:13px;color:#cdd3ee}
+  .pkg li::before{content:"";width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,#22d3ee 30%,transparent 70%);flex:none;margin-top:2px}
+  .pkg .buy{display:block;text-align:center;text-decoration:none;color:#fff;padding:10px;border-radius:10px;font-weight:700;font-size:13px;background:rgba(255,255,255,.06);border:1px solid var(--card-bd);transition:.2s}
+  .pkg.popular .buy{background:linear-gradient(135deg,#7c5cff,#22d3ee);border-color:transparent}
+  .pkg .buy:hover{filter:brightness(1.1)}
+
+  /* Subscription CTA */
+  .subscribe{position:relative;z-index:2;max-width:1180px;margin:20px auto 40px;padding:0 24px}
+  .sub-card{
+    position:relative;overflow:hidden;border-radius:24px;padding:40px;
+    background:linear-gradient(135deg, rgba(124,92,255,.25), rgba(34,211,238,.18) 60%, rgba(236,72,153,.22));
+    border:1px solid rgba(255,255,255,.12);
+    display:grid;grid-template-columns:1.4fr 1fr;gap:30px;align-items:center;
+  }
+  .sub-card::before{content:"";position:absolute;inset:0;background:radial-gradient(600px 300px at 90% 110%, rgba(34,211,238,.35), transparent 60%);pointer-events:none}
+  @media (max-width:820px){.sub-card{grid-template-columns:1fr;padding:28px}}
+  .sub-card .badge{display:inline-block;font-size:11px;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;letter-spacing:.6px;text-transform:uppercase;font-weight:700;margin-bottom:14px}
+  .sub-card h3{font-size:clamp(26px,3.4vw,36px);line-height:1.1;letter-spacing:-.01em;margin-bottom:12px}
+  .sub-card h3 em{font-style:normal;background:linear-gradient(90deg,#fff,#a5f3fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub-card p{color:#dbe1ff;font-size:15px;margin-bottom:18px;max-width:540px}
+  .sub-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:540px;margin-bottom:20px}
+  .sub-grid div{display:flex;gap:8px;align-items:center;font-size:13px;color:#e8ecff}
+  .sub-grid div::before{content:"✓";color:#22d3ee;font-weight:800}
+  .sub-cta{display:flex;flex-direction:column;gap:10px;background:rgba(7,11,26,.55);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:22px;backdrop-filter:blur(10px)}
+  .sub-cta small{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  .sub-cta .num{font-size:28px;font-weight:700;letter-spacing:.5px;background:linear-gradient(90deg,#a78bfa,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub-cta .btn-wa{display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;border-radius:12px;text-decoration:none;color:#fff;font-weight:700;background:linear-gradient(135deg,#16a34a,#22c55e);box-shadow:0 12px 28px rgba(34,197,94,.35)}
+  .sub-cta .btn-wa:hover{filter:brightness(1.08)}
+  .sub-cta .btn-call{display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;border-radius:12px;text-decoration:none;color:#e8ecff;font-weight:600;background:rgba(255,255,255,.06);border:1px solid var(--card-bd)}
+
+  /* Coverage / Service area */
+  .areas{position:relative;z-index:2;max-width:1180px;margin:0 auto 40px;padding:0 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media (max-width:820px){.areas{grid-template-columns:1fr}}
+  .area{padding:18px;border-radius:14px;background:rgba(18,22,46,.55);border:1px solid var(--card-bd);display:flex;gap:12px;align-items:flex-start}
+  .area svg{flex:none;width:28px;height:28px;color:#a78bfa}
+  .area b{display:block;font-size:15px;margin-bottom:4px}
+  .area p{font-size:13px;color:var(--muted)}
+
+  /* FAQ */
+  .faq{position:relative;z-index:2;max-width:880px;margin:0 auto 60px;padding:0 24px;display:flex;flex-direction:column;gap:10px}
+  details{background:rgba(18,22,46,.55);border:1px solid var(--card-bd);border-radius:14px;padding:14px 18px;cursor:pointer;transition:.2s}
+  details[open]{border-color:rgba(124,92,255,.45);background:rgba(28,32,60,.6)}
+  summary{font-weight:600;font-size:15px;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  summary::after{content:"+";font-size:22px;color:#a78bfa;transition:.2s;font-family:'Space Grotesk'}
+  details[open] summary::after{transform:rotate(45deg)}
+  details p{margin-top:10px;color:var(--muted);font-size:14px;line-height:1.6}
+
+  footer{position:relative;z-index:2;text-align:center;color:var(--muted);font-size:13px;padding:30px 24px;border-top:1px solid rgba(255,255,255,.05);margin-top:20px;line-height:1.7}
+  footer b{color:#cdd3ee}
+  footer .foot-brand{display:inline-flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:700;color:#e8ecff;font-size:15px}
+
+  /* Floating WhatsApp */
+  .fab{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:999px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-weight:700;text-decoration:none;box-shadow:0 14px 30px rgba(34,197,94,.45);transition:transform .2s}
+  .fab:hover{transform:translateY(-2px)}
+  .fab svg{width:22px;height:22px}
+  @media (max-width:560px){.fab span{display:none}.fab{padding:14px;border-radius:50%}}
+
+  @media (max-width:560px){.nav{padding:14px 18px}.features{grid-template-columns:1fr}.card{padding:22px}.sub-card{padding:24px}}
+</style>
+</head>
+<body>
+
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div class="blob b3"></div>
+
+<nav class="nav">
+  <div class="brand">
+    <div class="logo"></div>
+    <span>Dara<b>nett</b></span>
+  </div>
+  <div class="nav-actions">
+    <span class="pill green"><span class="dot"></span> Hotspot Online</span>
+    <a class="pill wa" href="https://wa.me/62895327449707" target="_blank">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24z"/></svg>
+      Chat Admin
+    </a>
+  </div>
+</nav>
+
+<section class="wrap">
+  <!-- HERO -->
+  <div class="hero">
+    <h1>Internet <em>cepat &amp; stabil</em><br/>untuk semua aktivitasmu.</h1>
+    <p class="lead">Selamat datang di jaringan <b>Daranett</b>. Login dengan voucher kamu untuk streaming, gaming, belajar, dan kerja tanpa hambatan. Tersedia juga paket <b>WiFi rumahan &amp; kantoran</b> bulanan dengan harga bersahabat.</p>
+
+    <div class="stats">
+      <div class="stat"><b>99.9%</b><span>Uptime jaringan</span></div>
+      <div class="stat"><b>≤ 20 ms</b><span>Latensi rata-rata</span></div>
+      <div class="stat"><b>24/7</b><span>Dukungan teknis</span></div>
+    </div>
+
+    <div class="features">
+      <div class="feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg><div><b>Bandwidth Stabil</b><p>Sesuai paket yang kamu pilih.</p></div></div>
+      <div class="feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg><div><b>Game &amp; Streaming</b><p>Optimal YouTube, ML, FF, TikTok.</p></div></div>
+      <div class="feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><div><b>Aman &amp; Terenkripsi</b><p>Privasi pengguna terjaga.</p></div></div>
+      <div class="feat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div><b>Voucher Fleksibel</b><p>Mulai 3 jam sampai bulanan.</p></div></div>
+    </div>
+  </div>
+
+  <!-- LOGIN CARD -->
+  <form class="card" name="login" action="$(link-login-only)" method="post"
+        $(if chap-id) onSubmit="return doLogin()" $(endif)>
+    <h2>Masuk Hotspot</h2>
+    <p class="sub">Gunakan username &amp; password voucher kamu.</p>
+
+    <div class="alert $(if error)show$(endif)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      <span>$(error)</span>
+    </div>
+
+    <div class="field">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <input type="text" name="username" placeholder="Username voucher" value="$(username)" autocomplete="username" required />
+    </div>
+
+    <div class="field">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      <input type="password" name="password" placeholder="Password" autocomplete="current-password" />
+    </div>
+
+    <div class="row">
+      <label><input type="checkbox" id="show"/> Tampilkan password</label>
+      <a href="https://wa.me/62895327449707" target="_blank">Lupa? Hubungi admin</a>
+    </div>
+
+    <input type="hidden" name="dst" value="$(link-orig)" />
+    <input type="hidden" name="popup" value="true" />
+
+    <button class="btn" type="submit">Masuk &amp; Mulai Internetan</button>
+
+    $(if trial == 'yes')
+    <div class="divider">atau</div>
+    <a class="btn ghost" href="$(link-login-only)?dst=$(link-orig-esc)&amp;username=T-$(mac-esc)">Coba Gratis (Trial)</a>
+    $(endif)
+
+    <div class="help">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <div>Belum punya voucher? Hubungi admin di <a href="https://wa.me/62895327449707" target="_blank">0895-3274-49707</a> untuk pembelian voucher harian/mingguan/bulanan.</div>
+    </div>
+  </form>
+</section>
+
+<!-- VOUCHER PACKAGES -->
+<div class="section-title">
+  <h3>Pilih <em>Paket Voucher</em> Kamu</h3>
+  <p>Beli voucher di admin / kasir, lalu login dengan kode yang diberikan.</p>
+</div>
+
+<section class="packages">
+  <div class="pkg">
+    <span class="tag">Hemat</span>
+    <h4>Quick 3 Jam</h4>
+    <div class="price"><b>Rp 3K</b><span>/ 3 jam</span></div>
+    <ul>
+      <li>Kecepatan hingga 5 Mbps</li>
+      <li>1 perangkat aktif</li>
+      <li>Cocok untuk chatting &amp; sosmed</li>
+    </ul>
+    <a class="buy" href="https://wa.me/62895327449707?text=Halo%20Daranett,%20saya%20mau%20beli%20Voucher%20Quick%203%20Jam">Beli Voucher</a>
+  </div>
+
+  <div class="pkg popular">
+    <span class="tag">Paling Laris</span>
+    <h4>Daily 24 Jam</h4>
+    <div class="price"><b>Rp 5K</b><span>/ 24 jam</span></div>
+    <ul>
+      <li>Kecepatan hingga 10 Mbps</li>
+      <li>1 perangkat aktif</li>
+      <li>Streaming 1080p lancar</li>
+      <li>WFH ringan oke</li>
+    </ul>
+    <a class="buy" href="https://wa.me/62895327449707?text=Halo%20Daranett,%20saya%20mau%20beli%20Voucher%20Daily">Beli Voucher</a>
+  </div>
+
+  <div class="pkg">
+    <span class="tag">Mingguan</span>
+    <h4>Weekly 7 Hari</h4>
+    <div class="price"><b>Rp 25K</b><span>/ 7 hari</span></div>
+    <ul>
+      <li>Kecepatan hingga 15 Mbps</li>
+      <li>2 perangkat aktif</li>
+      <li>Bebas streaming &amp; gaming</li>
+    </ul>
+    <a class="buy" href="https://wa.me/62895327449707?text=Halo%20Daranett,%20saya%20mau%20beli%20Voucher%20Weekly">Beli Voucher</a>
+  </div>
+
+  <div class="pkg">
+    <span class="tag">Premium</span>
+    <h4>Monthly Unlimited</h4>
+    <div class="price"><b>Rp 80K</b><span>/ 30 hari</span></div>
+    <ul>
+      <li>Kecepatan hingga 20 Mbps</li>
+      <li>3 perangkat aktif</li>
+      <li>Prioritas bandwidth</li>
+      <li>Support 24/7</li>
+    </ul>
+    <a class="buy" href="https://wa.me/62895327449707?text=Halo%20Daranett,%20saya%20mau%20beli%20Voucher%20Monthly">Beli Voucher</a>
+  </div>
+</section>
+
+<!-- SUBSCRIPTION CTA -->
+<section class="subscribe">
+  <div class="sub-card">
+    <div>
+      <span class="badge">★ Layanan Berlangganan</span>
+      <h3>Mau pasang <em>WiFi di rumah atau kantor?</em><br/>Bisa langganan bulanan, dipasang sampai siap pakai!</h3>
+      <p>Tinggalkan kuota & sinyal naik turun. Daranett menyediakan instalasi <b>WiFi rumahan</b> dan <b>jaringan kantor</b> dengan koneksi stabil 24 jam, support teknisi datang ke lokasi, dan paket fleksibel sesuai kebutuhan.</p>
+      <div class="sub-grid">
+        <div>Instalasi cepat &amp; rapi</div>
+        <div>Router WiFi disediakan</div>
+        <div>Bandwidth dedicated</div>
+        <div>Free maintenance</div>
+        <div>Cocok rumah, kost, kantor</div>
+        <div>Bayar bulanan, tanpa ribet</div>
+      </div>
+    </div>
+    <div class="sub-cta">
+      <small>Hubungi Admin Daranett</small>
+      <div class="num">0895-3274-49707</div>
+      <a class="btn-wa" href="https://wa.me/62895327449707?text=Halo%20Admin%20Daranett,%20saya%20tertarik%20berlangganan%20WiFi%20rumahan/kantoran.%20Mohon%20info%20paket%20dan%20pemasangannya." target="_blank">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24z"/></svg>
+        Chat WhatsApp Sekarang
+      </a>
+      <a class="btn-call" href="tel:+62895327449707">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.37 1.9.72 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0122 16.92z"/></svg>
+        Telepon Langsung
+      </a>
+      <small style="text-align:center">Konsultasi &amp; survei lokasi GRATIS</small>
+    </div>
+  </div>
+</section>
+
+<!-- COVERAGE -->
+<div class="section-title">
+  <h3>Kenapa pilih <em>Daranett</em>?</h3>
+  <p>Layanan ISP lokal dengan support cepat and harga jujur.</p>
+</div>
+<section class="areas">
+  <div class="area">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <div><b>Coverage Luas</b><p>Menjangkau pemukiman, kost, kafe, dan area perkantoran di sekitar wilayah layanan.</p></div>
+  </div>
+  <div class="area">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    <div><b>Teknisi Sigap</b><p>Gangguan ditangani cepat oleh tim teknisi lokal yang siap on-site kapan saja.</p></div>
+  </div>
+  <div class="area">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+    <div><b>Harga Bersahabat</b><p>Mulai voucher 3 jam sampai berlangganan bulanan, semua dengan harga transparan.</p></div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<div class="section-title">
+  <h3>Pertanyaan <em>yang Sering Ditanya</em></h3>
+</div>
+<section class="faq">
+  <details>
+    <summary>Bagaimana cara membeli voucher hotspot?</summary>
+    <p>Hubungi admin Daranett via WhatsApp di <b>0895-3274-49707</b>. Pilih paket yang diinginkan, lakukan pembayaran, lalu admin akan mengirim username & password voucher untuk login.</p>
+  </details>
+  <details>
+    <summary>Saya tidak bisa login, kenapa ya?</summary>
+    <p>Pastikan voucher belum kedaluwarsa dan kamu sudah terhubung ke WiFi <b>Daranett</b>. Jika tetap bermasalah, screenshot pesan error dan kirim ke admin.</p>
+  </details>
+  <details>
+    <summary>Apakah bisa pasang WiFi di rumah / kantor?</summary>
+    <p>Bisa! Daranett menyediakan instalasi WiFi rumahan dan jaringan kantor dengan paket bulanan. Hubungi admin di <b>0895-3274-49707</b> untuk survei lokasi dan info paket pemasangan. Konsultasi gratis tanpa biaya.</p>
+  </details>
+  <details>
+    <summary>Berapa lama voucher aktif setelah login pertama?</summary>
+    <p>Tergantung paket: 3 jam, 24 jam, 7 hari, atau 30 hari sejak login pertama. Selama belum login, voucher tetap aktif.</p>
+  </details>
+  <details>
+    <summary>Apakah bisa dipakai banyak perangkat?</summary>
+    <p>Bisa, sesuai jumlah slot perangkat di paketnya (1–3 perangkat). Untuk kebutuhan lebih banyak perangkat, kami sarankan paket berlangganan WiFi.</p>
+  </details>
+</section>
+
+<footer>
+  <div class="foot-brand"><div class="logo" style="width:24px;height:24px"></div> Daranett ISP</div>
+  Layanan Internet Hotspot &amp; WiFi Rumahan/Kantoran<br/>
+  📞 Admin: <b>0895-3274-49707</b> · WhatsApp 24/7<br/>
+  © <script>document.write(new Date().getFullYear())</script> Daranett — Powered by MikroTik Hotspot
+</footer>
+
+<a class="fab" href="https://wa.me/62895327449707?text=Halo%20Admin%20Daranett" target="_blank" aria-label="Chat WhatsApp Admin">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+  <span>Chat Admin</span>
+</a>
+
+<form name="sendin" action="$(link-login-only)" method="post">
+  <input type="hidden" name="username" />
+  <input type="hidden" name="password" />
+  <input type="hidden" name="dst" value="$(link-orig)" />
+  <input type="hidden" name="popup" value="true" />
+</form>
+<script src="md5.js" type="text/javascript"></script>
+<script type="text/javascript">
+  // Jalankan login otomatis jika ada parameter ?username=xxx&password=yyy di URL
+  function getQueryParam(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+  }
+
+  function doLogin(){
+    document.sendin.username.value = document.login.username.value;
+    document.sendin.password.value = hexMD5('$(chap-id)' + document.login.password.value + '$(chap-challenge)');
+    document.sendin.submit();
+    return false;
+  }
+  document.getElementById('show').addEventListener('change', function(e){
+    var p = document.login.password;
+    p.type = e.target.checked ? 'text' : 'password';
+  });
+
+  // Cek parameter otomatis saat halaman selesai dimuat
+  window.onload = function() {
+    var userParam = getQueryParam('username');
+    var passParam = getQueryParam('password');
+    if (userParam) {
+      document.login.username.value = userParam;
+      if (passParam) {
+        document.login.password.value = passParam;
+      }
+      // Tunggu 500ms agar user bisa melihat kode terisi, lalu login otomatis
+      setTimeout(function() {
+        if ('$(chap-id)') {
+          doLogin();
+        } else {
+          document.login.submit();
+        }
+      }, 500);
+    }
+  };
+</script>
+
+</body>
+</html>

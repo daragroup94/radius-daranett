@@ -147,6 +147,7 @@ def get_db_pool():
             password=app.config['DB_PASSWORD'],
             port=app.config['DB_PORT']
         )
+
     return _db_pool
 
 def get_db_connection():
@@ -213,31 +214,34 @@ def convert_data_limit_to_bytes(data_limit_str):
 # === NAS HEALTH MONITOR ===
 def ping_nas(ip_address):
     """
-    Fungsi untuk mem-ping sebuah IP address dan mengembalikan statusnya.
-    Mengembalikan 'online', 'offline', atau 'error'.
+    Cek konektivitas NAS: ICMP ping dulu, jika gagal coba TCP ke port umum router.
     """
+    import socket as _socket
+
+    # 1. Coba ICMP ping
     try:
-        # -c 1: kirim 1 packet (Linux/macOS)
-        # -w 1: timeout 1 detik
-        # Untuk Windows, ganti dengan '-n 1'
-        output = subprocess.run(
-            ["ping", "-c", "1", "-w", "1", ip_address],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=2  # timeout untuk prosesnya sendiri
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", "1", ip_address],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2
         )
-
-        if output.returncode == 0:
+        if result.returncode == 0:
             return "online"
-        else:
-            return "offline"
+    except Exception:
+        pass
 
-    except subprocess.TimeoutExpired:
-        return "offline"
-    except Exception as e:
-        print(f"Error pinging {ip_address}: {e}")
-        return "error"
+    # 2. Jika ping gagal (mungkin ICMP diblokir), coba TCP ke port umum router
+    for port in [8728, 80, 443, 22, 23, 8291]:
+        try:
+            sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+            sock.settimeout(1)
+            if sock.connect_ex((ip_address, port)) == 0:
+                sock.close()
+                return "online"
+            sock.close()
+        except Exception:
+            pass
+
+    return "offline"
 
 
 # Background cleanup thread dihapus - berbahaya karena menghapus session PPPoE aktif
@@ -326,7 +330,7 @@ def api_mfa_setup():
         return jsonify({
             'success': True, 
             'secret': secret,
-            'qr_code_url': f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={provisioning_url}"
+            'provisioning_url': provisioning_url
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -457,6 +461,7 @@ def nas_page():
 def users_page():
     return render_template('users.html')
 
+
 @app.route('/sessions')
 @login_required
 def sessions_page():
@@ -477,27 +482,68 @@ def backup_page():
 @login_required
 def api_stats():
     try:
-        # Total users registered in the system
-        total_users = execute_query("SELECT COUNT(*) as count FROM radcheck WHERE attribute = 'Cleartext-Password'")[0]['count']
-        
-        # Session aktif = acctstoptime IS NULL
-        active_sessions = execute_query("""
-            SELECT COUNT(*) as count FROM radacct WHERE acctstoptime IS NULL
+        # PPPoE Stats (Users not in ipoe, vpn, or 8021x groups)
+        pppoe_users = execute_query("""
+            SELECT COUNT(*) as count FROM radcheck c 
+            WHERE c.attribute = 'Cleartext-Password' 
+            AND NOT EXISTS (
+                SELECT 1 FROM radusergroup g 
+                WHERE LOWER(g.username) = LOWER(c.username) 
+                AND g.groupname IN ('ipoe', 'vpn', '8021x')
+            )
         """)[0]['count']
         
-        # Unique users currently online
-        online_users = execute_query("""
-            SELECT COUNT(DISTINCT username) as count FROM radacct WHERE acctstoptime IS NULL
+        pppoe_sessions = execute_query("""
+            SELECT COUNT(*) as count FROM radacct a 
+            WHERE a.acctstoptime IS NULL 
+            AND NOT EXISTS (
+                SELECT 1 FROM radusergroup g 
+                WHERE LOWER(g.username) = LOWER(a.username) 
+                AND g.groupname IN ('ipoe', 'vpn', '8021x')
+            ) 
+            AND NOT EXISTS (
+                SELECT 1 FROM hotspot_vouchers h 
+                WHERE LOWER(h.username) = LOWER(a.username)
+            )
         """)[0]['count']
         
+        # IPoE Stats
+        ipoe_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'ipoe'")[0]['count']
+        ipoe_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'ipoe' WHERE a.acctstoptime IS NULL")[0]['count']
+
+        # Hotspot Stats
+        hotspot_users = execute_query("SELECT COUNT(*) as count FROM hotspot_vouchers WHERE deleted_at IS NULL")[0]['count']
+        hotspot_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a WHERE a.acctstoptime IS NULL AND EXISTS (SELECT 1 FROM hotspot_vouchers h WHERE LOWER(h.username) = LOWER(a.username))")[0]['count']
+
+        # VPN Stats
+        vpn_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'vpn'")[0]['count']
+        vpn_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'vpn' WHERE a.acctstoptime IS NULL")[0]['count']
+
+        # 802.1X Stats
+        x8021x_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = '8021x'")[0]['count']
+        x8021x_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = '8021x' WHERE a.acctstoptime IS NULL")[0]['count']
+
+        total_users = pppoe_users + ipoe_users + hotspot_users + vpn_users + x8021x_users
+        active_sessions = pppoe_sessions + ipoe_sessions + hotspot_sessions + vpn_sessions + x8021x_sessions
+        online_users = execute_query("SELECT COUNT(DISTINCT username) as count FROM radacct WHERE acctstoptime IS NULL")[0]['count']
         today_auth = execute_query("SELECT COUNT(*) as count FROM radpostauth WHERE DATE(authdate AT TIME ZONE 'Asia/Jakarta') = CURRENT_DATE")[0]['count']
-        
+
         try:
             total_nas = execute_query("SELECT COUNT(*) as count FROM nas")[0]['count']
         except:
             total_nas = 0
-        
+
         return jsonify({
+            'pppoe_users': pppoe_users,
+            'pppoe_sessions': pppoe_sessions,
+            'ipoe_users': ipoe_users,
+            'ipoe_sessions': ipoe_sessions,
+            'hotspot_users': hotspot_users,
+            'hotspot_sessions': hotspot_sessions,
+            'vpn_users': vpn_users,
+            'vpn_sessions': vpn_sessions,
+            'x8021x_users': x8021x_users,
+            'x8021x_sessions': x8021x_sessions,
             'total_users': total_users,
             'active_sessions': active_sessions,
             'online_users': online_users,
@@ -629,11 +675,12 @@ def api_users():
                    (SELECT COUNT(*) FROM radacct a WHERE a.username = c.username AND a.acctstoptime IS NULL) as active_sessions
             FROM radcheck c
             WHERE c.attribute = 'Cleartext-Password'
+            AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'ipoe')
         """
         
         # Base query for count
-        count_query = "SELECT COUNT(*) as total FROM radcheck c WHERE c.attribute = 'Cleartext-Password'"
-        
+        count_query = "SELECT COUNT(*) as total FROM radcheck c WHERE c.attribute = 'Cleartext-Password' AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'ipoe')"
+
         params = []
         if search:
             data_query += " AND c.username ILIKE %s"
@@ -944,20 +991,29 @@ def api_fix_stale_sessions():
 def _send_coa_packet(nas_ip, secret, packet_type, attributes):
     """Kirim CoA/Disconnect packet via radclient di freeradius container"""
     try:
-        # Gunakan newline-separated dengan nilai di-quote agar nilai yang mengandung spasi
-        # (seperti Mikrotik-Rate-Limit burst format) tidak diparsing sebagai attribute baru
+        # Gunakan newline-separated attributes
         attr_lines = '\n'.join(f'{k} = "{v}"' for k, v in attributes.items())
+        # Jalankan docker exec secara langsung tanpa sh -c / pipeline untuk menghindari RCE
+        cmd = [
+            'docker', 'exec', '-i', 'freeradius-server',
+            'radclient', '-t', '3', '-r', '1', f'{nas_ip}:3799', packet_type, secret
+        ]
         result = subprocess.run(
-            ['docker', 'exec', 'freeradius-server', 'sh', '-c',
-             f"printf '{attr_lines}\\n' | radclient -t 3 -r 1 {nas_ip}:3799 {packet_type} {secret}"],
-            capture_output=True, text=True, timeout=6
+            cmd, input=f"{attr_lines}\n", capture_output=True, text=True, timeout=6
         )
         return result.stdout
     except Exception as e:
         print(f"CoA error ({nas_ip}): {e}")
         return ''
 
-def send_coa_disconnect(nas_ip, session_id, nas_secret):
+def send_coa_disconnect(nas_ip, session_id, nas_secret, framed_ip=None):
+    if framed_ip:
+        out = _send_coa_packet(nas_ip, nas_secret, 'disconnect', {
+            'Framed-IP-Address': framed_ip, 'NAS-IP-Address': nas_ip
+        })
+        if 'Disconnect-ACK' in out:
+            return True
+    # Fallback: Acct-Session-Id (PPPoE)
     out = _send_coa_packet(nas_ip, nas_secret, 'disconnect', {
         'Acct-Session-Id': session_id, 'NAS-IP-Address': nas_ip
     })
@@ -980,7 +1036,7 @@ def send_coa_update_async(nas_ip, session_id, nas_secret, rate_limit):
 def api_disconnect_session(session_id):
     try:
         session_data = execute_query("""
-            SELECT acctsessionid, nasipaddress FROM radacct 
+            SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct 
             WHERE acctsessionid = %s AND acctstoptime IS NULL
         """, (session_id,))
 
@@ -992,7 +1048,7 @@ def api_disconnect_session(session_id):
         secret = nas[0]['secret'] if nas else 'radiussecret'
 
         # Kirim CoA Disconnect ke MikroTik
-        coa_sent = send_coa_disconnect(nas_ip, session_id, secret)
+        coa_sent = send_coa_disconnect(nas_ip, session_id, secret, framed_ip=session_data[0].get('framedipaddress'))
 
         # Update database
         execute_query("""
@@ -1054,6 +1110,42 @@ def api_sessions_duplicates():
         return jsonify(dupes or [])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/disconnect-expired', methods=['POST'])
+@login_required
+def api_disconnect_expired():
+    """Disconnect semua sesi aktif milik user yang sudah expired (trigger manual)."""
+    try:
+        expired_sessions = execute_query("""
+            SELECT a.acctsessionid, a.nasipaddress, a.username
+            FROM radacct a
+            JOIN radcheck rc ON LOWER(rc.username) = LOWER(a.username)
+                AND rc.attribute = 'Expiration'
+            WHERE a.acctstoptime IS NULL
+              AND TO_TIMESTAMP(rc.value, 'Mon DD YYYY HH24:MI:SS') < NOW()
+        """)
+        if not expired_sessions:
+            return jsonify({'success': True, 'message': 'Tidak ada sesi expired yang aktif', 'count': 0})
+
+        coa_ok = 0
+        for s in expired_sessions:
+            nas_ip = str(s['nasipaddress'])
+            nas_row = execute_query("SELECT secret FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
+            secret = nas_row[0]['secret'] if nas_row else 'testing123'
+            if send_coa_disconnect(nas_ip, s['acctsessionid'], secret):
+                coa_ok += 1
+            execute_query("""
+                UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Session-Timeout'
+                WHERE acctsessionid = %s AND acctstoptime IS NULL
+            """, (s['acctsessionid'],), fetch=False)
+
+        return jsonify({
+            'success': True,
+            'message': f'{len(expired_sessions)} sesi expired di-disconnect ({coa_ok} CoA sent)',
+            'count': len(expired_sessions)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/sessions/duplicates/disconnect', methods=['POST'])
 @login_required
@@ -1467,8 +1559,8 @@ def api_download_backup(filename):
     """Download a specific backup file"""
     try:
         # Validate filename
-        if not allowed_backup_file(filename):
-            return jsonify({'success': False, 'error': 'Invalid file type'}), 400
+        if not allowed_backup_file(filename) or secure_filename(filename) != filename:
+            return jsonify({'success': False, 'error': 'Invalid file name or path'}), 400
         
         filepath = os.path.join(BACKUP_FOLDER, filename)
         
@@ -1490,8 +1582,8 @@ def api_delete_backup(filename):
     """Delete a specific backup file"""
     try:
         # Validate filename
-        if not allowed_backup_file(filename):
-            return jsonify({'success': False, 'error': 'Invalid file type'}), 400
+        if not allowed_backup_file(filename) or secure_filename(filename) != filename:
+            return jsonify({'success': False, 'error': 'Invalid file name or path'}), 400
         
         filepath = os.path.join(BACKUP_FOLDER, filename)
         
@@ -1554,8 +1646,8 @@ def api_restore_backup():
             return jsonify({'success': False, 'error': 'Filename is required'}), 400
         
         # Validate filename
-        if not allowed_backup_file(filename):
-            return jsonify({'success': False, 'error': 'Invalid file type'}), 400
+        if not allowed_backup_file(filename) or secure_filename(filename) != filename:
+            return jsonify({'success': False, 'error': 'Invalid file name or path'}), 400
         
         filepath = os.path.join(BACKUP_FOLDER, filename)
         
@@ -1602,6 +1694,593 @@ def api_restore_backup():
         print(f"Error restoring backup: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# === INTEGRATIONS API ===
+@app.route('/integrations')
+@login_required
+def integrations_page():
+    return render_template('integrations.html')
+
+@app.route('/api/integrations')
+@login_required
+def api_integrations():
+    try:
+        rows = execute_query("SELECT id, name, type, host, port, username, description, is_active, created_at FROM integrations ORDER BY id")
+        return jsonify(rows or [])
+    except Exception as e:
+        if 'does not exist' in str(e):
+            return jsonify([])
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/integrations/add', methods=['POST'])
+@login_required
+def api_add_integration():
+    data = request.get_json()
+    try:
+        execute_query("""
+            INSERT INTO integrations (name, type, host, port, username, password, description, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
+              data['username'], data['password'], data.get('description',''), data.get('is_active', True)), fetch=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/integrations/edit/<int:iid>', methods=['PUT'])
+@login_required
+def api_edit_integration(iid):
+    data = request.get_json()
+    try:
+        if data.get('password'):
+            execute_query("""
+                UPDATE integrations SET name=%s, type=%s, host=%s, port=%s, username=%s, password=%s, description=%s, is_active=%s
+                WHERE id=%s
+            """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
+                  data['username'], data['password'], data.get('description',''), data.get('is_active', True), iid), fetch=False)
+        else:
+            execute_query("""
+                UPDATE integrations SET name=%s, type=%s, host=%s, port=%s, username=%s, description=%s, is_active=%s
+                WHERE id=%s
+            """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
+                  data['username'], data.get('description',''), data.get('is_active', True), iid), fetch=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/integrations/delete/<int:iid>', methods=['DELETE'])
+@login_required
+def api_delete_integration(iid):
+    try:
+        execute_query("DELETE FROM integrations WHERE id=%s", (iid,), fetch=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/integrations/test/<int:iid>', methods=['POST'])
+@login_required
+def api_test_integration(iid):
+    try:
+        rows = execute_query("SELECT * FROM integrations WHERE id=%s", (iid,))
+        if not rows:
+            return jsonify({'success': False, 'error': 'Integration not found'}), 404
+        ig = rows[0]
+        if ig['type'] == 'mikrotik':
+            import librouteros
+            api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+            identity = list(api('/system/identity/print'))
+            api.close()
+            return jsonify({'success': True, 'message': f"Connected! Identity: {identity[0].get('name','?')}"})
+        return jsonify({'success': False, 'error': 'Unsupported type'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# === HOTSPOT USERS ===
+
+
+
+
+
+
+
+
+@app.route('/api/mikrotik/active')
+@login_required
+def api_mikrotik_active():
+    """Query /ppp active + /interface/print dari satu integrasi Mikrotik (read-only)"""
+    import librouteros
+    router_id = request.args.get('router_id', type=int)
+    try:
+        if router_id:
+            integrations = execute_query("SELECT * FROM integrations WHERE id=%s AND type='mikrotik' AND is_active=true", (router_id,)) or []
+        else:
+            integrations = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true ORDER BY id LIMIT 1") or []
+    except Exception:
+        integrations = []
+
+    results = []
+    for ig in integrations:
+        try:
+            api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+            active = list(api('/ppp/active/print'))
+            ifaces = list(api('/interface/print'))
+            api.close()
+
+            iface_map = {}
+            for iface in ifaces:
+                if iface.get('type') != 'pppoe-in':
+                    continue
+                iname = iface.get('name', '').strip('<>')
+                uname = iname[6:] if iname.startswith('pppoe-') else iname
+                iface_map[uname] = {
+                    'rx_byte': int(iface.get('rx-byte', 0)),
+                    'tx_byte': int(iface.get('tx-byte', 0)),
+                }
+
+            for s in active:
+                uname = s.get('name', '')
+                idata = iface_map.get(uname, {})
+                results.append({
+                    'router': ig['name'],
+                    'router_host': ig['host'],
+                    'router_id': ig['id'],
+                    'name': uname,
+                    'address': s.get('address', ''),
+                    'uptime': s.get('uptime', ''),
+                    'rx_byte': idata.get('rx_byte', 0),
+                    'tx_byte': idata.get('tx_byte', 0),
+                    'caller_id': s.get('caller-id', ''),
+                    'service': s.get('service', ''),
+                    'session_id': s.get('.id', ''),
+                })
+        except Exception as e:
+            results.append({'router': ig['name'], 'router_host': ig['host'], 'error': str(e)})
+        except Exception as e:
+            results.append({'router': ig['name'], 'router_host': ig['host'], 'error': str(e)})
+
+    return jsonify({'success': True, 'data': results, 'total': len([r for r in results if 'error' not in r])})
+
+@app.route('/api/ipoe/dhcp-leases')
+@login_required
+def api_ipoe_dhcp_leases():
+    """Ambil DHCP lease dari semua MikroTik, gabungkan dengan data RADIUS"""
+    import librouteros
+    integrations = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true ORDER BY id") or []
+    leases = {}
+    errors = []
+    for ig in integrations:
+        try:
+            api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+            raw = list(api('/ip/dhcp-server/lease/print'))
+            api.close()
+            for l in raw:
+                mac = l.get('mac-address', '').lower()
+                if not mac:
+                    continue
+                flags = ''
+                if l.get('radius'): flags += 'R'
+                if l.get('dynamic'): flags += 'D'
+                if l.get('blocked'): flags += 'B'
+                leases[mac] = {
+                    'router': ig['name'],
+                    'router_id': ig['id'],
+                    'address': l.get('active-address') or l.get('address', ''),
+                    'mac_address': mac,
+                    'client_id': l.get('active-client-id') or l.get('client-id', ''),
+                    'host_name': l.get('host-name', ''),
+                    'server': l.get('active-server') or l.get('server', ''),
+                    'status': l.get('status', ''),
+                    'expires_after': l.get('expires-after', ''),
+                    'last_seen': l.get('last-seen', ''),
+                    'rate_limit': l.get('rate-limit', ''),
+                    'flags': flags,
+                }
+        except Exception as e:
+            errors.append({'router': ig['name'], 'error': str(e)})
+
+    # Gabungkan dengan data RADIUS (radreply)
+    if leases:
+        macs = list(leases.keys())
+        placeholders = ','.join(['%s'] * len(macs))
+        radius_data = execute_query(
+            f"SELECT username, attribute, value FROM radreply WHERE username IN ({placeholders}) AND attribute IN ('Framed-IP-Address','Mikrotik-Rate-Limit','Framed-Pool')",
+            tuple(macs)
+        ) or []
+        for row in radius_data:
+            mac = row['username']
+            if mac in leases:
+                if row['attribute'] == 'Framed-IP-Address':
+                    leases[mac]['radius_ip'] = row['value']
+                elif row['attribute'] == 'Mikrotik-Rate-Limit':
+                    leases[mac]['radius_rate'] = row['value']
+                elif row['attribute'] == 'Framed-Pool':
+                    leases[mac]['radius_pool'] = row['value']
+
+    return jsonify({'success': True, 'leases': list(leases.values()), 'errors': errors})
+
+@app.route('/api/ipoe/stats')
+@login_required
+def api_ipoe_stats():
+    try:
+        total = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'ipoe'")[0]['count']
+        online = execute_query("""
+            SELECT COUNT(DISTINCT a.username) as count 
+            FROM radacct a 
+            INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'ipoe'
+            WHERE a.acctstoptime IS NULL
+        """)[0]['count']
+        return jsonify({'total': total, 'online': online})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================
+# IPoE ROUTES (MAC-based RADIUS auth)
+# ============================================================
+
+@app.route('/ipoe-users')
+@login_required
+def ipoe_users_page():
+    return render_template('ipoe-users.html')
+
+@app.route('/api/ipoe/users')
+@login_required
+def api_ipoe_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+
+        base_where = "c.attribute = 'Cleartext-Password' AND EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'ipoe')"
+        params = []
+        if search:
+            base_where += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+
+        data_query = f"""
+            SELECT c.id, c.username, c.username as mac_address, c.value as password,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-Pool' LIMIT 1) as framed_pool,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Description' LIMIT 1) as name,
+                   (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
+            FROM radcheck c WHERE {base_where}
+            ORDER BY c.id DESC LIMIT %s OFFSET %s
+        """
+        count_query = f"SELECT COUNT(*) as total FROM radcheck c WHERE {base_where}"
+
+        users = execute_query(data_query, tuple(params + [limit, offset]))
+        total = execute_query(count_query, tuple(params))[0]['total']
+        return jsonify({'users': users, 'total': total, 'page': page, 'limit': limit,
+                        'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ipoe/users/add', methods=['POST'])
+@login_required
+def api_ipoe_add_user():
+    try:
+        data = get_request_data()
+        username = (data.get('mac_address') or data.get('username', '')).strip().lower()
+        password = data.get('password', username).strip() or username
+        rate_limit = data.get('rate_limit', '').strip()
+        framed_pool = (data.get('ip_pool') or data.get('framed_pool', '')).strip()
+        ip_address = data.get('ip_address', '').strip()
+        name = data.get('name', '').strip()
+
+        if not username:
+            return jsonify({'success': False, 'error': 'Username (MAC) wajib diisi'}), 400
+
+        existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if existing:
+            return jsonify({'success': False, 'error': 'Username sudah ada'}), 400
+
+        execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)",
+                      (username, password), fetch=False)
+        execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, 'ipoe', 1) ON CONFLICT DO NOTHING",
+                      (username,), fetch=False)
+        if rate_limit:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)",
+                          (username, rate_limit), fetch=False)
+        if framed_pool:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-Pool', ':=', %s)",
+                          (username, framed_pool), fetch=False)
+        if ip_address:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)",
+                          (username, ip_address), fetch=False)
+        if name:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Description', ':=', %s)",
+                          (username, name), fetch=False)
+
+        return jsonify({'success': True, 'message': 'IPoE user berhasil ditambahkan'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ipoe/users/update/<username>', methods=['PUT'])
+@login_required
+def api_ipoe_update_user(username):
+    try:
+        data = get_request_data()
+        if data.get('password'):
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'",
+                          (data['password'], username), fetch=False)
+        for attr, key in [('Mikrotik-Rate-Limit', 'rate_limit'), ('Framed-Pool', 'framed_pool'), ('Framed-IP-Address', 'ip_address'), ('Description', 'name')]:
+            if key in data:
+                execute_query("DELETE FROM radreply WHERE username = %s AND attribute = %s", (username, attr), fetch=False)
+                if data[key]:
+                    execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, %s, ':=', %s)",
+                                  (username, attr, data[key]), fetch=False)
+        return jsonify({'success': True, 'message': 'IPoE user berhasil diupdate'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ipoe/users/delete/<username>', methods=['DELETE'])
+@login_required
+def api_ipoe_delete_user(username):
+    try:
+        execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = 'ipoe'", (username,), fetch=False)
+        return jsonify({'success': True, 'message': f'IPoE user {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ipoe/get-name')
+@app.route('/api/ipoe/get-name/<mac>')
+def api_ipoe_get_name(mac=None):
+    """Endpoint publik untuk diakses MikroTik Lease Script.
+    Menerima parameter 'mac' via path atau query dan membalas dengan format: name;rate_limit."""
+    try:
+        if mac is None:
+            mac = request.args.get('mac', '').strip().lower()
+        else:
+            mac = mac.strip().lower()
+
+        if not mac:
+            return "Name-Not-Found; ", 400
+        
+        # Bersihkan MAC address dari separator (hanya sisakan alfanumerik)
+        clean_mac = "".join(c for c in mac if c.isalnum())
+        
+        # Query ke database mencari nama (Description) dan rate limit (Mikrotik-Rate-Limit)
+        rows = execute_query("""
+            SELECT attribute, value FROM radreply 
+            WHERE regexp_replace(LOWER(username), '[^a-z0-9]', '', 'g') = %s 
+            AND attribute IN ('Description', 'Mikrotik-Rate-Limit')
+        """, (clean_mac,))
+        
+        name = ""
+        rate_limit = ""
+        for r in rows:
+            if r['attribute'] == 'Description':
+                name = r['value'].strip()
+            elif r['attribute'] == 'Mikrotik-Rate-Limit':
+                rate_limit = r['value'].strip()
+                
+        # Format name
+        if name:
+            name = name.replace(" ", "-")
+            safe_name = "".join(c for c in name if c.isalnum() or c == '-')
+        else:
+            safe_name = f"IPoE-{clean_mac}"
+            
+        return f"{safe_name};{rate_limit}"
+    except Exception as e:
+        return f"Error-{str(e)}; ", 500
+
+# ============================================================
+# VPN ROUTES
+# ============================================================
+
+@app.route('/vpn-users')
+@login_required
+def vpn_users_page():
+    return render_template('vpn-users.html')
+
+@app.route('/api/vpn/users')
+@login_required
+def api_vpn_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+
+        base_where = "c.attribute = 'Cleartext-Password' AND EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'vpn')"
+        params = []
+        if search:
+            base_where += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+
+        data_query = f"""
+            SELECT c.id, c.username, c.value as password,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-Pool' LIMIT 1) as framed_pool,
+                   (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
+            FROM radcheck c WHERE {base_where}
+            ORDER BY c.id DESC LIMIT %s OFFSET %s
+        """
+        count_query = f"SELECT COUNT(*) as total FROM radcheck c WHERE {base_where}"
+
+        users = execute_query(data_query, tuple(params + [limit, offset]))
+        total = execute_query(count_query, tuple(params))[0]['total']
+        return jsonify({'users': users, 'total': total, 'page': page, 'limit': limit,
+                        'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/vpn/users/add', methods=['POST'])
+@login_required
+def api_vpn_add_user():
+    try:
+        data = get_request_data()
+        username = data.get('username', '').strip().lower()
+        password = data.get('password', '').strip()
+        rate_limit = data.get('rate_limit', '').strip()
+        framed_pool = data.get('framed_pool', '').strip()
+        ip_address = data.get('ip_address', '').strip()
+
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Username dan Password wajib diisi'}), 400
+
+        existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if existing:
+            return jsonify({'success': False, 'error': 'Username sudah ada'}), 400
+
+        execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)",
+                      (username, password), fetch=False)
+        execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, 'vpn', 1) ON CONFLICT DO NOTHING",
+                      (username,), fetch=False)
+        if rate_limit:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)",
+                          (username, rate_limit), fetch=False)
+        if framed_pool:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-Pool', ':=', %s)",
+                          (username, framed_pool), fetch=False)
+        if ip_address:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)",
+                          (username, ip_address), fetch=False)
+
+        return jsonify({'success': True, 'message': 'VPN user berhasil ditambahkan'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/vpn/users/update/<username>', methods=['PUT'])
+@login_required
+def api_vpn_update_user(username):
+    try:
+        data = get_request_data()
+        if data.get('password'):
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'",
+                          (data['password'], username), fetch=False)
+        for attr, key in [('Mikrotik-Rate-Limit', 'rate_limit'), ('Framed-Pool', 'framed_pool'), ('Framed-IP-Address', 'ip_address')]:
+            if key in data:
+                execute_query("DELETE FROM radreply WHERE username = %s AND attribute = %s", (username, attr), fetch=False)
+                if data[key]:
+                    execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, %s, ':=', %s)",
+                                  (username, attr, data[key]), fetch=False)
+        return jsonify({'success': True, 'message': 'VPN user berhasil diupdate'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/vpn/users/delete/<username>', methods=['DELETE'])
+@login_required
+def api_vpn_delete_user(username):
+    try:
+        execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = 'vpn'", (username,), fetch=False)
+        return jsonify({'success': True, 'message': f'VPN user {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================
+# 802.1X ROUTES
+# ============================================================
+
+@app.route('/8021x-users')
+@login_required
+def x8021x_users_page():
+    return render_template('8021x-users.html')
+
+@app.route('/api/8021x/users')
+@login_required
+def api_x8021x_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+
+        base_where = "c.attribute = 'Cleartext-Password' AND EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = '8021x')"
+        params = []
+        if search:
+            base_where += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+
+        data_query = f"""
+            SELECT c.id, c.username, c.value as password,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-Pool' LIMIT 1) as framed_pool,
+                   (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
+            FROM radcheck c WHERE {base_where}
+            ORDER BY c.id DESC LIMIT %s OFFSET %s
+        """
+        count_query = f"SELECT COUNT(*) as total FROM radcheck c WHERE {base_where}"
+
+        users = execute_query(data_query, tuple(params + [limit, offset]))
+        total = execute_query(count_query, tuple(params))[0]['total']
+        return jsonify({'users': users, 'total': total, 'page': page, 'limit': limit,
+                        'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/8021x/users/add', methods=['POST'])
+@login_required
+def api_x8021x_add_user():
+    try:
+        data = get_request_data()
+        username = data.get('username', '').strip().lower()
+        password = data.get('password', '').strip()
+        rate_limit = data.get('rate_limit', '').strip()
+        framed_pool = data.get('framed_pool', '').strip()
+        ip_address = data.get('ip_address', '').strip()
+
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Username dan Password wajib diisi'}), 400
+
+        existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if existing:
+            return jsonify({'success': False, 'error': 'Username sudah ada'}), 400
+
+        execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)",
+                      (username, password), fetch=False)
+        execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, '8021x', 1) ON CONFLICT DO NOTHING",
+                      (username,), fetch=False)
+        if rate_limit:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)",
+                          (username, rate_limit), fetch=False)
+        if framed_pool:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-Pool', ':=', %s)",
+                          (username, framed_pool), fetch=False)
+        if ip_address:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)",
+                          (username, ip_address), fetch=False)
+
+        return jsonify({'success': True, 'message': '802.1X user berhasil ditambahkan'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/8021x/users/update/<username>', methods=['PUT'])
+@login_required
+def api_x8021x_update_user(username):
+    try:
+        data = get_request_data()
+        if data.get('password'):
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'",
+                          (data['password'], username), fetch=False)
+        for attr, key in [('Mikrotik-Rate-Limit', 'rate_limit'), ('Framed-Pool', 'framed_pool'), ('Framed-IP-Address', 'ip_address')]:
+            if key in data:
+                execute_query("DELETE FROM radreply WHERE username = %s AND attribute = %s", (username, attr), fetch=False)
+                if data[key]:
+                    execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, %s, ':=', %s)",
+                                  (username, attr, data[key]), fetch=False)
+        return jsonify({'success': True, 'message': '802.1X user berhasil diupdate'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/8021x/users/delete/<username>', methods=['DELETE'])
+@login_required
+def api_x8021x_delete_user(username):
+    try:
+        execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = '8021x'", (username,), fetch=False)
+        return jsonify({'success': True, 'message': f'802.1X user {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # === AKHIRI KODE TAMBAHAN ===
 
 # === SOCKET IO EVENTS ===
@@ -1634,6 +2313,240 @@ def api_system_metrics_data():
 
 # Start background task using socketio (safe with eventlet)
 socketio.start_background_task(background_metrics)
+
+def background_stale_sessions():
+    """Mark stale sessions setelah 24 jam tidak ada interim-update.
+    Interval panjang agar tidak mengganggu penghitungan sqlcounter untuk voucher aktif."""
+    socketio.sleep(60)
+    while True:
+        try:
+            execute_query("""
+                UPDATE radacct
+                SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
+                WHERE acctstoptime IS NULL
+                AND acctupdatetime < NOW() - INTERVAL '24 hours'
+            """, fetch=False)
+        except Exception as e:
+            print(f"[stale-session-cleaner] Error: {e}")
+        socketio.sleep(300)
+
+socketio.start_background_task(background_stale_sessions)
+
+
+def background_expired_disconnect():
+    """Setiap 60 detik: disconnect sesi aktif milik user yang Expiration-nya sudah lewat, lalu hapus akun."""
+    socketio.sleep(30)
+    while True:
+        try:
+            expired_sessions = execute_query("""
+                SELECT a.acctsessionid, a.nasipaddress, a.username, a.framedipaddress
+                FROM radacct a
+                JOIN radcheck rc ON LOWER(rc.username) = LOWER(a.username) AND rc.attribute = 'Expiration'
+                WHERE a.acctstoptime IS NULL
+                  AND to_timestamp(rc.value, 'Mon DD YYYY HH24:MI:SS') < NOW()
+            """)
+            for s in (expired_sessions or []):
+                nas_ip = str(s['nasipaddress'])
+                nas_row = execute_query("SELECT secret FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
+                secret = nas_row[0]['secret'] if nas_row else 'testing123'
+                ok = send_coa_disconnect(nas_ip, s['acctsessionid'], secret, framed_ip=s.get('framedipaddress'))
+                execute_query("UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Session-Timeout' WHERE acctsessionid = %s AND acctstoptime IS NULL",
+                              (s['acctsessionid'],), fetch=False)
+                print(f"[expired-disconnect] {s['username']} @ {nas_ip} | CoA={'OK' if ok else 'FAIL'}")
+
+            execute_query("""
+                DELETE FROM radcheck WHERE username IN (
+                    SELECT rc.username FROM radcheck rc
+                    WHERE rc.attribute = 'Expiration'
+                      AND to_timestamp(rc.value, 'Mon DD YYYY HH24:MI:SS') < NOW()
+                      AND NOT EXISTS (SELECT 1 FROM radacct a WHERE a.username = rc.username AND a.acctstoptime IS NULL)
+                )
+            """, fetch=False)
+            execute_query("""
+                DELETE FROM radreply WHERE username NOT IN (
+                    SELECT username FROM radcheck WHERE attribute = 'Cleartext-Password'
+                )
+            """, fetch=False)
+            execute_query("""
+                DELETE FROM radusergroup WHERE username NOT IN (
+                    SELECT username FROM radcheck WHERE attribute = 'Cleartext-Password'
+                )
+            """, fetch=False)
+        except Exception as e:
+            print(f"[expired-disconnect] Error: {e}")
+        socketio.sleep(60)
+
+socketio.start_background_task(background_expired_disconnect)
+
+
+_nas_last_status = {}
+
+def background_nas_monitor():
+    """Memantau status ping ke setiap IP NAS setiap 1 menit dan mengirim notifikasi Telegram jika berubah."""
+    socketio.sleep(15) # Tunggu 15 detik saat startup agar koneksi stabil
+    while True:
+        try:
+            nas_list = execute_query("SELECT nasname, shortname FROM nas")
+            for nas in (nas_list or []):
+                nas_ip = nas['nasname']
+                nas_name = nas['shortname'] or nas_ip
+                
+                # Gunakan fungsi ping_nas yang lebih tangguh (ping + port check)
+                is_online = (ping_nas(nas_ip) == "online")
+                
+                prev_status = _nas_last_status.get(nas_ip)
+                if prev_status is not None:
+                    # Jika status berubah dari ONLINE ke OFFLINE
+                    if prev_status and not is_online:
+                        time_str = datetime.now().strftime('%H:%M')
+                        msg = f"⚠️ <b>[ALERT]</b> NAS \"<b>{nas_name}</b>\" terdeteksi <b>OFFLINE</b> pada <b>{time_str} WIB</b>. Mohon segera periksa!"
+                        send_telegram_notification(msg)
+                        _nas_last_status[nas_ip] = False
+                    # Jika status berubah dari OFFLINE ke ONLINE
+                    elif not prev_status and is_online:
+                        msg = f"✅ <b>[RESOLVED]</b> NAS \"<b>{nas_name}</b>\" kembali <b>ONLINE</b>."
+                        send_telegram_notification(msg)
+                        _nas_last_status[nas_ip] = True
+                else:
+                    # Inisialisasi awal
+                    _nas_last_status[nas_ip] = is_online
+        except Exception as e:
+            print(f"[nas-monitor] Error: {e}")
+            
+        socketio.sleep(60)
+
+socketio.start_background_task(background_nas_monitor)
+
+
+
+
+# === HOTSPOT API ROUTES ===
+import secrets as _secrets
+import string as _string
+
+def _gen_voucher_code(length=10):
+    chars = _string.ascii_uppercase + _string.digits
+    return ''.join(_secrets.choice(chars) for _ in range(length))
+
+HOTSPOT_PACKAGES = {
+    '3h':  {'name': 'Quick 3 Jam',  'seconds': 10800},
+    '1d':  {'name': 'Daily 24 Jam', 'seconds': 86400},
+    '7d':  {'name': 'Weekly 7 Hari', 'seconds': 604800},
+    '30d': {'name': 'Monthly Unlimited', 'seconds': 2592000},
+}
+
+@app.route('/hotspot-users')
+@login_required
+def hotspot_users_page():
+    return render_template('hotspot-users.html')
+
+@app.route('/api/hotspot/vouchers')
+@login_required
+def api_hotspot_vouchers():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+        status = request.args.get('status', '')  # active, expired, unused
+
+        where = "deleted_at IS NULL"
+        params = []
+
+        if status == 'unused':
+            where += " AND first_login IS NULL"
+        elif status == 'active':
+            where += " AND first_login IS NOT NULL AND expires_at > NOW()"
+        elif status == 'expired':
+            where += " AND expires_at IS NOT NULL AND expires_at <= NOW()"
+
+        if search:
+            where += " AND (voucher_code ILIKE %s OR username ILIKE %s)"
+            params += [f'%{search}%', f'%{search}%']
+
+        rows = execute_query(f"""
+            SELECT id, voucher_code, username, password, package_name, rate_limit,
+                   first_login, expires_at, locked_mac, created_at,
+                   CASE
+                       WHEN first_login IS NULL THEN 'unused'
+                       WHEN expires_at > NOW() THEN 'active'
+                       ELSE 'expired'
+                   END AS status,
+                   CASE
+                       WHEN expires_at IS NOT NULL AND expires_at > NOW()
+                       THEN EXTRACT(EPOCH FROM (expires_at - NOW()))::INTEGER
+                       ELSE 0
+                   END AS remaining_seconds
+            FROM hotspot_vouchers
+            WHERE {where}
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+        """, tuple(params + [limit, offset]))
+
+        total = execute_query(f"SELECT COUNT(*) as total FROM hotspot_vouchers WHERE {where}", tuple(params))[0]['total']
+
+        return jsonify({'vouchers': rows, 'total': total, 'page': page,
+                        'limit': limit, 'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/hotspot/vouchers/generate', methods=['POST'])
+@login_required
+def api_hotspot_generate():
+    try:
+        data = get_request_data()
+        pkg_key = data.get('package', '1d')
+        rate_limit = data.get('rate_limit', '').strip()
+        count = min(int(data.get('count', 1)), 100)
+
+        pkg = HOTSPOT_PACKAGES.get(pkg_key)
+        if not pkg:
+            return jsonify({'success': False, 'error': 'Paket tidak valid'}), 400
+
+        generated = []
+        for _ in range(count):
+            code = _gen_voucher_code()
+            username = f"hs-{code.lower()}"
+            password = _gen_voucher_code(8)
+            execute_query("""
+                INSERT INTO hotspot_vouchers (voucher_code, username, password, duration_seconds, package_name, rate_limit)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (code, username, password, pkg['seconds'], pkg['name'], rate_limit), fetch=False)
+            generated.append({'voucher_code': code, 'username': username, 'password': password,
+                               'package': pkg['name']})
+
+        return jsonify({'success': True, 'vouchers': generated})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/hotspot/vouchers/delete/<int:vid>', methods=['DELETE'])
+@login_required
+def api_hotspot_delete(vid):
+    try:
+        execute_query("UPDATE hotspot_vouchers SET deleted_at = NOW() WHERE id = %s", (vid,), fetch=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/hotspot/vouchers/delete-expired', methods=['DELETE'])
+@login_required
+def api_hotspot_delete_expired():
+    try:
+        result = execute_query("""
+            UPDATE hotspot_vouchers SET deleted_at = NOW()
+            WHERE expires_at IS NOT NULL AND expires_at <= NOW() AND deleted_at IS NULL
+            RETURNING id
+        """)
+        return jsonify({'success': True, 'deleted': len(result) if result else 0})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/hotspot/packages')
+@login_required
+def api_hotspot_packages():
+    return jsonify(HOTSPOT_PACKAGES)
+
+
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

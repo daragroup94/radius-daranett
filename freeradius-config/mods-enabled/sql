@@ -13,28 +13,31 @@ sql {
     read_clients = yes
     client_table = "nas"
     
-    # QUERY AUTHORIZATION - INI YANG PENTING!
     authorize_check_query = "SELECT id, username, attribute, value, op FROM radcheck WHERE username = '%{SQL-User-Name}' ORDER BY id"
     
     authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{SQL-User-Name}' ORDER BY id"
     
-    # ACCOUNTING QUERIES
     accounting {
         reference = "%{tolower:type.%{Acct-Status-Type}.query}"
         
         type {
             start {
-                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctinputoctets, acctoutputoctets) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), 0, 0)"
+                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), NOW(), 0, 0, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}') ON CONFLICT (acctuniqueid) DO UPDATE SET acctupdatetime = NOW()"
             }
             
             stop {
-                query = "UPDATE radacct SET acctstoptime = NOW(), acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0}, acctterminatecause = '%{Acct-Terminate-Cause}' WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}'"
+                query = "UPDATE radacct SET acctstoptime = NOW(), acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0}, acctterminatecause = '%{Acct-Terminate-Cause}', acctupdatetime = NOW() WHERE acctuniqueid = '%{Acct-Unique-Session-Id}'"
             }
             
             interim-update {
-                query = "UPDATE radacct SET acctsessiontime = %{%{Acct-Session-Time}:-0}, acctinputoctets = %{%{Acct-Input-Octets}:-0}, acctoutputoctets = %{%{Acct-Output-Octets}:-0} WHERE acctsessionid = '%{Acct-Session-Id}' AND username = '%{SQL-User-Name}'"
+                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', NOW(), %{%{Acct-Session-Time}:-0}, %{%{Acct-Input-Octets}:-0}, %{%{Acct-Output-Octets}:-0}, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}') ON CONFLICT (acctuniqueid) DO UPDATE SET acctsessiontime = EXCLUDED.acctsessiontime, acctinputoctets = EXCLUDED.acctinputoctets, acctoutputoctets = EXCLUDED.acctoutputoctets, acctupdatetime = NOW()"
             }
         }
+    }
+    
+    post-auth {
+        reference = ".query"
+        query = "INSERT INTO radpostauth (username, pass, reply, authdate, calledstationid, callingstationid) VALUES ('%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', NOW(), '%{Called-Station-Id}', '%{Calling-Station-Id}')"
     }
     
     pool {

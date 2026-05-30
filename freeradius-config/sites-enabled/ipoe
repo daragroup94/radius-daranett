@@ -1,0 +1,80 @@
+server ipoe {
+
+listen {
+    type = auth
+    ipaddr = *
+    port = 11812
+    limit {
+          max_connections = 16
+          lifetime = 0
+          idle_timeout = 30
+    }
+}
+
+listen {
+    ipaddr = *
+    port = 11813
+    type = acct
+    limit {
+    }
+}
+
+authorize {
+    # Hanya proses jika IPoE (MAC auth atau Called-Station-Id dhcp)
+    if (!("%{Called-Station-Id}" =~ /^dhcp/i) && !("%{User-Name}" =~ /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$/)) {
+        reject
+    }
+
+    # Normalize User-Name ke lowercase untuk database lookup
+    update request {
+        &User-Name := "%{tolower:%{User-Name}}"
+    }
+
+    # Cek apakah user terdaftar di grup 'ipoe' (case-insensitive & mengabaikan separator)
+    if ("%{sql:SELECT groupname FROM radusergroup WHERE regexp_replace(LOWER(username), '[^a-z0-9]', '', 'g') = regexp_replace(LOWER('%{User-Name}'), '[^a-z0-9]', '', 'g') AND groupname = 'ipoe' LIMIT 1}" != "ipoe") {
+        reject
+    }
+
+    # Jalankan preprocess dan sql untuk memuat reply attributes (IP static, Pool, Limit speed)
+    preprocess
+    sql
+
+    # Hapus Mikrotik-Rate-Limit dari balasan RADIUS agar MikroTik tidak membuat queue dynamic
+    # Kita akan membuat static queue secara manual via Lease Script di MikroTik agar namanya bisa kustom
+    update reply {
+        &Mikrotik-Rate-Limit !* ANY
+    }
+
+    # Accept semua MAC address terdaftar tanpa cek password
+    update control {
+        &Auth-Type := Accept
+    }
+}
+
+authenticate {
+    Auth-Type Accept {
+        ok
+    }
+}
+
+preacct {
+    preprocess
+    acct_unique
+    files
+}
+
+accounting {
+    sql
+    attr_filter.accounting_response
+}
+
+post-auth {
+    sql
+
+    Post-Auth-Type REJECT {
+        sql
+        attr_filter.access_reject
+    }
+}
+
+}

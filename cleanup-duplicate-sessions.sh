@@ -1,7 +1,7 @@
 #!/bin/bash
 # cleanup-duplicate-sessions.sh
 
-LOGFILE="$HOME/project-radius/logs/freeradius-cleanup.log"
+LOGFILE="$(dirname "$0")/logs/freeradius-cleanup.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 echo "[$TIMESTAMP] Starting cleanup..." >> $LOGFILE

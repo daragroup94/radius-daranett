@@ -20,6 +20,13 @@ else
     echo "✗ WARNING: SQL config not found at /etc/freeradius/3.0/mods-available/sql"
 fi
 
+# Create symlink for SQL Hotspot module
+if [ -f /etc/freeradius/3.0/mods-available/sql_hotspot ]; then
+    echo "Creating SQL Hotspot module symlink..."
+    ln -sf /etc/freeradius/3.0/mods-available/sql_hotspot /etc/freeradius/3.0/mods-enabled/sql_hotspot
+    echo "✓ SQL Hotspot module enabled"
+fi
+
 # Verify symlink
 if [ -L /etc/freeradius/3.0/mods-enabled/sql ]; then
     echo "✓ SQL symlink verified: $(readlink -f /etc/freeradius/3.0/mods-enabled/sql)"

@@ -1,7 +1,7 @@
 #!/bin/bash
 # check-duplicate-sessions.sh
 
-LOGFILE="$HOME/project-radius/logs/freeradius-check.log"
+LOGFILE="$(dirname "$0")/logs/freeradius-check.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 # Check duplikasi

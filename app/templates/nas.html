@@ -6,34 +6,69 @@
 
 {% block extra_css %}
 <style>
-    .icon-gradient-nas { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .icon-gradient-add { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    /* Premium Font Styling */
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
+    }
+    
+    /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
+    .icon-wrapper-noc {
+        width: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 1rem !important; /* 16px */
+        flex-shrink: 0 !important;
+    }
+    .icon-noc {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    .icon-gradient-nas { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; }
+    .icon-gradient-add { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; }
+    
+    /* Floating icon animation */
+    .floating-icon { 
+        animation: float 3.5s ease-in-out infinite;
+        will-change: transform;
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="fade-in">
-    <div class="modern-card rounded-3xl p-8 shadow-xl">
-        <div class="flex justify-between items-center mb-8">
-            <div class="flex items-center">
-                <div class="w-16 h-16 icon-gradient-nas rounded-2xl flex items-center justify-center mr-4 shadow-lg floating-icon">
-                    <i class="fas fa-server text-white text-3xl"></i>
-                </div>
-                <div>
-                    <h3 class="text-2xl font-bold text-gray-800">Network Access Servers</h3>
-                    <p class="text-sm text-gray-500 mt-1">Manage all your NAS devices and configurations</p>
-                </div>
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-nas mr-4 shadow-lg shadow-emerald-500/15 floating-icon">
+                <i data-lucide="hard-drive" class="lucide icon-noc text-white"></i>
             </div>
-            <button onclick="openAddNasModal()" class="modern-btn text-white px-6 py-3 rounded-xl flex items-center space-x-2 font-semibold shadow-lg" style="background:linear-gradient(to right,#667eea,#764ba2);">
-                <i class="fas fa-plus-circle text-xl"></i>
-                <span>Add New NAS</span>
-            </button>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Network Access Servers (NAS)</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola seluruh perangkat access server dan router terintegrasi.</p>
+            </div>
         </div>
+        
+        <button onclick="openAddNasModal()" class="z-10 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]">
+            <i data-lucide="plus-circle" class="lucide w-5 h-5 text-white"></i>
+            <span>Tambah NAS Baru</span>
+        </button>
+    </div>
 
+    <!-- Main Content Card -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
         <div id="nasList" class="space-y-6">
             <div class="text-center py-16">
                 <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-                <p class="text-gray-600 font-semibold text-lg">Loading NAS devices...</p>
+                <p class="text-gray-600 dark:text-slate-300 font-semibold text-lg">Loading NAS devices...</p>
                 <p class="text-gray-400 text-sm mt-2">Please wait</p>
             </div>
         </div>
@@ -466,9 +501,10 @@
 
     async function confirmDeleteNas() {
         if (!_deleteNasId) return;
+        const nasId = _deleteNasId;
         closeDeleteNasModal();
         try {
-            const result = await apiCall('/api/nas/delete/' + _deleteNasId, { method: 'DELETE' });
+            const result = await apiCall('/api/nas/delete/' + nasId, { method: 'DELETE' });
             if (result.success) {
                 showNotification(result.message, 'success');
                 loadNAS();

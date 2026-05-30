@@ -15,7 +15,7 @@ sql {
     
     authorize_check_query = "SELECT id, username, attribute, value, op FROM radcheck WHERE username = '%{SQL-User-Name}' ORDER BY id"
     
-    authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{SQL-User-Name}' ORDER BY id"
+    authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{SQL-User-Name}' AND attribute != 'Description' ORDER BY id"
     
     accounting {
         reference = "%{tolower:type.%{Acct-Status-Type}.query}"
@@ -43,8 +43,8 @@ sql {
     pool {
         start = 5
         min = 3
-        max = 10
-        spare = 3
+        max = 32
+        spare = 5
         uses = 0
         lifetime = 0
         idle_timeout = 60

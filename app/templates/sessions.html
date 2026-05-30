@@ -1,436 +1,836 @@
 {% extends "base.html" %}
-
 {% block title %}Active Sessions - RADIUS Manager{% endblock %}
 {% block page_title %}Active Sessions{% endblock %}
-{% block page_subtitle %}Live PPPoE Connections & Real-time Monitoring{% endblock %}
+{% block page_subtitle %}Real-time PPPoE Monitoring{% endblock %}
 
 {% block extra_css %}
 <style>
-    .icon-gradient-sessions { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .pulse-ring {
-        animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        will-change: transform, opacity;
+    /* Premium Font Styling */
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
     }
-    @keyframes pulse-ring {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.5; transform: scale(1.1); }
+    
+    /* Stat Cards Hover & Shadows */
+    .stat-card-glow {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .stat-card-glow:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 30px rgba(0, 0, 0, 0.05);
+    }
+    .dark .stat-card-glow {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .dark .stat-card-glow:hover {
+        box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
+        border-color: rgba(16, 185, 129, 0.25);
+    }
+
+    /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
+    .icon-wrapper-noc {
+        width: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 1rem !important; /* 16px */
+        flex-shrink: 0 !important;
+    }
+    .icon-noc {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* Guaranteed Custom Gradients */
+    .icon-gradient-sessions { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; }
+    .icon-gradient-total { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%) !important; }
+    .icon-gradient-dupe { background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%) !important; }
+    .icon-gradient-dl { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; }
+    .icon-gradient-ul { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; }
+    .icon-gradient-dur { background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important; }
+    
+    /* Speed bar and other styles */
+    .speed-bar-wrap { height: 6px; border-radius: 9999px; overflow: hidden; }
+    .speed-bar-fill { height: 100%; border-radius: 9999px; transition: width 0.8s ease; }
+    .spark-canvas { display: block; }
+    .session-card { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    .session-card:hover { transform: translateY(-2px); }
+    .pulse-dot { background: #22c55e; }
+    .tab-btn { transition: all .2s; }
+    .tab-btn.active { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; color:#fff; box-shadow: 0 4px 12px rgba(16,185,129,.3); }
+
+    /* Floating icon animation */
+    .floating-icon { 
+        animation: float 3.5s ease-in-out infinite;
+        will-change: transform;
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <div class="modern-card rounded-3xl p-8 shadow-xl">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div class="flex items-center">
-                <div class="w-12 h-12 icon-gradient-sessions rounded-xl flex items-center justify-center mr-3 shadow-lg floating-icon">
-                    <i class="fas fa-signal text-white text-xl"></i>
-                </div>
-                <div>
-                    <h3 class="text-lg font-bold text-gray-800 dark:text-white">Active PPPoE Sessions</h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Real-time connection monitoring</p>
-                </div>
-            </div>
-            <div class="flex gap-2 flex-wrap">
-                <button onclick="loadSessions()" class="text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#667eea,#764ba2);">
-                    <i class="fas fa-sync-alt"></i><span>Refresh</span>
-                </button>
-                <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#10b981,#059669);">
-                    <i class="fas fa-play"></i><span>Auto</span>
-                </button>
-                <button onclick="disconnectAllDuplicates()" id="disconnectDupBtn" class="hidden text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
-                    <i class="fas fa-user-times"></i><span>Putus Semua Ganda</span>
-                </button>
-                <button onclick="cleanupSessions()" class="text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold text-sm shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#f97316,#ef4444);">
-                    <i class="fas fa-broom"></i><span>Cleanup</span>
-                </button>
-            </div>
-        </div>
+<div class="fade-in space-y-6">
 
-        <!-- Session Statistics Cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-            <div class="rounded-xl p-4 bg-blue-50 border border-blue-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-bold text-blue-600 uppercase tracking-wider">Sessions</p>
-                        <p id="totalSessions" class="text-2xl font-black text-blue-900">0</p>
-                    </div>
-                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#667eea,#764ba2);">
-                        <i class="fas fa-users text-white text-sm"></i>
-                    </div>
-                </div>
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-sessions mr-4 shadow-lg shadow-emerald-500/15 floating-icon">
+                <i data-lucide="activity" class="lucide icon-noc text-white"></i>
             </div>
-            <div class="rounded-xl p-4 bg-red-50 border border-red-200 cursor-pointer hover:bg-red-100 transition-colors" onclick="toggleDuplicateFilter()">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-bold text-red-600 uppercase tracking-wider">Ganda</p>
-                        <p id="totalDuplicates" class="text-2xl font-black text-red-900">0</p>
-                    </div>
-                    <div class="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-clone text-white text-sm"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="rounded-xl p-4 bg-green-50 border border-green-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-bold text-green-600 uppercase tracking-wider">Download</p>
-                        <p id="totalDownload" class="text-2xl font-black text-green-900">0 B</p>
-                    </div>
-                    <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-download text-white text-sm"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="rounded-xl p-4 bg-purple-50 border border-purple-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-bold text-purple-600 uppercase tracking-wider">Upload</p>
-                        <p id="totalUpload" class="text-2xl font-black text-purple-900">0 B</p>
-                    </div>
-                    <div class="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-upload text-white text-sm"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="rounded-xl p-4 bg-orange-50 border border-orange-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-bold text-orange-600 uppercase tracking-wider">Avg Duration</p>
-                        <p id="avgDuration" class="text-2xl font-black text-orange-900">0h 0m</p>
-                    </div>
-                    <div class="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-clock text-white text-sm"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Filter & Search -->
-        <div class="flex flex-wrap gap-3 mb-5">
-            <div class="relative flex-1 min-w-[200px]">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i class="fas fa-search text-gray-400 text-xs"></i>
-                </div>
-                <input type="text" id="searchInput" placeholder="Cari username..." 
-                       class="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-gray-800 text-sm transition-all"
-                       onkeyup="filterSessions()">
-            </div>
-            <select id="filterNas" onchange="filterSessions()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 text-sm focus:ring-2 focus:ring-indigo-400">
-                <option value="">Semua NAS</option>
-            </select>
-            <select id="filterDuplicate" onchange="filterSessions()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 text-sm focus:ring-2 focus:ring-red-400">
-                <option value="">Semua Session</option>
-                <option value="duplicate">Ganda Only</option>
-            </select>
-            <select id="sortBy" onchange="sortSessions()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-800 text-sm focus:ring-2 focus:ring-indigo-400">
-                <option value="duration_desc">Duration (Terlama)</option>
-                <option value="duration_asc">Duration (Tercepat)</option>
-                <option value="download_desc">Download (Terbesar)</option>
-                <option value="upload_desc">Upload (Terbesar)</option>
-                <option value="username_asc">Username (A-Z)</option>
-            </select>
-        </div>
-
-        <!-- Sessions List -->
-        <div id="sessionsList" class="space-y-6">
-            <div class="text-center py-20">
-                <div class="relative w-20 h-20 mx-auto mb-6">
-                    <div class="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
-                    <div class="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-                </div>
-                <p class="text-gray-700 font-bold text-xl mb-2">Loading Active Sessions</p>
-                <p class="text-gray-500">Please wait while we fetch the data...</p>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Sesi Aktif</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Pemantauan real-time aktivitas sesi online, pemakaian bandwidth, dan status koneksi.</p>
             </div>
         </div>
     </div>
+
+    <!-- Tab switcher: RADIUS vs Mikrotik Live -->
+    <div class="flex gap-2.5 mb-2">
+        <button id="tabRadius" class="tab-btn active px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow" onclick="switchTab('radius')">
+            <i class="fas fa-database mr-2"></i>RADIUS Sessions
+        </button>
+        <button id="tabMikrotik" class="tab-btn px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700/50" onclick="switchTab('mikrotik')">
+            <i class="fas fa-router mr-2"></i>Mikrotik Live
+        </button>
+    </div>
+
+    <!-- ===== RADIUS TAB ===== -->
+    <div id="panelRadius">
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+
+            <!-- Sub-header dengan Kontrol -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800 dark:text-white">Active Sessions Accounting</h3>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Pemantauan data sesi aktif langsung dari RADIUS Accounting.</p>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="loadSessions()" class="text-white px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
+                        <i class="fas fa-sync-alt mr-1"></i>Refresh
+                    </button>
+                    <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="text-white px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-750 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
+                        <i class="fas fa-play mr-1"></i>Auto
+                    </button>
+                    <button onclick="disconnectAllDuplicates()" id="disconnectDupBtn" class="hidden text-white px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
+                        <i class="fas fa-user-times mr-1"></i>Putus Ganda
+                    </button>
+                    <button onclick="cleanupSessions()" class="text-white px-4 py-2.5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
+                        <i class="fas fa-broom mr-1"></i>Cleanup
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Cards Row -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <!-- Sessions Card -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+          <div class="icon-wrapper-noc icon-gradient-total shadow-md shadow-blue-500/10">
+            <i data-lucide="activity" class="lucide icon-noc text-white"></i>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sessions</p>
+            <p id="totalSessions" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit">0</p>
+          </div>
+        </div>
+
+        <!-- Duplicate Card -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4 cursor-pointer hover:border-red-300 dark:hover:border-red-800/80 transition-colors" onclick="toggleDuplicateFilter()">
+          <div class="icon-wrapper-noc icon-gradient-dupe shadow-md shadow-red-500/10">
+            <i data-lucide="users" class="lucide icon-noc text-white"></i>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Ganda</p>
+            <p id="totalDuplicates" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit">0</p>
+          </div>
+        </div>
+
+        <!-- Download Card -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+          <div class="icon-wrapper-noc icon-gradient-dl shadow-md shadow-emerald-500/10">
+            <i data-lucide="download" class="lucide icon-noc text-white"></i>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Download</p>
+            <p id="totalDownload" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit truncate max-w-[130px]">0 B</p>
+          </div>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+          <div class="icon-wrapper-noc icon-gradient-ul shadow-md shadow-purple-500/10">
+            <i data-lucide="upload" class="lucide icon-noc text-white"></i>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Upload</p>
+            <p id="totalUpload" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit truncate max-w-[130px]">0 B</p>
+          </div>
+        </div>
+
+        <!-- Duration Card -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+          <div class="icon-wrapper-noc icon-gradient-dur shadow-md shadow-orange-500/10">
+            <i data-lucide="clock" class="lucide icon-noc text-white"></i>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Avg Duration</p>
+            <p id="avgDuration" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit truncate">0h 0m</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="flex flex-wrap gap-3 mb-4">
+        <div class="relative flex-1 min-w-[200px]">
+          <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="searchInput" placeholder="Cari username..."
+            class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+            onkeyup="filterSessions()">
+        </div>
+        <select id="filterNas" onchange="filterSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
+          <option value="">Semua NAS</option>
+        </select>
+        <select id="filterDuplicate" onchange="filterSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
+          <option value="">Semua Session</option>
+          <option value="duplicate">Ganda Only</option>
+        </select>
+        <select id="sortBy" onchange="sortSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
+          <option value="duration_desc">Duration (Terlama)</option>
+          <option value="duration_asc">Duration (Tercepat)</option>
+          <option value="download_desc">Download (Terbesar)</option>
+          <option value="upload_desc">Upload (Terbesar)</option>
+          <option value="username_asc">Username (A-Z)</option>
+        </select>
+      </div>
+
+      <!-- Sessions List -->
+      <div id="sessionsList">
+        <div class="text-center py-16">
+          <div class="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p class="text-slate-400 dark:text-slate-500 font-semibold text-xs">Memuat sesi aktif...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MIKROTIK LIVE TAB ===== -->
+  <div id="panelMikrotik" class="hidden">
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
+        <div class="flex items-center gap-3">
+          <div class="icon-wrapper-noc bg-gradient-to-tr from-amber-500 to-orange-600 shadow-lg shadow-orange-500/15 floating-icon">
+            <i class="fas fa-router text-white"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-850 dark:text-white">Mikrotik Live Traffic</h3>
+            <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Real-time dari RouterOS API · <span id="mkLastUpdate" class="text-emerald-500 font-bold">-</span></p>
+          </div>
+        </div>
+        <div class="flex gap-2 flex-wrap items-center">
+          <span id="mkStatusBadge" class="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">Idle</span>
+          <button onclick="loadMikrotik()" class="text-white px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
+            <i class="fas fa-sync-alt mr-1"></i>Refresh
+          </button>
+          <button onclick="toggleMkAuto()" id="mkAutoBtn" class="text-white px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
+            <i class="fas fa-play mr-1"></i>Auto (3s)
+          </button>
+        </div>
+      </div>
+
+      <!-- Mikrotik Stats -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- Online -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+          <div class="icon-wrapper-noc icon-gradient-dur shadow-md shadow-orange-500/10">
+            <i data-lucide="users" class="lucide icon-noc text-white"></i>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Online</p>
+            <p id="mkTotal" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit">0</p>
+          </div>
+        </div>
+
+        <!-- Total RX -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+          <div class="icon-wrapper-noc icon-gradient-dl shadow-md shadow-emerald-500/10">
+            <i data-lucide="download" class="lucide icon-noc text-white"></i>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total RX</p>
+            <p id="mkTotalRx" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit truncate max-w-[150px]">0 bps</p>
+          </div>
+        </div>
+
+        <!-- Total TX -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+          <div class="icon-wrapper-noc icon-gradient-total shadow-md shadow-blue-500/10">
+            <i data-lucide="upload" class="lucide icon-noc text-white"></i>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total TX</p>
+            <p id="mkTotalTx" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit truncate max-w-[150px]">0 bps</p>
+          </div>
+        </div>
+
+        <!-- Router -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+          <div class="icon-wrapper-noc icon-gradient-ul shadow-md shadow-purple-500/10">
+            <i data-lucide="server" class="lucide icon-noc text-white"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Router</p>
+            <p id="mkRouters" class="text-base font-bold text-slate-800 dark:text-white mt-0.5 font-outfit truncate">-</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Mikrotik -->
+      <div class="flex flex-wrap gap-3 mb-4">
+        <div class="relative flex-1 min-w-[200px]">
+          <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="mkSearch" placeholder="Cari username..."
+            class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+            oninput="renderMikrotik()">
+        </div>
+        <select id="mkFilterRouter" onchange="onRouterChange()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-bold">
+          <option value="">Memuat router...</option>
+        </select>
+        <select id="mkSort" onchange="renderMikrotik()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all">
+          <option value="rx_desc">RX Speed ↓</option>
+          <option value="tx_desc">TX Speed ↓</option>
+          <option value="name_asc">Username A-Z</option>
+          <option value="uptime_desc">Uptime ↓</option>
+        </select>
+      </div>
+
+      <!-- Mikrotik List -->
+      <div id="mkList" class="w-full">
+        <div class="col-span-full text-center py-16 text-slate-400 bg-white rounded-3xl border border-slate-150 p-6 shadow-sm">
+          <i class="fas fa-router text-5xl mb-4 opacity-30 text-slate-400"></i>
+          <p class="font-semibold text-sm">Klik Refresh atau aktifkan Auto untuk mulai monitoring</p>
+          <p class="text-xs text-slate-400 mt-1">Pastikan sudah menambahkan integrasi Mikrotik di menu <a href="/integrations" class="text-emerald-500 hover:underline">Integrations</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-    let allSessions = [];
-    let duplicateUsernames = new Set();
-    let autoRefreshInterval = null;
-    let isAutoRefresh = false;
+// ===== SHARED =====
+let currentTab = 'radius';
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('panelRadius').classList.toggle('hidden', tab !== 'radius');
+  document.getElementById('panelMikrotik').classList.toggle('hidden', tab !== 'mikrotik');
+  document.getElementById('tabRadius').classList.toggle('active', tab === 'radius');
+  document.getElementById('tabRadius').classList.toggle('bg-gray-100', tab !== 'radius');
+  document.getElementById('tabRadius').classList.toggle('text-gray-600', tab !== 'radius');
+  document.getElementById('tabMikrotik').classList.toggle('active', tab === 'mikrotik');
+  document.getElementById('tabMikrotik').classList.toggle('bg-gray-100', tab !== 'mikrotik');
+  document.getElementById('tabMikrotik').classList.toggle('text-gray-600', tab !== 'mikrotik');
+  if (tab === 'mikrotik' && mkData.length === 0) loadMkRouters();
+}
 
-    async function loadSessions() {
-        try {
-            const [data, dupes] = await Promise.all([
-                apiCall('/api/sessions'),
-                apiCall('/api/sessions/duplicates')
-            ]);
-            const sessionsList = document.getElementById('sessionsList');
-            
-            if (data.error) {
-                sessionsList.innerHTML = `
-                    <div class="text-center py-20">
-                        <div class="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <i class="fas fa-exclamation-triangle text-red-600 text-4xl"></i>
-                        </div>
-                        <p class="text-red-600 font-bold text-2xl mb-2">Error Loading Sessions</p>
-                        <p class="text-gray-600 mb-6">${data.error}</p>
-                        <button onclick="loadSessions()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg">
-                            Try Again
-                        </button>
-                    </div>
-                `;
-                return;
-            }
+// ===== RADIUS TAB =====
+let allSessions = [], duplicateUsernames = new Set();
+let autoRefreshInterval = null, isAutoRefresh = false;
 
-            allSessions = data;
-            duplicateUsernames = new Set((dupes || []).map(d => d.username));
+async function loadSessions() {
+  try {
+    const [data, dupes] = await Promise.all([apiCall('/api/sessions'), apiCall('/api/sessions/duplicates')]);
+    if (data.error) { showError('sessionsList', data.error); return; }
+    allSessions = data;
+    duplicateUsernames = new Set((dupes||[]).map(d => d.username));
+    document.getElementById('disconnectDupBtn').classList.toggle('hidden', duplicateUsernames.size === 0);
+    updateStats(data, dupes||[]);
+    filterSessions();
+  } catch(e) { showError('sessionsList', e.message); }
+}
 
-            // Tampilkan/sembunyikan tombol putus semua ganda
-            const dupBtn = document.getElementById('disconnectDupBtn');
-            if (duplicateUsernames.size > 0) {
-                dupBtn.classList.remove('hidden');
-            } else {
-                dupBtn.classList.add('hidden');
-            }
+function showError(id, msg) {
+  document.getElementById(id).innerHTML = `<div class="text-center py-16 text-red-500"><i class="fas fa-exclamation-triangle text-4xl mb-3"></i><p class="font-bold">${msg}</p></div>`;
+}
 
-            if (data.length === 0) {
-                sessionsList.innerHTML = `
-                    <div class="text-center py-20">
-                        <div class="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                            <i class="fas fa-plug text-gray-400 text-4xl"></i>
-                        </div>
-                        <p class="text-gray-700 font-bold text-2xl mb-2">No Active Sessions</p>
-                        <p class="text-gray-500">All PPPoE connections are currently idle</p>
-                    </div>
-                `;
-                updateStatistics(data, dupes || []);
-                return;
-            }
+function updateStats(sessions, dupes) {
+  let dl=0, ul=0, dur=0;
+  sessions.forEach(s => { dl+=parseInt(s.acctinputoctets||0); ul+=parseInt(s.acctoutputoctets||0); dur+=parseInt(s.acctsessiontime||0); });
+  document.getElementById('totalSessions').textContent = sessions.length;
+  document.getElementById('totalDuplicates').textContent = dupes.length;
+  document.getElementById('totalDownload').textContent = fmtBytes(dl);
+  document.getElementById('totalUpload').textContent = fmtBytes(ul);
+  document.getElementById('avgDuration').textContent = sessions.length ? fmtDur(Math.floor(dur/sessions.length)) : '0s';
+}
 
-            updateStatistics(data, dupes || []);
-            displaySessions(data);
+function filterSessions() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const nas = document.getElementById('filterNas').value;
+  const dup = document.getElementById('filterDuplicate').value;
+  let list = allSessions.filter(s =>
+    s.username.toLowerCase().includes(q) &&
+    (!nas || s.nasipaddress === nas) &&
+    (!dup || (dup==='duplicate' && duplicateUsernames.has(s.username)))
+  );
+  sortAndRender(list);
+}
 
-        } catch (error) {
-            console.error('Error loading sessions:', error);
-            document.getElementById('sessionsList').innerHTML = `
-                <div class="text-center py-20">
-                    <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
-                    <p class="text-red-600 font-bold text-xl">Network error: ${error.message}</p>
-                </div>
-            `;
+function sortSessions() { filterSessions(); }
+
+function sortAndRender(list) {
+  const by = document.getElementById('sortBy').value;
+  list = [...list];
+  if (by==='duration_desc') list.sort((a,b)=>(b.acctsessiontime||0)-(a.acctsessiontime||0));
+  else if (by==='duration_asc') list.sort((a,b)=>(a.acctsessiontime||0)-(b.acctsessiontime||0));
+  else if (by==='download_desc') list.sort((a,b)=>(b.acctinputoctets||0)-(a.acctinputoctets||0));
+  else if (by==='upload_desc') list.sort((a,b)=>(b.acctoutputoctets||0)-(a.acctoutputoctets||0));
+  else if (by==='username_asc') list.sort((a,b)=>a.username.localeCompare(b.username));
+  renderSessions(list);
+}
+
+function renderSessions(sessions) {
+  const el = document.getElementById('sessionsList');
+  if (!sessions.length) {
+    el.innerHTML = `<div class="text-center py-16 text-slate-400 bg-white rounded-3xl border border-slate-150 p-6 shadow-sm"><i class="fas fa-plug text-5xl mb-4 opacity-30"></i><p class="font-semibold text-sm">Tidak ada sesi aktif</p></div>`;
+    return;
+  }
+  
+  let html = `
+    <div class="overflow-x-auto min-w-full bg-white rounded-3xl border border-slate-150 p-4 shadow-sm">
+      <table class="w-full text-left border-collapse align-middle">
+        <thead>
+          <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
+            <th class="pb-3 pt-1 px-4 font-extrabold">USER</th>
+            <th class="pb-3 pt-1 px-4 font-extrabold">ALAMAT IP & SERVER</th>
+            <th class="pb-3 pt-1 px-4 font-extrabold">DURASI KONEKSI</th>
+            <th class="pb-3 pt-1 px-4 font-extrabold">TRAFIK (IN / OUT)</th>
+            <th class="pb-3 pt-1 px-4 font-extrabold text-right">AKSI</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50 dark:divide-slate-750">
+  `;
+  
+  html += sessions.map(s => {
+    const isDup = duplicateUsernames.has(s.username);
+    const dl = parseInt(s.acctinputoctets||0), ul = parseInt(s.acctoutputoctets||0);
+    const total = dl + ul;
+    const dlPct = total ? Math.round(dl/total*100) : 50;
+    
+    const dupBadge = isDup 
+      ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100">GANDA</span>'
+      : '';
+    
+    return `
+      <tr class="hover:bg-slate-50/50 transition-colors ${isDup ? 'bg-rose-50/20' : ''}">
+        <td class="py-3 px-4">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 bg-gradient-to-tr from-emerald-500 to-teal-650 text-white relative">
+              <i class="fas fa-user text-white text-xs"></i>
+              <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-white pulse-dot"></span>
+            </div>
+            <div class="flex flex-col">
+              <span class="font-bold text-slate-800 text-sm truncate">${s.username}</span>
+              <div class="flex gap-1.5 mt-0.5">
+                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">LIVE</span>
+                ${dupBadge}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td class="py-3 px-4">
+          <div class="flex flex-col text-xs text-slate-600">
+            <span class="font-mono"><i class="fas fa-network-wired text-slate-400 mr-1"></i>${s.framedipaddress||'Dynamic'}</span>
+            <span class="text-[10px] text-slate-400"><i class="fas fa-server text-slate-400 mr-1.5"></i>${s.nasipaddress}</span>
+          </div>
+        </td>
+        <td class="py-3 px-4">
+          <span class="text-xs font-mono font-bold text-indigo-650 bg-indigo-50/50 px-2 py-0.5 rounded border border-indigo-100/50">
+            <i class="fas fa-clock text-indigo-400 mr-1.5"></i>
+            <span class="session-timer font-bold" data-start="${s.acctstarttime}">${fmtDur(s.acctsessiontime||0)}</span>
+          </span>
+        </td>
+        <td class="py-3 px-4">
+          <div class="flex flex-col w-48 gap-1">
+            <div class="flex justify-between text-[10px] font-bold">
+              <span class="text-emerald-600">↓ ${fmtBytes(dl)}</span>
+              <span class="text-blue-600">↑ ${fmtBytes(ul)}</span>
+            </div>
+            <div class="w-full speed-bar-wrap bg-slate-100 h-1.5 overflow-hidden rounded-full">
+              <div class="speed-bar-fill h-full rounded-full" style="width:${dlPct}%;background:linear-gradient(90deg,#10b981,#3b82f6)"></div>
+            </div>
+          </div>
+        </td>
+        <td class="py-3 px-4 text-right">
+          <button onclick="disconnectSession('${s.acctsessionid}','${s.username}')"
+            class="w-8 h-8 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-600 rounded-lg transition-all inline-flex items-center justify-center border border-rose-100/50" title="Disconnect">
+            <i class="fas fa-plug text-xs"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+  el.innerHTML = html;
+}
+
+function toggleDuplicateFilter() {
+  const s = document.getElementById('filterDuplicate');
+  s.value = s.value==='duplicate' ? '' : 'duplicate';
+  filterSessions();
+}
+
+function toggleAutoRefresh() {
+  const btn = document.getElementById('autoRefreshBtn');
+  if (isAutoRefresh) {
+    clearInterval(autoRefreshInterval); isAutoRefresh = false;
+    btn.innerHTML = '<i class="fas fa-play mr-1"></i>Auto';
+    btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+  } else {
+    autoRefreshInterval = setInterval(loadSessions, 10000); isAutoRefresh = true;
+    btn.innerHTML = '<i class="fas fa-stop mr-1"></i>Stop';
+    btn.style.background = 'linear-gradient(135deg,#ef4444,#be123c)';
+    showNotification('Auto refresh aktif (10s)', 'success');
+  }
+}
+
+async function cleanupSessions() {
+  if (!confirm('Hapus stale sessions (tidak update >30 menit)?')) return;
+  const r = await fetch('/api/sessions/cleanup', {method:'POST'});
+  const d = await r.json();
+  showNotification(d.message||d.error, d.success?'success':'error');
+  if (d.success) setTimeout(loadSessions, 500);
+}
+
+async function disconnectSession(sid, uname) {
+  if (!confirm(`Disconnect "${uname}"?`)) return;
+  const r = await fetch(`/api/sessions/disconnect/${sid}`, {method:'POST'});
+  const d = await r.json();
+  showNotification(d.message||d.error, d.success?'success':'error');
+  if (d.success) setTimeout(loadSessions, 1000);
+}
+
+async function disconnectAllDuplicates() {
+  if (!confirm(`Putus semua session duplikat?`)) return;
+  const r = await fetch('/api/sessions/duplicates/disconnect', {method:'POST'});
+  const d = await r.json();
+  showNotification(d.message||d.error, d.success?'success':'error');
+  if (d.success) setTimeout(loadSessions, 1000);
+}
+
+async function loadNasFilter() {
+  try {
+    const nas = await apiCall('/api/nas');
+    const sel = document.getElementById('filterNas');
+    (nas||[]).forEach(n => { const o=document.createElement('option'); o.value=n.nasname; o.textContent=n.shortname||n.nasname; sel.appendChild(o); });
+  } catch(e) {}
+}
+
+// ===== MIKROTIK LIVE TAB =====
+let mkData = [], mkAutoInterval = null, mkIsAuto = false;
+const mkHistory = {};
+const MK_HISTORY_MAX = 20;
+const sparkCharts = {};
+const mkByteCache = {};
+
+async function loadMkRouters() {
+  try {
+    const igs = await apiCall('/api/integrations');
+    const sel = document.getElementById('mkFilterRouter');
+    const mikrotiks = (igs||[]).filter(i => i.type === 'mikrotik' && i.is_active);
+    if (!mikrotiks.length) { sel.innerHTML = '<option value="">Tidak ada router</option>'; return; }
+    sel.innerHTML = mikrotiks.map(i => `<option value="${i.id}">${i.name} (${i.host})</option>`).join('');
+    // auto-load first router
+    loadMikrotik();
+  } catch(e) {}
+}
+
+function onRouterChange() {
+  // Reset byte cache when switching router so delta starts fresh
+  Object.keys(mkByteCache).forEach(k => delete mkByteCache[k]);
+  Object.keys(mkHistory).forEach(k => delete mkHistory[k]);
+  // Clear cards
+  document.getElementById('mkList').innerHTML = '';
+  Object.keys(sparkCharts).forEach(k => { try { sparkCharts[k].destroy(); } catch(e){} delete sparkCharts[k]; });
+  loadMikrotik();
+}
+
+async function loadMikrotik() {
+  const badge = document.getElementById('mkStatusBadge');
+  badge.textContent = 'Loading...'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700';
+  const routerId = document.getElementById('mkFilterRouter').value;
+  if (!routerId) return;
+  try {
+    const tBefore = performance.now();
+    const res = await apiCall(`/api/mikrotik/active?router_id=${routerId}`);
+    const tAfter = performance.now();
+    const tNow = (tBefore + tAfter) / 2;
+
+    if (!res.success) { badge.textContent = 'Error'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700'; return; }
+
+    mkData = (res.data || []).map(s => {
+      if (s.error) return s;
+      const key = `${s.router_host}:${s.name}`;
+      let rx_rate = 0, tx_rate = 0;
+      if (mkByteCache[key]) {
+        const dt = (tNow - mkByteCache[key].t) / 1000;
+        if (dt > 0.5) {
+          rx_rate = Math.max(0, Math.round((s.rx_byte - mkByteCache[key].rx) / dt * 8));
+          tx_rate = Math.max(0, Math.round((s.tx_byte - mkByteCache[key].tx) / dt * 8));
         }
-    }
-
-    function displaySessions(sessions) {
-        const sessionsList = document.getElementById('sessionsList');
-        
-        sessionsList.innerHTML = sessions.map((session, index) => {
-            const duration = formatDuration(session.acctsessiontime || 0);
-            const startTime = new Date(session.acctstarttime).toLocaleString('id-ID', {
-                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-            });
-            const isDuplicate = duplicateUsernames.has(session.username);
-            
-            return `
-                <div class="bg-white rounded-xl p-3 border ${isDuplicate ? 'border-red-300 bg-red-50' : 'border-gray-100'} hover:border-indigo-300 hover:shadow-sm transition-all duration-200" style="contain: content;">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-3 flex-1 min-w-0">
-                            <div class="relative flex-shrink-0">
-                                <div class="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm" style="background:linear-gradient(135deg,#667eea,#764ba2);">
-                                    <i class="fas fa-user text-white text-sm"></i>
-                                </div>
-                                <div class="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white pulse-ring"></div>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2 mb-0.5">
-                                    <h4 class="font-bold text-gray-800 text-sm truncate">${session.username}</h4>
-                                    <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 flex-shrink-0">
-                                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>LIVE
-                                    </span>
-                                    ${isDuplicate ? '<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0"><i class="fas fa-clone mr-1"></i>GANDA</span>' : ''}
-                                </div>
-                                <div class="flex flex-wrap gap-3 text-xs text-gray-500">
-                                    <span title="NAS IP"><i class="fas fa-server text-blue-400 mr-1"></i>${session.nasipaddress}</span>
-                                    <span title="Client IP"><i class="fas fa-network-wired text-green-400 mr-1"></i>${session.framedipaddress || 'Dynamic'}</span>
-                                    <span title="Duration"><i class="fas fa-clock text-purple-400 mr-1"></i><span class="session-timer font-mono font-bold text-purple-600" data-start="${session.acctstarttime}">${duration}</span></span>
-                                    <span title="Start"><i class="fas fa-calendar-alt text-orange-400 mr-1"></i>${startTime}</span>
-                                    ${session.acctinputoctets ? `<span title="DL/UL"><i class="fas fa-download text-indigo-400 mr-1"></i>${formatBytes(session.acctinputoctets)} / <i class="fas fa-upload text-pink-400 mr-1"></i>${formatBytes(session.acctoutputoctets || 0)}</span>` : ''}
-                                </div>
-                            </div>
-                        </div>
-                        <button onclick="disconnectSession('${session.acctsessionid}', '${session.username}')"
-                                class="flex-shrink-0 w-8 h-8 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors flex items-center justify-center"
-                                title="Disconnect">
-                            <i class="fas fa-plug text-xs"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function updateStatistics(sessions, dupes) {
-        const totalSessions = sessions.length;
-        let totalDownload = 0;
-        let totalUpload = 0;
-        let totalDuration = 0;
-
-        sessions.forEach(session => {
-            totalDownload += parseInt(session.acctinputoctets || 0);
-            totalUpload += parseInt(session.acctoutputoctets || 0);
-            totalDuration += parseInt(session.acctsessiontime || 0);
-        });
-
-        document.getElementById('totalSessions').textContent = totalSessions;
-        document.getElementById('totalDuplicates').textContent = (dupes || []).length;
-        document.getElementById('totalDownload').textContent = formatBytes(totalDownload);
-        document.getElementById('totalUpload').textContent = formatBytes(totalUpload);
-        
-        if (totalSessions > 0) {
-            const avgDuration = Math.floor(totalDuration / totalSessions);
-            document.getElementById('avgDuration').textContent = formatDuration(avgDuration);
-        } else {
-            document.getElementById('avgDuration').textContent = '0h 0m';
-        }
-    }
-
-    function formatBytes(bytes) {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    function formatBytesShort(bytes) {
-        return `${(bytes / (1024 * 1024)).toFixed(0)} MB total`;
-    }
-
-    function formatDuration(seconds) {
-        const days = Math.floor(seconds / 86400);
-        const hours = Math.floor((seconds % 86400) / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-        
-        let result = [];
-        if (days > 0) result.push(`${days}d`);
-        if (hours > 0) result.push(`${hours}h`);
-        if (minutes > 0) result.push(`${minutes}m`);
-        if (secs > 0 && days === 0 && hours === 0) result.push(`${secs}s`);
-        
-        return result.join(' ') || '0s';
-    }
-
-    function filterSessions() {
-        const search = document.getElementById('searchInput').value.toLowerCase();
-        const nas = document.getElementById('filterNas').value;
-        const dupFilter = document.getElementById('filterDuplicate').value;
-        const filtered = allSessions.filter(s =>
-            s.username.toLowerCase().includes(search) &&
-            (!nas || s.nasipaddress === nas) &&
-            (!dupFilter || (dupFilter === 'duplicate' && duplicateUsernames.has(s.username)))
-        );
-        displaySessions(filtered);
-    }
-
-    function toggleDuplicateFilter() {
-        const sel = document.getElementById('filterDuplicate');
-        sel.value = sel.value === 'duplicate' ? '' : 'duplicate';
-        filterSessions();
-    }
-
-    function sortSessions() {
-        const sortBy = document.getElementById('sortBy').value;
-        let sorted = [...allSessions];
-        
-        switch(sortBy) {
-            case 'duration_desc':
-                sorted.sort((a, b) => (b.acctsessiontime || 0) - (a.acctsessiontime || 0));
-                break;
-            case 'duration_asc':
-                sorted.sort((a, b) => (a.acctsessiontime || 0) - (b.acctsessiontime || 0));
-                break;
-            case 'download_desc':
-                sorted.sort((a, b) => (b.acctinputoctets || 0) - (a.acctinputoctets || 0));
-                break;
-            case 'upload_desc':
-                sorted.sort((a, b) => (b.acctoutputoctets || 0) - (a.acctoutputoctets || 0));
-                break;
-            case 'username_asc':
-                sorted.sort((a, b) => a.username.localeCompare(b.username));
-                break;
-        }
-        
-        displaySessions(sorted);
-    }
-
-    function toggleAutoRefresh() {
-        const btn = document.getElementById('autoRefreshBtn');
-        if (isAutoRefresh) {
-            clearInterval(autoRefreshInterval);
-            isAutoRefresh = false;
-            btn.innerHTML = '<i class="fas fa-play"></i><span>Auto</span>';
-            btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
-            showNotification('Auto refresh stopped', 'info');
-        } else {
-            autoRefreshInterval = setInterval(loadSessions, 10000);
-            isAutoRefresh = true;
-            btn.innerHTML = '<i class="fas fa-stop"></i><span>Stop</span>';
-            btn.style.background = 'linear-gradient(135deg,#ef4444,#be123c)';
-            showNotification('Auto refresh aktif (10s)', 'success');
-        }
-    }
-
-    async function cleanupSessions() {
-        if (!confirm('Hapus semua stale sessions (tidak ada update >30 menit)?\nSession PPPoE aktif tidak akan terpengaruh.')) return;
-        try {
-            const r = await fetch('/api/sessions/cleanup', {method: 'POST'});
-            const result = await r.json();
-            showNotification(result.message || result.error, result.success ? 'success' : 'error');
-            if (result.success) setTimeout(loadSessions, 500);
-        } catch(e) { showNotification(e.message, 'error'); }
-    }
-
-    async function disconnectSession(sessionId, username) {
-        if (!confirm(`Disconnect user "${username}"?\nThis will terminate their PPPoE connection immediately.`)) return;
-        try {
-            const r = await fetch(`/api/sessions/disconnect/${sessionId}`, {method: 'POST'});
-            const result = await r.json();
-            showNotification(result.message || result.error, result.success ? 'success' : 'error');
-            if (result.success) setTimeout(loadSessions, 1000);
-        } catch(e) { showNotification(e.message, 'error'); }
-    }
-
-    async function disconnectAllDuplicates() {
-        if (!confirm(`Putus semua session duplikat (${duplicateUsernames.size} username)?\nSession terbaru per user akan dipertahankan.`)) return;
-        try {
-            const r = await fetch('/api/sessions/duplicates/disconnect', {method: 'POST'});
-            const result = await r.json();
-            showNotification(result.message || result.error, result.success ? 'success' : 'error');
-            if (result.success) setTimeout(loadSessions, 1000);
-        } catch(e) { showNotification(e.message, 'error'); }
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        loadSessions();
-        loadNasFilter();
-        // Timer real-time: update setiap detik
-        setInterval(() => {
-            document.querySelectorAll('.session-timer[data-start]').forEach(el => {
-                const start = new Date(el.dataset.start);
-                const secs = Math.floor((Date.now() - start.getTime()) / 1000);
-                el.textContent = formatDuration(secs > 0 ? secs : 0);
-            });
-        }, 1000);
+      }
+      mkByteCache[key] = { t: tNow, rx: s.rx_byte, tx: s.tx_byte };
+      return { ...s, rx_rate, tx_rate };
     });
 
-    async function loadNasFilter() {
-        try {
-            const nas = await apiCall('/api/nas');
-            const sel = document.getElementById('filterNas');
-            (nas || []).forEach(n => {
-                const opt = document.createElement('option');
-                opt.value = n.nasname;
-                opt.textContent = n.shortname || n.nasname;
-                sel.appendChild(opt);
-            });
-        } catch(e) {}
+    mkData.forEach(s => {
+      if (s.error) return;
+      if (!mkHistory[s.name]) mkHistory[s.name] = [];
+      mkHistory[s.name].push(s.rx_rate || 0);
+      if (mkHistory[s.name].length > MK_HISTORY_MAX) mkHistory[s.name].shift();
+    });
+
+    const valid = mkData.filter(s=>!s.error);
+    const routerName = document.getElementById('mkFilterRouter').selectedOptions[0]?.text || '-';
+    document.getElementById('mkTotal').textContent = valid.length;
+    document.getElementById('mkTotalRx').textContent = fmtBps(valid.reduce((a,s)=>a+(s.rx_rate||0),0));
+    document.getElementById('mkTotalTx').textContent = fmtBps(valid.reduce((a,s)=>a+(s.tx_rate||0),0));
+    document.getElementById('mkRouters').textContent = routerName;
+    document.getElementById('mkLastUpdate').textContent = new Date().toLocaleTimeString('id-ID');
+    badge.textContent = `${valid.length} Online`; badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700';
+    renderMikrotik();
+  } catch(e) {
+    badge.textContent = 'Error'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700';
+  }
+}
+
+function renderMikrotik() {
+  const q = document.getElementById('mkSearch').value.toLowerCase();
+  const sortBy = document.getElementById('mkSort').value;
+  let list = mkData.filter(s => !s.error && s.name.toLowerCase().includes(q));
+  if (sortBy==='rx_desc') list.sort((a,b)=>(b.rx_rate||0)-(a.rx_rate||0));
+  else if (sortBy==='tx_desc') list.sort((a,b)=>(b.tx_rate||0)-(a.tx_rate||0));
+  else if (sortBy==='name_asc') list.sort((a,b)=>a.name.localeCompare(b.name));
+  else if (sortBy==='uptime_desc') list.sort((a,b)=>mkUptimeSec(b.uptime)-mkUptimeSec(a.uptime));
+
+  const errors = mkData.filter(s=>s.error);
+  const el = document.getElementById('mkList');
+
+  if (!list.length && !errors.length) {
+    Object.keys(sparkCharts).forEach(k => { try { sparkCharts[k].destroy(); } catch(e){} delete sparkCharts[k]; });
+    el.innerHTML = `<div class="text-center py-16 text-slate-400 bg-white rounded-3xl border border-slate-150 p-6 shadow-sm"><i class="fas fa-router text-5xl mb-4 opacity-30"></i><p class="font-semibold">Tidak ada koneksi aktif</p></div>`;
+    return;
+  }
+
+  // Ensure the table structure is initialized in el
+  let tbody = el.querySelector('#mkListTableBody');
+  if (!tbody) {
+    el.innerHTML = `
+      <div class="overflow-x-auto min-w-full bg-white rounded-3xl border border-slate-150 p-4 shadow-sm">
+        <table class="w-full text-left border-collapse align-middle">
+          <thead>
+            <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
+              <th class="pb-3 pt-1 px-4 font-extrabold">USER & ROUTER</th>
+              <th class="pb-3 pt-1 px-4 font-extrabold">IP / MAC</th>
+              <th class="pb-3 pt-1 px-4 font-extrabold">UPTIME</th>
+              <th class="pb-3 pt-1 px-4 font-extrabold">KECEPAN AKTIF</th>
+              <th class="pb-3 pt-1 px-4 font-extrabold">TRAFIK TOTAL</th>
+              <th class="pb-3 pt-1 px-4 font-extrabold text-right">SPARKLINE</th>
+            </tr>
+          </thead>
+          <tbody id="mkListTableBody" class="divide-y divide-slate-50 dark:divide-slate-750">
+          </tbody>
+        </table>
+      </div>
+    `;
+    tbody = el.querySelector('#mkListTableBody');
+  }
+
+  // Determine which rows need to be added/removed
+  const neededIds = new Set(list.map(s => `mk_row_${s.name.replace(/[^a-z0-9]/gi,'_')}`));
+  // Remove rows no longer in list
+  Array.from(tbody.querySelectorAll('[data-mk-row]')).forEach(row => {
+    if (!neededIds.has(row.id)) {
+      const cid = row.querySelector('canvas')?.id;
+      if (cid && sparkCharts[cid]) { try { sparkCharts[cid].destroy(); } catch(e){} delete sparkCharts[cid]; }
+      row.remove();
     }
+  });
+  const maxRx = Math.max(...list.map(s=>s.rx_rate||0), 1);
+  const maxTx = Math.max(...list.map(s=>s.tx_rate||0), 1);
+
+  // Update-in-place: add new rows, update existing, remove stale
+  list.forEach(s => {
+    const cardId = `mk_row_${s.name.replace(/[^a-z0-9]/gi,'_')}`;
+    const canvasId = `spark_${s.name.replace(/[^a-z0-9]/gi,'_')}`;
+    const rxPct = Math.round((s.rx_rate||0)/maxRx*100);
+    const txPct = Math.round((s.tx_rate||0)/maxTx*100);
+    let row = document.getElementById(cardId);
+
+    if (!row) {
+      row = document.createElement('tr');
+      row.id = cardId;
+      row.setAttribute('data-mk-row', '1');
+      row.className = 'hover:bg-slate-50/50 transition-colors';
+      row.innerHTML = `
+        <td class="py-3 px-4">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-tr from-amber-500 to-orange-600 text-white shadow-sm flex-shrink-0 relative">
+              <i class="fas fa-user text-white text-xs"></i>
+              <span class="w-2 h-2 bg-emerald-500 rounded-full border border-white absolute -top-0.5 -right-0.5"></span>
+            </div>
+            <div class="flex flex-col">
+              <span class="font-bold text-slate-800 text-sm truncate">${s.name}</span>
+              <div class="flex gap-1.5 mt-0.5">
+                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100">${s.router}</span>
+                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-50 text-slate-500 border border-slate-100">${s.service||'pppoe'}</span>
+              </div>
+            </div>
+          </div>
+        </td>
+        <td class="py-3 px-4">
+          <div class="flex flex-col text-xs text-slate-600 font-medium">
+            <span class="font-mono"><i class="fas fa-network-wired text-slate-400 mr-1"></i>${s.address||'-'}</span>
+            <span class="text-[10px] text-slate-400 font-mono"><i class="fas fa-ethernet text-slate-400 mr-1.5"></i>${s.caller_id||'-'}</span>
+          </div>
+        </td>
+        <td class="py-3 px-4">
+          <span class="text-xs font-mono font-bold text-purple-650 bg-purple-50/50 px-2 py-0.5 rounded border border-purple-100/50">
+            <i class="fas fa-clock text-purple-400 mr-1.5"></i>${s.uptime||'-'}
+          </span>
+        </td>
+        <td class="py-3 px-4">
+          <div class="flex flex-col w-40 gap-1">
+            <div class="flex justify-between text-[10px] font-bold">
+              <span class="mk-rx-val text-emerald-600">↓ ${fmtBps(s.rx_rate||0)}</span>
+              <span class="mk-tx-val text-blue-600">↑ ${fmtBps(s.tx_rate||0)}</span>
+            </div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div class="mk-rx-bar speed-bar-fill h-full rounded-full" style="width:${rxPct}%;background:linear-gradient(90deg,#10b981,#34d399)"></div>
+            </div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div class="mk-tx-bar speed-bar-fill h-full rounded-full" style="width:${txPct}%;background:linear-gradient(90deg,#3b82f6,#818cf8)"></div>
+            </div>
+          </div>
+        </td>
+        <td class="py-3 px-4">
+          <div class="flex flex-col gap-0.5 text-[11px] text-slate-500 font-medium">
+            <span>↓ <span class="mk-rx-byte text-emerald-500 font-semibold">${fmtBytes(s.rx_byte||0)}</span></span>
+            <span>↑ <span class="mk-tx-byte text-blue-500 font-semibold">${fmtBytes(s.tx_byte||0)}</span></span>
+          </div>
+        </td>
+        <td class="py-3 px-4 text-right">
+          <div class="inline-block w-24 h-10"><canvas id="${canvasId}" class="spark-canvas" width="96" height="40"></canvas></div>
+        </td>
+      `;
+      tbody.appendChild(row);
+    } else {
+      row.querySelector('.mk-rx-bar').style.width = rxPct + '%';
+      row.querySelector('.mk-tx-bar').style.width = txPct + '%';
+      row.querySelector('.mk-rx-val').textContent = '↓ ' + fmtBps(s.rx_rate||0);
+      row.querySelector('.mk-tx-val').textContent = '↑ ' + fmtBps(s.tx_rate||0);
+      row.querySelector('.mk-rx-byte').textContent = fmtBytes(s.rx_byte||0);
+      row.querySelector('.mk-tx-byte').textContent = fmtBytes(s.tx_byte||0);
+    }
+
+    // Sparkline: update if exists, create if new
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const hist = mkHistory[s.name] || [0];
+    if (sparkCharts[canvasId]) {
+      sparkCharts[canvasId].data.labels = hist.map((_,i)=>i);
+      sparkCharts[canvasId].data.datasets[0].data = [...hist];
+      sparkCharts[canvasId].update('none');
+    } else {
+      const orphan = Chart.getChart(canvas);
+      if (orphan) orphan.destroy();
+      sparkCharts[canvasId] = new Chart(canvas, {
+        type: 'line',
+        data: { labels: hist.map((_,i)=>i), datasets: [{ data: [...hist], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4 }] },
+        options: { responsive: false, animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false, min: 0 } } }
+      });
+    }
+  });
+
+  // Error banner
+  let errBanner = el.querySelector('.mk-err-banner');
+  if (errors.length) {
+    const msg = '<b>Router errors:</b> ' + errors.map(e=>`${e.router}: ${e.error}`).join(' | ');
+    if (!errBanner) { errBanner = document.createElement('div'); errBanner.className='mk-err-banner mt-3 p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-600'; el.appendChild(errBanner); }
+    errBanner.innerHTML = msg;
+  } else if (errBanner) errBanner.remove();
+}
+
+function toggleMkAuto() {
+  const btn = document.getElementById('mkAutoBtn');
+  if (mkIsAuto) {
+    clearInterval(mkAutoInterval); mkIsAuto = false;
+    btn.innerHTML = '<i class="fas fa-play mr-1"></i>Auto (3s)';
+    btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+  } else {
+    loadMikrotik();
+    mkAutoInterval = setInterval(loadMikrotik, 3000); mkIsAuto = true;
+    btn.innerHTML = '<i class="fas fa-stop mr-1"></i>Stop';
+    btn.style.background = 'linear-gradient(135deg,#ef4444,#be123c)';
+    showNotification('Live monitoring aktif (3s)', 'success');
+  }
+}
+
+function mkUptimeSec(uptime) {
+  if (!uptime) return 0;
+  let s=0;
+  const m = uptime.match(/(\d+)w/); if(m) s+=parseInt(m[1])*604800;
+  const d = uptime.match(/(\d+)d/); if(d) s+=parseInt(d[1])*86400;
+  const h = uptime.match(/(\d+)h/); if(h) s+=parseInt(h[1])*3600;
+  const mi = uptime.match(/(\d+)m/); if(mi) s+=parseInt(mi[1])*60;
+  const sc = uptime.match(/(\d+)s/); if(sc) s+=parseInt(sc[1]);
+  return s;
+}
+
+// ===== HELPERS =====
+function fmtBytes(b) {
+  if (!b) return '0 B';
+  const k=1024, s=['B','KB','MB','GB','TB'], i=Math.floor(Math.log(b)/Math.log(k));
+  return (b/Math.pow(k,i)).toFixed(1)+' '+s[i];
+}
+function fmtBps(bps) {
+  if (!bps) return '0 bps';
+  if (bps>=1e9) return (bps/1e9).toFixed(2)+' Gbps';
+  if (bps>=1e6) return (bps/1e6).toFixed(2)+' Mbps';
+  if (bps>=1e3) return (bps/1e3).toFixed(1)+' Kbps';
+  return bps+' bps';
+}
+function fmtDur(sec) {
+  const d=Math.floor(sec/86400), h=Math.floor((sec%86400)/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  let r=[];
+  if(d) r.push(d+'d'); if(h) r.push(h+'h'); if(m) r.push(m+'m');
+  if(s && !d && !h) r.push(s+'s');
+  return r.join(' ')||'0s';
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadSessions();
+  loadNasFilter();
+  setInterval(() => {
+    document.querySelectorAll('.session-timer[data-start]').forEach(el => {
+      const secs = Math.floor((Date.now() - new Date(el.dataset.start).getTime()) / 1000);
+      el.textContent = fmtDur(Math.max(0, secs));
+    });
+  }, 1000);
+});
 </script>
 {% endblock %}
