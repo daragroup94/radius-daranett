@@ -2,11 +2,11 @@ sql sql_hotspot {
     dialect = "postgresql"
     driver = "rlm_sql_postgresql"
 
-    server = "postgres"
-    port = 5432
-    login = "radius"
-    password = "radiuspass"
-    radius_db = "radius"
+    server = "$ENV{DB_HOST}"
+    port = $ENV{DB_PORT}
+    login = "$ENV{DB_USER}"
+    password = "$ENV{DB_PASS}"
+    radius_db = "$ENV{DB_NAME}"
 
     sql_user_name = "%{User-Name}"
 
