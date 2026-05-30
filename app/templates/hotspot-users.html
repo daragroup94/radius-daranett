@@ -127,7 +127,7 @@
                 <!-- Hotspot Domain Settings (Saved in LocalStorage) -->
                 <div class="flex items-center gap-1.5 border border-amber-100 dark:border-amber-900/30 rounded-xl px-3 py-2.5 bg-amber-50/30 dark:bg-amber-950/20">
                     <span class="text-[10px] text-amber-700 dark:text-amber-400 font-extrabold uppercase tracking-wider whitespace-nowrap"><i data-lucide="link" class="lucide w-3.5 h-3.5 inline mr-1"></i>Hotspot Link:</span>
-                    <input type="text" id="hotspotDomain" placeholder="http://dara.hotspot" 
+                    <input type="text" id="hotspotDomain" placeholder="http://daranett.hs.com" 
                         class="border-none p-0 text-xs focus:ring-0 focus:outline-none bg-transparent w-36 font-mono font-bold text-amber-900 dark:text-amber-200"
                         onchange="saveHotspotDomain()">
                 </div>
@@ -217,8 +217,8 @@ function debounceLoad() { clearTimeout(_debounce); _debounce = setTimeout(loadVo
 // Load hotspot domain on page load
 document.addEventListener('DOMContentLoaded', () => {
     let savedDomain = localStorage.getItem('hotspot_domain');
-    if (!savedDomain || savedDomain === 'http://10.5.50.1') {
-        savedDomain = 'http://dara.hotspot';
+    if (!savedDomain || savedDomain === 'http://10.5.50.1' || savedDomain === 'http://dara.hotspot') {
+        savedDomain = 'http://daranett.hs.com';
         localStorage.setItem('hotspot_domain', savedDomain);
     }
     document.getElementById('hotspotDomain').value = savedDomain;
@@ -259,7 +259,7 @@ async function loadVouchers(page = 1) {
         return;
     }
 
-    const hostDomain = document.getElementById('hotspotDomain').value.trim() || 'http://dara.hotspot';
+    const hostDomain = document.getElementById('hotspotDomain').value.trim() || 'http://daranett.hs.com';
 
     grid.innerHTML = `
         <div class="overflow-x-auto min-w-full bg-white rounded-3xl border border-slate-150 p-4 shadow-sm">
