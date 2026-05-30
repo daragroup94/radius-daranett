@@ -165,7 +165,7 @@ Sebagai gantinya, MikroTik RouterOS mengambil data limitasi (`rate_limit`) dan n
 4. Klik kolom **Lease Script** di bagian paling bawah tab DHCP.
 5. Tempelkan script di bawah ini ke dalam kolom **Lease Script**:
 
-### 📋 DHCP Lease Script (RouterOS v7 - VPN IP Direct Edition)
+### 📋 DHCP Lease Script (RouterOS v7 - WireGuard IP Direct Edition)
 ```routeros
 :if ($leaseBound = 1) do={
     :delay 2s; # Tunggu lease stabil
@@ -179,12 +179,12 @@ Sebagai gantinya, MikroTik RouterOS mengambil data limitasi (`rate_limit`) dan n
     :for i from=1 to=$attempts do={
         :if (!$success) do={
             :do {
-                # Mengambil data langsung via IP VPN VPS (10.20.0.1) untuk menghindari resolving error
-                :set res [/tool fetch url="https://10.20.0.1/api/ipoe/get-name/$leaseActMAC" http-header-field="Host: radius.access.daragroup.cloud" check-certificate=no as-value output=user]
+                # Mengambil data langsung via IP WireGuard VPS (10.100.0.1) untuk menghindari resolving error
+                :set res [/tool fetch url="https://10.100.0.1/api/ipoe/get-name/$leaseActMAC" http-header-field="Host: radius.access.daragroup.cloud" check-certificate=no as-value output=user]
                 :set data ($res->"data")
                 :set success true
             } on-error={
-                :log warn "IPoE: Percobaan ke-$i gagal menghubungi IP NAS (10.20.0.1) untuk MAC $leaseActMAC. Mencoba lagi dalam $delayTime..."
+                :log warn "IPoE: Percobaan ke-$i gagal menghubungi IP WireGuard (10.100.0.1) untuk MAC $leaseActMAC. Mencoba lagi dalam $delayTime..."
                 :delay $delayTime
             }
         }
@@ -206,7 +206,7 @@ Sebagai gantinya, MikroTik RouterOS mengambil data limitasi (`rate_limit`) dan n
             }
         }
     } else={
-        :log error "Gagal memproses limitasi IPoE dari RADIUS Dashboard untuk MAC: $leaseActMAC (Koneksi ke IP NAS gagal setelah $attempts percobaan)"
+        :log error "Gagal memproses limitasi IPoE dari RADIUS Dashboard untuk MAC: $leaseActMAC (Koneksi ke IP WireGuard gagal setelah $attempts percobaan)"
     }
 } else={
     # Saat client terputus (leaseBound = 0), hapus static queue secara otomatis
