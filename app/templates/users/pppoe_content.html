@@ -1,0 +1,616 @@
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-users mr-4 shadow-lg shadow-purple-500/15 floating-icon">
+                <i data-lucide="wifi" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Pelanggan PPPoE</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola akun PPPoE pelanggan, batas kecepatan bandwidth, dan profil masa aktif.</p>
+            </div>
+        </div>
+        
+        <button onclick="openAddUserModal()" class="z-10 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] whitespace-nowrap">
+            <i data-lucide="user-plus" class="lucide w-5 h-5 text-white"></i>
+            <span>Tambah Pelanggan</span>
+        </button>
+    </div>
+
+    <!-- Stats Cards Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Total PPPoE Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-users shadow-md shadow-purple-500/10">
+                <i data-lucide="users" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Pelanggan PPPoE</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statPppoeTotal">—</p>
+            </div>
+        </div>
+        <!-- Online Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-nas shadow-md shadow-emerald-500/10">
+                <i data-lucide="activity" class="lucide icon-noc text-white"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sedang Online</p>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white font-outfit" id="statPppoeOnline">—</p>
+                    <p class="text-xs text-emerald-500 font-bold" id="statPppoeOnlinePct"></p>
+                </div>
+                <div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 mt-2 overflow-hidden">
+                    <div id="statPppoeOnlineBar" class="h-full rounded-full bg-emerald-500 transition-all duration-500" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+        <!-- Offline Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc bg-gradient-to-tr from-rose-500 to-red-600 shadow-md shadow-red-500/10">
+                <i data-lucide="power" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pelanggan Offline</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statPppoeOffline">—</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main List Card Container -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+        <!-- Sub-header dengan Search Bar saja -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-800 dark:text-white">Daftar Akun PPPoE</h3>
+                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Cari, edit, batasi kecepatan, atau hapus pelanggan.</p>
+            </div>
+            
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <!-- SEARCH BAR -->
+                <div class="relative flex-1 sm:w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <i data-lucide="search" class="lucide w-4 h-4 text-slate-400"></i>
+                    </div>
+                    <input type="text" id="userSearch" 
+                           class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-xs font-medium transition-all" 
+                           placeholder="Cari username...">
+                </div>
+            </div>
+        </div>
+
+        <!-- Users List -->
+        <div id="usersList" class="w-full" style="max-height: 70vh; overflow-y: auto; -webkit-overflow-scrolling: touch;">
+            <!-- Content will be loaded here -->
+        </div>
+
+        <!-- Pagination Controls -->
+        <div id="paginationControls" class="flex items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-slate-700">
+            <p class="text-sm text-gray-500 dark:text-slate-400">
+                Showing <span id="startRange" class="font-semibold text-gray-800 dark:text-white">0</span> to <span id="endRange" class="font-semibold text-gray-800 dark:text-white">0</span> of <span id="totalItems" class="font-semibold text-gray-800 dark:text-white">0</span> users
+            </p>
+            <div class="flex space-x-2">
+                <button onclick="changePage(currentPage - 1)" id="prevPage" class="p-2.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div id="pageNumbers" class="flex space-x-2">
+                    <!-- Page numbers will be loaded here -->
+                </div>
+                <button onclick="changePage(currentPage + 1)" id="nextPage" class="p-2.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div id="addUserModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="modern-card rounded-3xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/20">
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center">
+                <div class="w-12 h-12 icon-gradient-add-user rounded-2xl flex items-center justify-center mr-4 shadow-lg">
+                    <i class="fas fa-user-plus text-white text-lg"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">Add New PPPoE User</h3>
+            </div>
+            <button onclick="closeAddUserModal()" class="w-9 h-9 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-lg transition-all">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="addUserForm" class="space-y-4">
+            <!-- Basic Information -->
+            <div class="border border-blue-100 rounded-2xl p-5 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
+                <h4 class="text-base font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-user text-blue-600 mr-2.5"></i>
+                    Basic Information
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">
+                            Username *
+                        </label>
+                        <input type="text" name="username" required 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 text-sm font-medium" 
+                               placeholder="user123">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">
+                            Password *
+                        </label>
+                        <input type="password" name="password" required 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 text-sm font-medium" 
+                               placeholder="•••••••">
+                    </div>
+                </div>
+            </div>
+
+            <!-- IP Configuration -->
+            <div class="border border-green-100 rounded-2xl p-5 bg-gradient-to-r from-green-50/50 to-emerald-50/50">
+                <h4 class="text-base font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-network-wired text-green-600 mr-2.5"></i>
+                    IP Configuration
+                </h4>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">IP Address (Optional)</label>
+                    <input type="text" name="ip_address" 
+                           class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 text-sm font-medium" 
+                           placeholder="192.168.1.100">
+                </div>
+            </div>
+
+            <!-- Bandwidth Control -->
+            <div class="border border-purple-100 rounded-2xl p-5 bg-gradient-to-r from-purple-50/50 to-violet-50/50">
+                <h4 class="text-base font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-tachometer-alt text-purple-600 mr-2.5"></i>
+                    Bandwidth Control (MikroTik Style)
+                </h4>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Max Download</label>
+                            <div class="flex space-x-1.5">
+                                <input type="number" id="simpleDownload" value="10" 
+                                       class="flex-1 px-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-gray-800 text-sm font-medium" 
+                                       onchange="updateRateLimitPreview()">
+                                <select id="simpleDownloadUnit" 
+                                        class="px-2 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-xs font-medium" 
+                                        onchange="updateRateLimitPreview()">
+                                    <option value="k">Kbps</option>
+                                    <option value="M" selected>Mbps</option>
+                                    <option value="G">Gbps</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Max Upload</label>
+                            <div class="flex space-x-1.5">
+                                <input type="number" id="simpleUpload" value="10" 
+                                       class="flex-1 px-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-gray-800 text-sm font-medium" 
+                                       onchange="updateRateLimitPreview()">
+                                <select id="simpleUploadUnit" 
+                                        class="px-2 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-xs font-medium" 
+                                        onchange="updateRateLimitPreview()">
+                                    <option value="k">Kbps</option>
+                                    <option value="M" selected>Mbps</option>
+                                    <option value="G">Gbps</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Priority (1-8)</label>
+                            <select id="simplePriority" 
+                                    class="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-medium" 
+                                    onchange="updateRateLimitPreview()">
+                                <option value="1">1 - Highest</option>
+                                <option value="2">2 - Very High</option>
+                                <option value="3">3 - High</option>
+                                <option value="4">4 - Above Normal</option>
+                                <option value="5" selected>5 - Normal</option>
+                                <option value="6">6 - Below Normal</option>
+                                <option value="7">7 - Low</option>
+                                <option value="8">8 - Lowest</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Auto Burst -->
+                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="simpleEnableBurst" checked 
+                                   class="w-4 h-4 text-green-600 rounded" 
+                                   onchange="updateRateLimitPreview()">
+                            <div>
+                                <span class="text-xs font-bold text-gray-800">Enable Auto Burst (Recommended)</span>
+                                <p class="text-[10px] text-gray-500 mt-0.5">Burst: 2x speed | Threshold: 50% | Duration: 8s</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Rate Limit Preview -->
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <div class="flex justify-between items-center mb-2.5">
+                            <label class="text-xs font-bold text-gray-700">MikroTik Rate-Limit String:</label>
+                            <button type="button" onclick="copyRateLimit()" 
+                                    class="text-[10px] bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1.5 rounded-lg font-bold transition-all">
+                                <i class="fas fa-copy mr-1"></i>Copy
+                            </button>
+                        </div>
+                        <input type="text" id="rateLimitPreview" name="rate_limit" readonly 
+                               class="w-full bg-white text-purple-700 font-mono text-xs px-3 py-2.5 rounded-lg border border-gray-200" 
+                               value="10M/10M 20M/20M 5M/5M 8/8 5">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Settings -->
+            <div class="border border-orange-100 rounded-2xl p-5 bg-gradient-to-r from-orange-50/50 to-amber-50/50">
+                <h4 class="text-base font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-cog text-orange-600 mr-2.5"></i>
+                    Additional Settings
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Data Limit</label>
+                        <input type="text" name="data_limit" 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-medium" 
+                               placeholder="10GB">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Session Timeout (s)</label>
+                        <input type="number" name="session_timeout" 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-medium" 
+                               placeholder="3600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Idle Timeout (s)</label>
+                        <input type="number" name="idle_timeout" 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-medium" 
+                               placeholder="300">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div class="flex space-x-3 pt-4 border-t border-gray-100">
+                <button type="button" onclick="closeAddUserModal()" 
+                        class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold text-sm transition-all">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="flex-[2] px-4 py-3 text-white rounded-xl font-bold text-sm transition-all shadow-lg transform hover:scale-[1.02] hover:opacity-90"
+                        style="background:linear-gradient(135deg,#667eea,#764ba2);">
+                    <i class="fas fa-user-plus mr-2"></i>Create User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editUserModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="modern-card rounded-3xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/20">
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center">
+                <div class="w-12 h-12 icon-gradient-edit-user rounded-2xl flex items-center justify-center mr-4 shadow-lg">
+                    <i class="fas fa-user-edit text-white text-lg"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">Edit PPPoE User</h3>
+            </div>
+            <button onclick="closeEditUserModal()" class="w-9 h-9 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-lg transition-all">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="editUserForm" class="space-y-4">
+            <input type="hidden" id="editUsername" name="username">
+            
+            <!-- Basic Information -->
+            <div class="border border-blue-100 rounded-2xl p-5 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
+                <h4 class="text-base font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-user text-blue-600 mr-2.5"></i>
+                    Basic Information
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Username</label>
+                        <input type="text" id="editUsernameDisplay" readonly 
+                               class="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 text-sm font-bold cursor-not-allowed">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">New Password (Optional)</label>
+                        <input type="password" name="password" 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 text-sm font-medium" 
+                               placeholder="•••••••">
+                    </div>
+                </div>
+            </div>
+
+            <!-- IP Configuration -->
+            <div class="border border-green-100 rounded-2xl p-5 bg-gradient-to-r from-green-50/50 to-emerald-50/50">
+                <h4 class="text-base font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-network-wired text-green-600 mr-2.5"></i>
+                    IP Configuration
+                </h4>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">IP Address (Optional)</label>
+                    <input type="text" name="ip_address" id="editIpAddress" 
+                           class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 text-sm font-medium" 
+                           placeholder="192.168.1.100">
+                </div>
+            </div>
+
+            <!-- Bandwidth Control -->
+            <div class="border border-purple-100 rounded-2xl p-5 bg-gradient-to-r from-purple-50/50 to-violet-50/50">
+                <h4 class="text-base font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-tachometer-alt text-purple-600 mr-2.5"></i>
+                    Bandwidth Control (MikroTik Style)
+                </h4>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Max Download</label>
+                            <div class="flex space-x-1.5">
+                                <input type="number" id="editSimpleDownload" value="10" 
+                                       class="flex-1 px-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-gray-800 text-sm font-medium" 
+                                       onchange="updateEditRateLimitPreview()">
+                                <select id="editSimpleDownloadUnit" 
+                                        class="px-2 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-xs font-medium" 
+                                        onchange="updateEditRateLimitPreview()">
+                                    <option value="k">Kbps</option>
+                                    <option value="M" selected>Mbps</option>
+                                    <option value="G">Gbps</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Max Upload</label>
+                            <div class="flex space-x-1.5">
+                                <input type="number" id="editSimpleUpload" value="10" 
+                                       class="flex-1 px-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-gray-800 text-sm font-medium" 
+                                       onchange="updateEditRateLimitPreview()">
+                                <select id="editSimpleUploadUnit" 
+                                        class="px-2 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-xs font-medium" 
+                                        onchange="updateEditRateLimitPreview()">
+                                    <option value="k">Kbps</option>
+                                    <option value="M" selected>Mbps</option>
+                                    <option value="G">Gbps</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Priority (1-8)</label>
+                            <select id="editSimplePriority" 
+                                    class="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-medium" 
+                                    onchange="updateEditRateLimitPreview()">
+                                <option value="1">1 - Highest</option>
+                                <option value="2">2 - Very High</option>
+                                <option value="3">3 - High</option>
+                                <option value="4">4 - Above Normal</option>
+                                <option value="5" selected>5 - Normal</option>
+                                <option value="6">6 - Below Normal</option>
+                                <option value="7">7 - Low</option>
+                                <option value="8">8 - Lowest</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Auto Burst -->
+                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="editSimpleEnableBurst" checked 
+                                   class="w-4 h-4 text-green-600 rounded" 
+                                   onchange="updateEditRateLimitPreview()">
+                            <div>
+                                <span class="text-xs font-bold text-gray-800">Enable Auto Burst (Recommended)</span>
+                                <p class="text-[10px] text-gray-500 mt-0.5">Burst: 2x speed | Threshold: 50% | Duration: 8s</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Rate Limit Preview -->
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <div class="flex justify-between items-center mb-2.5">
+                            <label class="text-xs font-bold text-gray-700">MikroTik Rate-Limit String:</label>
+                            <button type="button" onclick="copyEditRateLimit()" 
+                                    class="text-[10px] bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1.5 rounded-lg font-bold transition-all">
+                                <i class="fas fa-copy mr-1"></i>Copy
+                            </button>
+                        </div>
+                        <input type="text" id="editRateLimitPreview" name="rate_limit" readonly 
+                               class="w-full bg-white text-purple-700 font-mono text-xs px-3 py-2.5 rounded-lg border border-gray-200" 
+                               value="10M/10M 20M/20M 5M/5M 8/8 5">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Settings -->
+            <div class="border border-orange-100 rounded-2xl p-5 bg-gradient-to-r from-orange-50/50 to-amber-50/50">
+                <h4 class="text-base font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-cog text-orange-600 mr-2.5"></i>
+                    Additional Settings
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Data Limit</label>
+                        <input type="text" name="data_limit" id="editDataLimit" 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-medium" 
+                               placeholder="10GB">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Session Timeout (s)</label>
+                        <input type="number" name="session_timeout" id="editSessionTimeout" 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-medium" 
+                               placeholder="3600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1.5 ml-1">Idle Timeout (s)</label>
+                        <input type="number" name="idle_timeout" id="editIdleTimeout" 
+                               class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-800 text-sm font-medium" 
+                               placeholder="300">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div class="flex space-x-3 pt-4 border-t border-gray-100">
+                <button type="button" onclick="closeEditUserModal()" 
+                        class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold text-sm transition-all">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="flex-[2] px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-100 transform hover:scale-[1.02]">
+                    <i class="fas fa-save mr-2"></i>Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div id="deleteConfirmModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+    <div class="modern-card rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-white/20">
+        <div class="flex items-center mb-4">
+            <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
+                <i class="fas fa-trash text-white text-lg"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 dark:text-white">Delete User</h3>
+        </div>
+        <p class="text-gray-600 dark:text-gray-300 mb-6">Hapus user <strong id="deleteUsername" class="text-red-600"></strong>? Tindakan ini tidak dapat dibatalkan.</p>
+        <div class="flex space-x-3">
+            <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all">Batal</button>
+            <button onclick="confirmDelete()" class="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-semibold transition-all">Hapus</button>
+        </div>
+    </div>
+</div>
+
+<!-- Device Info Modal (GenieACS) -->
+<div id="deviceInfoModal" class="fixed inset-0 flex items-center justify-center hidden z-50 p-4" style="backdrop-filter:blur(6px);background:rgba(15,23,42,0.7)">
+    <div class="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl" style="background:#0f172a;border:1px solid rgba(255,255,255,0.08)">
+
+        <!-- Header -->
+        <div class="px-5 py-4 flex justify-between items-center" style="border-bottom:1px solid rgba(255,255,255,0.07)">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                    <i class="fas fa-satellite-dish text-white text-sm"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-white">ACS Device Info</p>
+                    <p id="deviceInfoUsername" class="text-xs font-mono" style="color:#94a3b8"></p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('deviceInfoModal').classList.add('hidden')"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                    style="background:rgba(255,255,255,0.06);color:#64748b"
+                    onmouseover="this.style.background='rgba(239,68,68,0.15)';this.style.color='#f87171'"
+                    onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#64748b'">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        </div>
+
+        <div class="p-5 max-h-[80vh] overflow-y-auto" style="scrollbar-width:thin;scrollbar-color:#334155 transparent">
+            <!-- Loading -->
+            <div id="deviceInfoLoading" class="text-center py-14">
+                <i class="fas fa-spinner fa-spin text-3xl mb-3" style="color:#6366f1"></i>
+                <p class="text-sm" style="color:#64748b">Menghubungi GenieACS...</p>
+            </div>
+
+            <!-- Not found -->
+            <div id="deviceInfoNotFound" class="hidden text-center py-14">
+                <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:rgba(255,255,255,0.05)">
+                    <i class="fas fa-unlink text-2xl" style="color:#334155"></i>
+                </div>
+                <p class="text-sm font-semibold text-white mb-1">Device tidak ditemukan</p>
+                <p id="deviceInfoNotFoundMsg" class="text-xs" style="color:#64748b"></p>
+            </div>
+
+            <!-- Data -->
+            <div id="deviceInfoData" class="hidden space-y-3">
+
+                <!-- RX Power hero card -->
+                <div id="di_rx_card" class="rounded-2xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,0.15)">
+                            <i class="fas fa-signal text-white text-lg"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium mb-0.5" style="color:rgba(255,255,255,0.6)">RX Power</p>
+                            <p id="di_rx_power" class="text-2xl font-black text-white leading-none"></p>
+                        </div>
+                    </div>
+                    <span id="di_rx_badge" class="text-xs font-bold px-3 py-1.5 rounded-xl" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.2)"></span>
+                </div>
+
+                <!-- Device identity row -->
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Manufacturer</p>
+                        <p id="di_manufacturer" class="text-xs font-bold text-white truncate"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Model</p>
+                        <p id="di_model" class="text-xs font-bold text-white truncate"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">PON Mode</p>
+                        <p id="di_pon_mode" class="text-xs font-bold text-white"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="col-span-2 rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Serial Number</p>
+                        <p id="di_serial" class="text-xs font-bold text-white font-mono truncate"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Suhu</p>
+                        <p id="di_temperature" class="text-xs font-bold text-white"></p>
+                    </div>
+                </div>
+
+                <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                    <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style="color:#475569">Firmware</p>
+                    <p id="di_firmware" class="text-xs font-bold text-white font-mono"></p>
+                </div>
+
+                <!-- Divider -->
+                <div style="border-top:1px solid rgba(255,255,255,0.06)"></div>
+
+                <!-- Connection info -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="rounded-xl p-3" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1" style="color:#34d399">
+                            <i class="fas fa-network-wired"></i> PPPoE IP
+                        </p>
+                        <p id="di_pppoe_ip" class="text-xs font-bold text-white font-mono"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1" style="color:#34d399">
+                            <i class="fas fa-clock"></i> PPP Uptime
+                        </p>
+                        <p id="di_ppp_uptime" class="text-xs font-bold text-white"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1" style="color:#475569">
+                            <i class="fas fa-power-off"></i> Device Uptime
+                        </p>
+                        <p id="di_device_uptime" class="text-xs font-bold text-white"></p>
+                    </div>
+                    <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider mb-1.5 flex items-center gap-1" style="color:#475569">
+                            <i class="fas fa-sync"></i> Last Inform
+                        </p>
+                        <p id="di_last_inform" class="text-xs font-bold text-white"></p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>

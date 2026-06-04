@@ -43,24 +43,30 @@
 
 {% block content %}
 <div class="fade-in">
-    <!-- NOC Operations Header -->
+    <!-- NAS PAGE HEADER -->
     <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
-        <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
         
         <div class="z-10 mb-4 md:mb-0 flex items-center">
-            <div class="icon-wrapper-noc icon-gradient-nas mr-4 shadow-lg shadow-emerald-500/15 floating-icon">
-                <i data-lucide="hard-drive" class="lucide icon-noc text-white"></i>
+            <div class="icon-wrapper-noc bg-gradient-to-r from-blue-500 to-indigo-650 mr-4 shadow-lg shadow-blue-500/15 floating-icon">
+                <i data-lucide="server" class="lucide icon-noc text-white"></i>
             </div>
             <div>
-                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Network Access Servers (NAS)</h2>
-                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola seluruh perangkat access server dan router terintegrasi.</p>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Daftar NAS (MikroTik Router)</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola konfigurasi, radius secret, dan status integrasi perangkat NAS.</p>
             </div>
         </div>
         
-        <button onclick="openAddNasModal()" class="z-10 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]">
-            <i data-lucide="plus-circle" class="lucide w-5 h-5 text-white"></i>
-            <span>Tambah NAS Baru</span>
-        </button>
+        <div class="z-10 flex items-center gap-3">
+            <button id="btnRefreshNoc" onclick="loadStatusBadges()" class="bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 border border-white/10 hover:scale-[1.02] whitespace-nowrap">
+                <i id="iconRefreshNoc" class="fas fa-sync-alt"></i>
+                <span>Cek Status</span>
+            </button>
+            <button onclick="openAddNasModal()" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] whitespace-nowrap">
+                <i data-lucide="plus-circle" class="lucide w-5 h-5 text-white"></i>
+                <span>Tambah NAS Baru</span>
+            </button>
+        </div>
     </div>
 
     <!-- Main Content Card -->
@@ -307,6 +313,11 @@
                 return;
             }
 
+            // Hitung dan update total sesi aktif di panel NOC
+            const totalSessions = data.reduce((sum, nas) => sum + (nas.session_count || 0), 0);
+            const nocTotalSessions = document.getElementById('noc-total-sessions');
+            if (nocTotalSessions) nocTotalSessions.innerText = totalSessions;
+
             nasList.innerHTML = data.map(nas => `
                 <div class="bg-white rounded-2xl p-6 border border-blue-100 hover:border-blue-300 hover:shadow-md transition-[transform,box-shadow,border-color] duration-300 transform hover:-translate-y-0.5" style="contain: content;">
                     <div class="flex justify-between items-start">
@@ -399,9 +410,17 @@
     }
 
     async function loadStatusBadges() {
+        const btn = document.getElementById('btnRefreshNoc');
+        const icon = document.getElementById('iconRefreshNoc');
+        if (btn && icon) {
+            icon.classList.add('fa-spin');
+            btn.disabled = true;
+        }
         try {
             const data = await apiCall('/api/nas/status');
             if (!data.success) return;
+            
+            // Update status badge di kartu detail NAS bawah
             data.nas_status.forEach(nas => {
                 const badge = document.getElementById('status-badge-' + nas.id);
                 const dot = document.getElementById('status-dot-' + nas.id);
@@ -416,7 +435,14 @@
                     if (dot) dot.className = 'absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white bg-red-500';
                 }
             });
-        } catch (e) { console.error('Status check error:', e); }
+        } catch (e) {
+            console.error('Status check error:', e);
+        } finally {
+            if (btn && icon) {
+                icon.classList.remove('fa-spin');
+                btn.disabled = false;
+            }
+        }
     }
 
     async function testConnection(nasId, nasName) {

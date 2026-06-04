@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="theme-color" content="#0b1020" />
+<title>Daranett Hotspot — Status Koneksi</title>
+$(if refresh-timeout)
+<meta http-equiv="refresh" content="$(refresh-timeout-secs)">
+$(endif)
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#070b1a;
+    --card:rgba(18,22,46,.62);
+    --card-bd:rgba(255,255,255,.08);
+    --text:#e8ecff;
+    --muted:#9aa3c7;
+    --brand:#7c5cff;
+    --brand2:#22d3ee;
+    --brand3:#ec4899;
+    --ok:#22c55e;
+    --warn:#f59e0b;
+    --err:#ef4444;
+    --radius:18px;
+  }
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+    color:var(--text);
+    background:
+      radial-gradient(1200px 700px at 85% -10%, rgba(124,92,255,.35), transparent 60%),
+      radial-gradient(900px 600px at -10% 20%, rgba(34,211,238,.28), transparent 60%),
+      radial-gradient(900px 700px at 50% 110%, rgba(236,72,153,.22), transparent 60%),
+      var(--bg);
+    min-height:100vh;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  .blob{position:fixed;filter:blur(80px);opacity:.55;border-radius:50%;z-index:0;pointer-events:none;animation:float 14s ease-in-out infinite}
+  .b1{width:520px;height:520px;background:#7c5cff;top:-160px;left:-120px}
+  .b2{width:460px;height:460px;background:#22d3ee;bottom:-160px;right:-120px;animation-delay:-4s}
+  .b3{width:380px;height:380px;background:#ec4899;top:40%;left:60%;animation-delay:-8s}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-30px) scale(1.08)}}
+
+  .nav{position:relative;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:18px 28px;flex-wrap:wrap;gap:10px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px;font-size:18px}
+  .logo{width:36px;height:36px;border-radius:10px;background:conic-gradient(from 220deg,#7c5cff,#22d3ee,#ec4899,#7c5cff);box-shadow:0 8px 24px rgba(124,92,255,.45);position:relative}
+  .logo::after{content:"";position:absolute;inset:6px;border-radius:6px;background:radial-gradient(circle at 30% 30%, #fff, transparent 55%), #0b1020;}
+  .brand b{background:linear-gradient(90deg,#a78bfa,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .nav-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--card-bd);font-size:13px;color:var(--muted);text-decoration:none}
+  .pill.green{color:#bbf7d0}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .wrap{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 160px);padding:24px}
+  .card{position:relative;background:var(--card);backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);border:1px solid var(--card-bd);border-radius:var(--radius);padding:32px;box-shadow:0 30px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);width:100%;max-width:520px}
+  .card::before{content:"";position:absolute;inset:-1px;border-radius:calc(var(--radius)+1px);background:linear-gradient(140deg, rgba(124,92,255,.5), rgba(34,211,238,.0) 40%, rgba(236,72,153,.45));z-index:-1;filter:blur(10px);opacity:.45}
+  
+  .welcome-header{text-align:center;margin-bottom:24px}
+  .welcome-header svg{width:48px;height:48px;color:var(--ok);margin-bottom:12px;filter:drop-shadow(0 0 8px rgba(34,197,94,.4))}
+  .welcome-header h2{font-size:24px;margin-bottom:6px}
+  .welcome-header p{color:var(--muted);font-size:14px}
+  .welcome-header p b{color:var(--brand2)}
+
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+  .stat-box{padding:14px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--card-bd);display:flex;flex-direction:column;gap:4px}
+  .stat-box.full{grid-column:1 / -1}
+  .stat-box span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .stat-box b{font-size:15px;color:var(--text);font-family:monospace}
+  .stat-box.highlight{background:linear-gradient(135deg, rgba(124,92,255,.15), rgba(34,211,238,.08))}
+  .stat-box.highlight b{color:#22d3ee;font-size:17px;font-weight:800}
+
+  .btn{width:100%;padding:14px;border:none;border-radius:12px;cursor:pointer;font-weight:700;font-size:15px;color:#fff;letter-spacing:.2px;transition:transform .15s ease, filter .2s;text-align:center;text-decoration:none;display:block}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.05)}
+  .btn.logout{background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 10px 24px rgba(239,68,68,.3)}
+  .btn.refresh{background:rgba(255,255,255,.06);border:1px solid var(--card-bd);color:var(--text);margin-bottom:12px;font-weight:600}
+
+  .help{margin-top:20px;padding:12px;border-radius:12px;background:rgba(124,92,255,.08);border:1px solid rgba(124,92,255,.2);font-size:13px;color:#dbe1ff;display:flex;gap:10px;align-items:flex-start}
+  .help svg{flex:none;width:18px;height:18px;color:#a78bfa;margin-top:2px}
+  .help a{color:#a78bfa;font-weight:700;text-decoration:none}
+
+  footer{position:relative;z-index:2;text-align:center;color:var(--muted);font-size:13px;padding:30px 24px;border-top:1px solid rgba(255,255,255,.05);margin-top:20px;line-height:1.7}
+  footer b{color:#cdd3ee}
+  footer .foot-brand{display:inline-flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:700;color:#e8ecff;font-size:15px}
+
+  @media (max-width:560px){.nav{padding:14px 18px}.card{padding:22px}}
+</style>
+<script type="text/javascript">
+  function openLogout() {
+    if (confirm("Apakah Anda yakin ingin memutuskan koneksi internet?")) {
+      return true;
+    }
+    return false;
+  }
+</script>
+</head>
+<body>
+
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div class="blob b3"></div>
+
+<nav class="nav">
+  <div class="brand">
+    <div class="logo"></div>
+    <span>Dara<b>nett</b></span>
+  </div>
+  <div class="nav-actions">
+    <span class="pill green"><span class="dot"></span> Terkoneksi</span>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="card">
+    <div class="welcome-header">
+      <!-- Checked/Success Shield Icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>
+      <h2>Koneksi Aktif</h2>
+      <p>Selamat menikmati internet cepat dari <b>Daranett</b>.</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box full highlight">
+        <span>Username Voucher</span>
+        <b>$(username)</b>
+      </div>
+      
+      <div class="stat-box">
+        <span>IP Address</span>
+        <b>$(ip)</b>
+      </div>
+      
+      <div class="stat-box">
+        <span>MAC Address</span>
+        <b>$(mac)</b>
+      </div>
+
+      <div class="stat-box">
+        <span>Durasi Aktif (Uptime)</span>
+        <b>$(uptime)</b>
+      </div>
+
+      $(if session-time-left)
+      <div class="stat-box">
+        <span>Sisa Waktu Paket</span>
+        <b>$(session-time-left)</b>
+      </div>
+      $(else)
+      <div class="stat-box">
+        <span>Sisa Waktu Paket</span>
+        <b>Unlimited</b>
+      </div>
+      $(endif)
+
+      <div class="stat-box">
+        <span>Data Diunggah (Upload)</span>
+        <b>$(bytes-in-nice)</b>
+      </div>
+
+      <div class="stat-box">
+        <span>Data Diunduh (Download)</span>
+        <b>$(bytes-out-nice)</b>
+      </div>
+
+      $(if remain-bytes-total)
+      <div class="stat-box full">
+        <span>Sisa Kuota Data</span>
+        <b>$(remain-bytes-total-nice)</b>
+      </div>
+      $(endif)
+      
+      $(if refresh-timeout)
+      <div class="stat-box full" style="border-style: dashed; background: transparent">
+        <span>Halaman akan memuat ulang dalam</span>
+        <b style="color: var(--muted)">$(refresh-timeout)</b>
+      </div>
+      $(endif)
+    </div>
+
+    <a class="btn refresh" href="$(link-status)">Perbarui Data Statistik</a>
+
+    <form action="$(link-logout)" name="logout" onSubmit="return openLogout()">
+      <input type="hidden" name="erase-cookie" value="true" />
+      <button class="btn logout" type="submit">Putuskan Koneksi (Logout)</button>
+    </form>
+
+    <div class="help">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+      <div>Butuh bantuan teknis atau kuota habis? Hubungi admin 24/7 di <a href="https://wa.me/62895327449707" target="_blank">0895-3274-49707</a>.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot-brand"><div class="logo" style="width:24px;height:24px"></div> Daranett ISP</div>
+  Layanan Internet Hotspot &amp; WiFi Rumahan/Kantoran<br/>
+  📞 Admin: <b>0895-3274-49707</b> · WhatsApp 24/7<br/>
+  © <script>document.write(new Date().getFullYear())</script> Daranett — Powered by MikroTik Hotspot
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,485 @@
+<script>
+    // === FUNGSI UNTUK ADD USER ===
+    function updateRateLimitPreview() {
+        const down = document.getElementById('simpleDownload').value + document.getElementById('simpleDownloadUnit').value;
+        const up = document.getElementById('simpleUpload').value + document.getElementById('simpleUploadUnit').value;
+        const priority = document.getElementById('simplePriority').value;
+        const enableBurst = document.getElementById('simpleEnableBurst').checked;
+
+        let rateLimit = `${down}/${up}`;
+
+        if (enableBurst) {
+            const burstDown = (parseFloat(document.getElementById('simpleDownload').value) * 2) + document.getElementById('simpleDownloadUnit').value;
+            const burstUp = (parseFloat(document.getElementById('simpleUpload').value) * 2) + document.getElementById('simpleUploadUnit').value;
+            const threshDown = (parseFloat(document.getElementById('simpleDownload').value) * 0.5) + document.getElementById('simpleDownloadUnit').value;
+            const threshUp = (parseFloat(document.getElementById('simpleUpload').value) * 0.5) + document.getElementById('simpleUploadUnit').value;
+            rateLimit += ` ${burstDown}/${burstUp} ${threshDown}/${threshUp} 8/8`;
+        } else {
+            rateLimit += ` 0/0 0/0 0/0`;
+        }
+
+        rateLimit += ` ${priority}`;
+        document.getElementById('rateLimitPreview').value = rateLimit;
+    }
+
+    async function copyRateLimit() {
+        const input = document.getElementById('rateLimitPreview');
+        try {
+            await navigator.clipboard.writeText(input.value);
+            showNotification('Rate limit copied to clipboard!', 'success');
+        } catch (err) {
+            showNotification('Failed to copy', 'error');
+        }
+    }
+
+    function openAddUserModal() {
+        document.getElementById('addUserModal').classList.remove('hidden');
+        updateRateLimitPreview();
+    }
+
+    function closeAddUserModal() {
+        document.getElementById('addUserModal').classList.add('hidden');
+    }
+
+    // === FUNGSI UNTUK EDIT USER ===
+    function updateEditRateLimitPreview() {
+        const down = document.getElementById('editSimpleDownload').value + document.getElementById('editSimpleDownloadUnit').value;
+        const up = document.getElementById('editSimpleUpload').value + document.getElementById('editSimpleUploadUnit').value;
+        const priority = document.getElementById('editSimplePriority').value;
+        const enableBurst = document.getElementById('editSimpleEnableBurst').checked;
+
+        let rateLimit = `${down}/${up}`;
+
+        if (enableBurst) {
+            const burstDown = (parseFloat(document.getElementById('editSimpleDownload').value) * 2) + document.getElementById('editSimpleDownloadUnit').value;
+            const burstUp = (parseFloat(document.getElementById('editSimpleUpload').value) * 2) + document.getElementById('editSimpleUploadUnit').value;
+            const threshDown = (parseFloat(document.getElementById('editSimpleDownload').value) * 0.5) + document.getElementById('editSimpleDownloadUnit').value;
+            const threshUp = (parseFloat(document.getElementById('editSimpleUpload').value) * 0.5) + document.getElementById('editSimpleUploadUnit').value;
+            rateLimit += ` ${burstDown}/${burstUp} ${threshDown}/${threshUp} 8/8`;
+        } else {
+            rateLimit += ` 0/0 0/0 0/0`;
+        }
+
+        rateLimit += ` ${priority}`;
+        document.getElementById('editRateLimitPreview').value = rateLimit;
+    }
+
+    async function copyEditRateLimit() {
+        const input = document.getElementById('editRateLimitPreview');
+        try {
+            await navigator.clipboard.writeText(input.value);
+            showNotification('Rate limit copied to clipboard!', 'success');
+        } catch (err) {
+            showNotification('Failed to copy', 'error');
+        }
+    }
+
+    function closeEditUserModal() {
+        document.getElementById('editUserModal').classList.add('hidden');
+    }
+
+    // === FUNGSI UTAMA: editUser dan loadUsers ===
+    async function editUser(username) {
+        try {
+            const response = await fetch(`/api/users?search=${encodeURIComponent(username)}&limit=1`);
+            if (!response.ok) throw new Error('Failed to fetch user');
+            const result = await response.json();
+            const user = (result.users || []).find(u => u.username === username);
+            
+            if (!user) {
+                showNotification('User not found!', 'error');
+                return;
+            }
+            
+            document.getElementById('editUsername').value = user.username;
+            document.getElementById('editUsernameDisplay').value = user.username;
+            document.getElementById('editIpAddress').value = user.ip_address || '';
+            document.getElementById('editDataLimit').value = user.data_limit || '';
+            document.getElementById('editSessionTimeout').value = user.session_timeout || '';
+            document.getElementById('editIdleTimeout').value = user.idle_timeout || '';
+            
+            if (user.rate_limit) {
+                const parts = user.rate_limit.split(' ');
+                if (parts.length >= 1) {
+                    const maxRate = parts[0].split('/');
+                    if (maxRate.length === 2) {
+                        const downMatch = maxRate[0].match(/(\d+)([kMG]?)/);
+                        const upMatch = maxRate[1].match(/(\d+)([kMG]?)/);
+                        if (downMatch && upMatch) {
+                            document.getElementById('editSimpleDownload').value = downMatch[1];
+                            document.getElementById('editSimpleDownloadUnit').value = downMatch[2] || 'M';
+                            document.getElementById('editSimpleUpload').value = upMatch[1];
+                            document.getElementById('editSimpleUploadUnit').value = upMatch[2] || 'M';
+                        }
+                    }
+                    if (parts.length >= 5) {
+                        const priorityMatch = parts[4].match(/(\d+)/);
+                        if (priorityMatch) document.getElementById('editSimplePriority').value = priorityMatch[1];
+                    }
+                    if (parts.length >= 2 && parts[1] !== '0/0') {
+                        document.getElementById('editSimpleEnableBurst').checked = true;
+                    } else {
+                        document.getElementById('editSimpleEnableBurst').checked = false;
+                    }
+                }
+            }
+            
+            updateEditRateLimitPreview();
+            document.getElementById('editUserModal').classList.remove('hidden');
+            
+        } catch (error) {
+            console.error('Error loading user data:', error);
+            showNotification('Error loading user data', 'error');
+        }
+    }
+
+    let searchTimeout;
+    document.getElementById('userSearch').addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            currentPage = 1;
+            loadUsers(e.target.value);
+        }, 300); // debounce 300ms untuk performa
+    });
+
+    let currentPage = 1;
+    const itemsPerPage = 20;
+
+    async function changePage(page) {
+        if (page < 1) return;
+        currentPage = page;
+        await loadUsers();
+    }
+
+    async function loadUsers(searchQuery = document.getElementById('userSearch').value) {
+        const usersList = document.getElementById('usersList');
+        
+        try {
+            const url = new URL('/api/users', window.location.origin);
+            url.searchParams.append('page', currentPage);
+            url.searchParams.append('limit', itemsPerPage);
+            if (searchQuery) url.searchParams.append('search', searchQuery);
+            
+            const response = await fetch(url);
+            const result = await response.json();
+            const users = result.users || [];
+            
+            // Update pagination UI
+            document.getElementById('totalItems').textContent = result.total || 0;
+            document.getElementById('startRange').textContent = result.total ? (currentPage - 1) * itemsPerPage + 1 : 0;
+            document.getElementById('endRange').textContent = Math.min(currentPage * itemsPerPage, result.total || 0);
+            
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage >= result.total_pages;
+            
+            // Generate page numbers
+            let pageHtml = '';
+            for (let i = 1; i <= result.total_pages; i++) {
+                if (i === 1 || i === result.total_pages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    pageHtml += `
+                        <button onclick="changePage(${i})" class="w-10 h-10 rounded-xl font-bold transition-all ${i === currentPage ? 'bg-emerald-500 text-white shadow-lg' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}">
+                            ${i}
+                        </button>
+                    `;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    pageHtml += '<span class="flex items-center text-gray-400">...</span>';
+                }
+            }
+            document.getElementById('pageNumbers').innerHTML = pageHtml;
+
+            if (users.length === 0) {
+                if (searchQuery) {
+                    usersList.innerHTML = `
+                        <div class="col-span-full text-center py-20">
+                            <div class="w-24 h-24 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                <i class="fas fa-search text-gray-400 text-4xl"></i>
+                            </div>
+                            <p class="text-gray-700 font-bold text-2xl mb-2">No users match "${searchQuery}"</p>
+                            <p class="text-gray-500">Try a different search term</p>
+                        </div>
+                    `;
+                } else {
+                    usersList.innerHTML = `
+                        <div class="col-span-full text-center py-20">
+                            <div class="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                                <i class="fas fa-users text-gray-400 text-4xl"></i>
+                            </div>
+                            <p class="text-gray-700 font-bold text-2xl mb-2">No Users Found</p>
+                            <p class="text-gray-500 mb-6">Get started by adding your first PPPoE user</p>
+                            <button onclick="openAddUserModal()" class="bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg transition-all">
+                                <i class="fas fa-user-plus mr-2"></i>Add First User
+                            </button>
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            let html = `
+                <div class="overflow-x-auto min-w-full">
+                    <table class="w-full text-left border-collapse align-middle">
+                        <thead>
+                            <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
+                                <th class="pb-3 pt-1 px-4 font-extrabold">PELANGGAN</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold">STATUS</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold">ALAMAT IP</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold">RATE LIMIT</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold text-right">AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50 dark:divide-slate-750">
+            `;
+            users.forEach(user => {
+                const isOnline = user.active_sessions > 0;
+                const statusBadge = isOnline
+                    ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>Online</span>'
+                    : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-500 border border-gray-100">Offline</span>';
+                const throttleBtns = isOnline
+                    ? '<button onclick="throttleUser(\'' + user.username + '\')" class="w-8 h-8 bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Throttle"><i class="fas fa-tachometer-alt text-xs"></i></button>'
+                    + '<button onclick="unthrottleUser(\'' + user.username + '\')" class="w-8 h-8 bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Unthrottle"><i class="fas fa-rocket text-xs"></i></button>'
+                    : '';
+                const userId = user.id;
+                const uname = user.username;
+
+                html += '<tr class="hover:bg-slate-50/50 transition-colors">'
+                    + '<td class="py-3 px-4">'
+                    + '<div class="flex items-center gap-3">'
+                    + '<div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0" style="background:linear-gradient(135deg,#667eea,#764ba2);"><i class="fas fa-user text-white text-xs"></i></div>'
+                    + '<span class="font-bold text-slate-800 text-sm truncate">' + uname + '</span>'
+                    + '</div>'
+                    + '</td>'
+                    + '<td class="py-3 px-4">' + statusBadge + '</td>'
+                    + '<td class="py-3 px-4"><span class="text-xs font-mono text-slate-550"><i class="fas fa-network-wired text-slate-400 mr-1.5"></i>' + (user.ip_address || 'Dynamic') + '</span></td>'
+                    + '<td class="py-3 px-4"><span class="text-xs font-mono text-indigo-650 bg-indigo-50/60 px-2 py-0.5 rounded border border-indigo-100/50"><i class="fas fa-tachometer-alt text-indigo-400 mr-1.5"></i>' + (user.rate_limit || 'Not set') + '</span></td>'
+                    + '<td class="py-3 px-4 text-right">'
+                    + '<div class="flex gap-1.5 justify-end">'
+                    + '<button onclick="showDeviceInfo(\'' + uname + '\')" class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs transition-all hover:opacity-80" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);" title="Device Info"><i class="fas fa-satellite-dish"></i></button>'
+                    + '<button onclick="editUser(\'' + uname + '\')" class="w-8 h-8 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Edit"><i class="fas fa-edit text-xs"></i></button>'
+                    + throttleBtns
+                    + '<button onclick="deleteUser(' + userId + ', \'' + uname + '\')" class="w-8 h-8 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Delete"><i class="fas fa-trash text-xs"></i></button>'
+                    + '</div>'
+                    + '</td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table></div>';
+            usersList.innerHTML = html;
+            loadPppoeStats();
+        } catch (error) {
+            console.error('Error loading users:', error);
+            usersList.innerHTML = `
+                <div class="col-span-full text-center py-20">
+                    <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+                    <p class="text-gray-700 font-bold text-xl mb-2">Error Loading Users</p>
+                    <p class="text-gray-500">${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    async function loadPppoeStats() {
+        try {
+            const res = await (await fetch('/api/stats')).json();
+            const total = res.pppoe_users || 0;
+            const online = res.pppoe_sessions || 0;
+            const offline = Math.max(0, total - online);
+            const pct = total ? Math.round((online / total) * 100) : 0;
+            
+            document.getElementById('statPppoeTotal').textContent = total;
+            document.getElementById('statPppoeOnline').textContent = online;
+            document.getElementById('statPppoeOnlinePct').textContent = pct + '%';
+            document.getElementById('statPppoeOnlineBar').style.width = pct + '%';
+            document.getElementById('statPppoeOffline').textContent = offline;
+        } catch (e) {
+            console.error('Error loading PPPoE stats:', e);
+        }
+    }
+
+    async function throttleUser(username) {
+        const rate = prompt(`Throttle "${username}" to speed (e.g. 512k/512k, 1M/1M):`, '512k/512k');
+        if (!rate) return;
+        try {
+            const r = await fetch(`/api/users/throttle/${username}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({rate_limit: rate})
+            });
+            const result = await r.json();
+            showNotification(result.message || result.error, result.success ? 'warning' : 'error');
+            if (result.success) loadUsers();
+        } catch(e) { showNotification(e.message, 'error'); }
+    }
+
+    async function unthrottleUser(username) {
+        try {
+            const r = await fetch(`/api/users/unthrottle/${username}`, {method: 'POST'});
+            const result = await r.json();
+            showNotification(result.message || result.error, result.success ? 'success' : 'error');
+            if (result.success) loadUsers();
+        } catch(e) { showNotification(e.message, 'error'); }
+    }
+
+    let _deleteUsername = null;
+
+    function deleteUser(userId, username) {
+        _deleteUsername = username;
+        document.getElementById('deleteUsername').textContent = username;
+        document.getElementById('deleteConfirmModal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+        _deleteUsername = null;
+        document.getElementById('deleteConfirmModal').classList.add('hidden');
+    }
+
+    async function confirmDelete() {
+        if (!_deleteUsername) return;
+        const username = _deleteUsername;
+        closeDeleteModal();
+        try {
+            const response = await fetch(`/api/users/delete/by-username/${encodeURIComponent(username)}`, { method: 'DELETE' });
+            if (response.status === 401) { window.location.href = '/login'; return; }
+            const result = await response.json();
+            if (result.success) {
+                showNotification('User deleted successfully!', 'success');
+                loadUsers();
+            } else {
+                showNotification('Error: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showNotification('Error: ' + error.message, 'error');
+        }
+    }
+
+    // === DEVICE INFO (GenieACS) ===
+    async function showDeviceInfo(username) {
+        document.getElementById('deviceInfoModal').classList.remove('hidden');
+        document.getElementById('deviceInfoUsername').textContent = username;
+        document.getElementById('deviceInfoLoading').classList.remove('hidden');
+        document.getElementById('deviceInfoNotFound').classList.add('hidden');
+        document.getElementById('deviceInfoData').classList.add('hidden');
+
+        try {
+            const resp = await fetch(`/api/users/${encodeURIComponent(username)}/device`);
+            const data = await resp.json();
+
+            document.getElementById('deviceInfoLoading').classList.add('hidden');
+
+            if (!data.found) {
+                document.getElementById('deviceInfoNotFoundMsg').textContent = data.message || 'Device not found';
+                document.getElementById('deviceInfoNotFound').classList.remove('hidden');
+                return;
+            }
+
+            // RX Power card color
+            const rxCard = document.getElementById('di_rx_card');
+            const rxBadge = document.getElementById('di_rx_badge');
+            const rxStyles = {
+                good:    { bg: 'linear-gradient(135deg,#059669,#0d9488)', badge: '✓ Sinyal Bagus' },
+                warning: { bg: 'linear-gradient(135deg,#d97706,#ea580c)', badge: '⚠ Sinyal Lemah' },
+                bad:     { bg: 'linear-gradient(135deg,#dc2626,#be123c)', badge: '✗ Sinyal Buruk' },
+                unknown: { bg: 'linear-gradient(135deg,#334155,#475569)', badge: '— N/A' },
+            };
+            const s = rxStyles[data.rx_status] || rxStyles.unknown;
+            rxCard.style.background = s.bg;
+            rxBadge.textContent = s.badge;
+
+            document.getElementById('di_rx_power').textContent = data.rx_power !== 'N/A' ? `${data.rx_power} dBm` : 'N/A';
+            document.getElementById('di_manufacturer').textContent = data.manufacturer;
+            document.getElementById('di_model').textContent = data.model;
+            document.getElementById('di_serial').textContent = data.serial;
+            document.getElementById('di_pon_mode').textContent = data.pon_mode;
+            document.getElementById('di_temperature').textContent = data.temperature !== 'N/A' ? `${data.temperature} °C` : 'N/A';
+            document.getElementById('di_firmware').textContent = data.firmware || '-';
+            document.getElementById('di_pppoe_ip').textContent = data.pppoe_ip || '-';
+            document.getElementById('di_device_uptime').textContent = data.device_uptime;
+            document.getElementById('di_ppp_uptime').textContent = data.ppp_uptime;
+            document.getElementById('di_last_inform').textContent = data.last_inform ? new Date(data.last_inform).toLocaleString('id-ID') : '-';
+
+            document.getElementById('deviceInfoData').classList.remove('hidden');
+        } catch (e) {
+            document.getElementById('deviceInfoLoading').classList.add('hidden');
+            document.getElementById('deviceInfoNotFoundMsg').textContent = 'Error: ' + e.message;
+            document.getElementById('deviceInfoNotFound').classList.remove('hidden');
+        }
+    }
+
+    // === EVENT LISTENERS ===
+    document.addEventListener('DOMContentLoaded', function() {
+        loadUsers();
+        updateRateLimitPreview();
+    });
+
+    document.getElementById('addUserForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+        submitBtn.disabled = true;
+
+        try {
+            const formData = new FormData(this);
+            const response = await fetch('/api/users/add', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification('User added successfully!', 'success');
+                closeAddUserModal();
+                this.reset();
+                updateRateLimitPreview();
+                loadUsers();
+            } else {
+                showNotification('Error: ' + result.error, 'error');
+            }
+            
+        } catch (error) {
+            console.error('Error adding user:', error);
+            showNotification('Error: ' + error.message, 'error');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
+    document.getElementById('editUserForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Updating...';
+        submitBtn.disabled = true;
+
+        try {
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            const username = document.getElementById('editUsername').value;
+            
+            if (!data.password) delete data.password;
+            
+            const response = await fetch(`/api/users/update/${username}`, {
+                method: 'PUT',
+                body: JSON.stringify(data),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification('User updated successfully!', 'success');
+                closeEditUserModal();
+                loadUsers();
+            } else {
+                showNotification('Error: ' + result.error, 'error');
+            }
+            
+        } catch (error) {
+            console.error('Error updating user:', error);
+            showNotification('Error: ' + error.message, 'error');
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+</script>

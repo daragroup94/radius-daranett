@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+
+{% block title %}Pusat Diagnostik & Troubleshoot - RADIUS Manager{% endblock %}
+{% block page_title %}Troubleshooting Center{% endblock %}
+{% block page_subtitle %}Pusat Diagnostik & Pengujian Jaringan MikroTik & RADIUS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
+    }
+    
+    /* Terminal styling for Ping/Trace output */
+    .terminal-window {
+        background-color: #090d16;
+        border: 1px solid #1e293b;
+        color: #10b981;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: inset 0 2px 8px rgba(0,0,0,0.8), 0 10px 25px -5px rgba(0,0,0,0.3);
+        position: relative;
+        min-height: 250px;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    
+    .terminal-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 12px;
+        border-b: 1px solid #1e293b;
+        padding-bottom: 8px;
+    }
+    
+    .terminal-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    .td-red { background-color: #ef4444; }
+    .td-yellow { background-color: #eab308; }
+    .td-green { background-color: #22c55e; }
+    
+    .terminal-cursor {
+        display: inline-block;
+        width: 8px;
+        height: 15px;
+        background-color: #10b981;
+        animation: blink 1s infinite;
+        vertical-align: middle;
+        margin-left: 2px;
+    }
+    
+    @keyframes blink {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in space-y-6">
+
+    <!-- Header Banner -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <div class="z-10 flex items-center">
+            <div class="icon-wrapper-noc bg-gradient-to-r from-indigo-500 to-purple-600 mr-4 shadow-lg floating-icon">
+                <i data-lucide="wrench" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight text-white">NOC Diagnostics Center</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Lakukan pengujian langsung dari MikroTik, cek tabel ARP/FDB, atau kick koneksi client.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Control Card (Sidebar) -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm col-span-1 h-fit space-y-5">
+            <h3 class="text-base font-bold text-slate-800 dark:text-white pb-3 border-b border-slate-100 dark:border-slate-750">Pengaturan Diagnostik</h3>
+            
+            <!-- Router Selector -->
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pilih Router MikroTik</label>
+                <select id="routerSelect" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                    {% for r in routers %}
+                    <option value="{{ r.id }}">{{ r.name }} ({{ r.host }})</option>
+                    {% else %}
+                    <option value="">Tidak ada router terintegrasi</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Tool Selector -->
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pilih Fitur Pengujian</label>
+                <select id="toolSelect" onchange="toggleToolInputs()" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                    <option value="ping">Remote Ping (Tes Konektivitas)</option>
+                    <option value="traceroute">Traceroute (Rute Koneksi)</option>
+                    <option value="arp">Cek ARP Table (Pencarian IP/MAC)</option>
+                    <option value="fdb">Cek FDB Table (Cek Port Switch/Bridge)</option>
+                    <option value="kick">Kick Customer (RADIUS & DHCP Lease)</option>
+                </select>
+            </div>
+
+            <!-- Dynamic Inputs Container -->
+            <div id="dynamicInputs" class="space-y-4 pt-2">
+                <!-- IP/Target Input (Used for Ping, Trace, Kick) -->
+                <div id="inputTargetGroup" class="space-y-1.5">
+                    <label id="targetLabel" class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">IP Address Target</label>
+                    <input type="text" id="targetInput" placeholder="Contoh: 192.168.5.2" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+                </div>
+
+                <!-- MAC Input (Used for Kick, optional for ARP/FDB search) -->
+                <div id="inputMacGroup" class="space-y-1.5 hidden">
+                    <label class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">MAC Address (Opsional/Kick)</label>
+                    <input type="text" id="macInput" placeholder="Contoh: 9C:A2:F4:1C:9B:BD" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+                </div>
+
+                <!-- Ping Count (Used for Ping) -->
+                <div id="pingCountGroup" class="space-y-1.5">
+                    <label class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Jumlah Paket Ping</label>
+                    <select id="pingCountSelect" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-800 dark:text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                        <option value="5">5 Paket</option>
+                        <option value="10">10 Paket</option>
+                        <option value="20">20 Paket</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <button id="runBtn" onclick="executeDiagnostic()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white py-3 rounded-xl flex items-center justify-center space-x-2 font-bold shadow-lg shadow-indigo-500/20 transition-all hover:scale-[1.01] mt-4">
+                <i class="fas fa-play mr-1.5"></i>
+                <span>Jalankan Pengujian</span>
+            </button>
+        </div>
+
+        <!-- Output Container (Main Panel) -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm col-span-2 flex flex-col min-h-[400px]">
+            <h3 class="text-base font-bold text-slate-800 dark:text-white pb-3 border-b border-slate-100 dark:border-slate-750 mb-4 flex items-center justify-between">
+                <span>Hasil Output</span>
+                <span id="outputStatus" class="text-xs font-semibold text-slate-400">Menunggu aksi...</span>
+            </h3>
+
+            <!-- Terminal View (For Ping / Traceroute) -->
+            <div id="terminalView" class="terminal-window flex-1">
+                <div class="terminal-header">
+                    <div class="terminal-dot td-red"></div>
+                    <div class="terminal-dot td-yellow"></div>
+                    <div class="terminal-dot td-green"></div>
+                    <span class="text-slate-500 text-xs ml-2 font-semibold">interactive_console_v1.0</span>
+                </div>
+                <div id="terminalBody">
+                    <p class="text-slate-500">System ready. Masukkan target dan jalankan pengujian untuk melihat log di sini...</p>
+                </div>
+                <span class="terminal-cursor"></span>
+            </div>
+
+            <!-- Table View (For ARP / FDB tables) -->
+            <div id="tableView" class="flex-1 overflow-x-auto hidden">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-100 dark:border-slate-750 text-slate-400 font-bold uppercase tracking-wider">
+                            <th id="thCol1" class="py-3 px-2">IP Address</th>
+                            <th id="thCol2" class="py-3 px-2">MAC Address</th>
+                            <th id="thCol3" class="py-3 px-2">Interface</th>
+                            <th id="thCol4" class="py-3 px-2">Keterangan / Flags</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-750 font-medium text-slate-700 dark:text-slate-200">
+                        <tr>
+                            <td colspan="4" class="text-center py-10 text-slate-400">Tidak ada data untuk ditampilkan.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleToolInputs() {
+        const tool = document.getElementById('toolSelect').value;
+        const targetLabel = document.getElementById('targetLabel');
+        const targetInput = document.getElementById('targetInput');
+        const inputMacGroup = document.getElementById('inputMacGroup');
+        const pingCountGroup = document.getElementById('pingCountGroup');
+        const inputTargetGroup = document.getElementById('inputTargetGroup');
+
+        // Reset
+        inputMacGroup.classList.add('hidden');
+        pingCountGroup.classList.add('hidden');
+        inputTargetGroup.classList.remove('hidden');
+
+        if (tool === 'ping') {
+            targetLabel.textContent = "IP Address / Domain Target";
+            targetInput.placeholder = "Contoh: 192.168.5.2";
+            pingCountGroup.classList.remove('hidden');
+        } else if (tool === 'traceroute') {
+            targetLabel.textContent = "IP Address / Domain Target";
+            targetInput.placeholder = "Contoh: 8.8.8.8";
+        } else if (tool === 'arp') {
+            targetLabel.textContent = "Kata Kunci Cari (Opsional)";
+            targetInput.placeholder = "Cari IP, MAC, Interface...";
+        } else if (tool === 'fdb') {
+            targetLabel.textContent = "Cari MAC Address (Opsional)";
+            targetInput.placeholder = "Cari MAC di port switch...";
+        } else if (tool === 'kick') {
+            targetLabel.textContent = "IP Address Pelanggan";
+            targetInput.placeholder = "Masukkan IP Pelanggan";
+            inputMacGroup.classList.remove('hidden');
+        }
+    }
+
+    async function executeDiagnostic() {
+        const routerId = document.getElementById('routerSelect').value;
+        const tool = document.getElementById('toolSelect').value;
+        const target = document.getElementById('targetInput').value.trim();
+        const mac = document.getElementById('macInput').value.trim();
+        const pingCount = document.getElementById('pingCountSelect').value;
+        const runBtn = document.getElementById('runBtn');
+        const outputStatus = document.getElementById('outputStatus');
+
+        const termView = document.getElementById('terminalView');
+        const tableView = document.getElementById('tableView');
+        const termBody = document.getElementById('terminalBody');
+        const tableBody = document.getElementById('tableBody');
+
+        if (!routerId) {
+            showNotification('Router harus dipilih!', 'warning');
+            return;
+        }
+
+        if ((tool === 'ping' || tool === 'traceroute') && !target) {
+            showNotification('Target IP wajib diisi!', 'warning');
+            return;
+        }
+
+        if (tool === 'kick' && !target && !mac) {
+            showNotification('Masukkan IP atau MAC address pelanggan yang ingin di-kick!', 'warning');
+            return;
+        }
+
+        // Set Loading UI
+        runBtn.disabled = true;
+        runBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1.5"></i> Proses...`;
+        outputStatus.textContent = "Mengeksekusi perintah...";
+        outputStatus.className = "text-xs font-bold text-amber-500 animate-pulse";
+
+        try {
+            if (tool === 'ping') {
+                termView.classList.remove('hidden');
+                tableView.classList.add('hidden');
+                termBody.innerHTML = `<p class="text-slate-400">Melakukan ping ke ${target} dari router...</p>`;
+
+                const res = await fetch('/api/diagnostics/ping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ router_id: routerId, target: target, count: pingCount })
+                });
+                const d = await res.json();
+                
+                if (!d.success) {
+                    termBody.innerHTML += `<p class="text-red-500">Gagal: ${d.error}</p>`;
+                    return;
+                }
+
+                termBody.innerHTML = `<p class="text-slate-350">PING ${target} dari MikroTik:</p>`;
+                
+                // Simulate output response typing
+                let delay = 100;
+                d.results.forEach((r, idx) => {
+                    setTimeout(() => {
+                        if (r.status === 'ok') {
+                            termBody.innerHTML += `<p>Reply from ${r.host}: bytes=${r.size} ttl=${r.ttl} time=${r.time}</p>`;
+                        } else {
+                            termBody.innerHTML += `<p class="text-red-400">Request timed out / ${r.status}</p>`;
+                        }
+                        termView.scrollTop = termView.scrollHeight;
+                    }, idx * delay);
+                });
+
+            } else if (tool === 'traceroute') {
+                termView.classList.remove('hidden');
+                tableView.classList.add('hidden');
+                termBody.innerHTML = `<p class="text-slate-400">Menelusuri rute (traceroute) ke ${target}...</p>`;
+
+                const res = await fetch('/api/diagnostics/traceroute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ router_id: routerId, target: target })
+                });
+                const d = await res.json();
+                
+                if (!d.success) {
+                    termBody.innerHTML += `<p class="text-red-500">Gagal: ${d.error}</p>`;
+                    return;
+                }
+
+                termBody.innerHTML = `<p class="text-slate-350">Traceroute ke ${target} via MikroTik:</p>`;
+                
+                d.results.forEach((r, idx) => {
+                    setTimeout(() => {
+                        termBody.innerHTML += `<p>${r.hop}. ${r.address}   loss=${r.loss}%   sent=${r.sent}   time=${r.time}</p>`;
+                        termView.scrollTop = termView.scrollHeight;
+                    }, idx * 150);
+                });
+
+            } else if (tool === 'arp') {
+                termView.classList.add('hidden');
+                tableView.classList.remove('hidden');
+                tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Membaca tabel ARP...</td></tr>`;
+
+                // Update Table Header
+                document.getElementById('thCol1').textContent = "IP Address";
+                document.getElementById('thCol2').textContent = "MAC Address";
+                document.getElementById('thCol3').textContent = "Interface";
+                document.getElementById('thCol4').textContent = "Keterangan / Flags";
+
+                const res = await fetch(`/api/diagnostics/arp?router_id=${routerId}&search=${encodeURIComponent(target)}`);
+                const d = await res.json();
+
+                if (!d.success) {
+                    tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 py-10">${d.error}</td></tr>`;
+                    return;
+                }
+
+                if (d.arp.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400">Tidak ada data ARP yang cocok.</td></tr>`;
+                    return;
+                }
+
+                tableBody.innerHTML = d.arp.map(r => `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-750/50">
+                        <td class="py-3 px-2 font-bold font-mono text-slate-800 dark:text-white">${r.address}</td>
+                        <td class="py-3 px-2 font-mono">${r.mac_address}</td>
+                        <td class="py-3 px-2">${r.interface}</td>
+                        <td class="py-3 px-2">
+                            <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-bold text-slate-500 mr-2">${r.flags || 'S'}</span>
+                            <span class="text-slate-400 text-[10px]">${r.comment}</span>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } else if (tool === 'fdb') {
+                termView.classList.add('hidden');
+                tableView.classList.remove('hidden');
+                tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Membaca database bridge/hosts...</td></tr></tr>`;
+
+                // Update Table Header
+                document.getElementById('thCol1').textContent = "MAC Address";
+                document.getElementById('thCol2').textContent = "Bridge Interface";
+                document.getElementById('thCol3').textContent = "Physical Port";
+                document.getElementById('thCol4').textContent = "Flags / Age";
+
+                const res = await fetch(`/api/diagnostics/fdb?router_id=${routerId}&search=${encodeURIComponent(target)}`);
+                const d = await res.json();
+
+                if (!d.success) {
+                    tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 py-10">${d.error}</td></tr>`;
+                    return;
+                }
+
+                if (d.fdb.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400">Tidak ada data MAC pada bridge yang cocok.</td></tr>`;
+                    return;
+                }
+
+                tableBody.innerHTML = d.fdb.map(r => `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-750/50">
+                        <td class="py-3 px-2 font-bold font-mono text-slate-800 dark:text-white">${r.mac_address}</td>
+                        <td class="py-3 px-2 font-mono">${r.bridge}</td>
+                        <td class="py-3 px-2 font-semibold text-indigo-600 dark:text-indigo-400">${r.interface}</td>
+                        <td class="py-3 px-2">
+                            <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-bold text-slate-500 mr-2">${r.flags || 'Static'}</span>
+                            <span class="text-slate-450 text-[10px]">${r.age}</span>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } else if (tool === 'kick') {
+                termView.classList.remove('hidden');
+                tableView.classList.add('hidden');
+                termBody.innerHTML = `<p class="text-slate-400">Mengirim sinyal diskoneksi RADIUS (PoD) & membersihkan lease di MikroTik...</p>`;
+
+                const res = await fetch('/api/diagnostics/kick', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mac: mac, ip: target })
+                });
+                const d = await res.json();
+
+                if (d.success) {
+                    termBody.innerHTML = `<p class="text-emerald-500 font-bold"><i class="fas fa-check-circle mr-1"></i> Sukses: ${d.message}</p>`;
+                    showNotification('Client berhasil di-kick dari sistem!', 'success');
+                } else {
+                    termBody.innerHTML = `<p class="text-red-500 font-bold"><i class="fas fa-times-circle mr-1"></i> Gagal: ${d.error}</p>`;
+                }
+            }
+
+            outputStatus.textContent = "Selesai";
+            outputStatus.className = "text-xs font-bold text-emerald-500";
+
+        } catch (e) {
+            termBody.innerHTML = `<p class="text-red-500">Error eksekusi: ${e.message}</p>`;
+            outputStatus.textContent = "Gagal";
+            outputStatus.className = "text-xs font-bold text-red-500";
+        } finally {
+            runBtn.disabled = false;
+            runBtn.innerHTML = `<i class="fas fa-play mr-1.5"></i> Jalankan Pengujian`;
+        }
+    }
+
+    // Auto set configuration inputs on page load
+    document.addEventListener('DOMContentLoaded', toggleToolInputs);
+</script>
+{% endblock %}

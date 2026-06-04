@@ -18,11 +18,20 @@ listen {
     limit {
     }
 }
-
 authorize {
     # Tolak jika format MAC address (bukan username voucher)
     if ("%{User-Name}" =~ /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$/) {
         reject
+    }
+
+    # Normalize Calling-Station-Id: remove leading "1:" or "1-" and lowercase
+    if ("%{Calling-Station-Id}" =~ /^1[:-](.*)$/) {
+        update request {
+            &Calling-Station-Id := "%{1}"
+        }
+    }
+    update request {
+        &Calling-Station-Id := "%{tolower:%{Calling-Station-Id}}"
     }
 
     preprocess
@@ -51,6 +60,16 @@ authenticate {
 }
 
 preacct {
+    # Normalize Calling-Station-Id: remove leading "1:" or "1-" and lowercase
+    if ("%{Calling-Station-Id}" =~ /^1[:-](.*)$/) {
+        update request {
+            &Calling-Station-Id := "%{1}"
+        }
+    }
+    update request {
+        &Calling-Station-Id := "%{tolower:%{Calling-Station-Id}}"
+    }
+
     preprocess
     acct_unique
 }
@@ -66,6 +85,7 @@ post-auth {
     sql_hotspot
 
     Post-Auth-Type REJECT {
+        sql_hotspot
         attr_filter.access_reject
     }
 }

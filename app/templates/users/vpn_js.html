@@ -1,0 +1,217 @@
+<script>
+let vpnPage = 1;
+let vpnLimit = 20;
+let vpnTotal = 0;
+let vpnSearchTimeout = null;
+
+async function loadVpnUsers() {
+    const searchVal = document.getElementById('vpnSearch').value;
+    const tbody = document.getElementById('vpnTableBody');
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading data...</td></tr>`;
+
+    try {
+        const data = await apiCall(`/api/vpn/users?page=${vpnPage}&limit=${vpnLimit}&search=${encodeURIComponent(searchVal)}`);
+        if (!data || !data.users) throw new Error('Data format error');
+
+        vpnTotal = data.total;
+        
+        // Update Stats
+        document.getElementById('statTotal').textContent = vpnTotal;
+        
+        // Count active sessions in this dataset (just for stats)
+        const onlineCount = data.users.reduce((acc, curr) => acc + (curr.active_sessions > 0 ? 1 : 0), 0);
+        document.getElementById('statOnline').textContent = onlineCount;
+
+        if (data.users.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-gray-400">Tidak ada user VPN ditemukan.</td></tr>`;
+            updatePagination(0, 0, 0);
+            return;
+        }
+
+        tbody.innerHTML = data.users.map(u => {
+            const isOnline = u.active_sessions > 0;
+            const statusBadge = isOnline 
+                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100"><span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>Online</span>`
+                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-500 border border-gray-100">Offline</span>`;
+
+            return `
+                <tr class="hover:bg-slate-50/50 transition-colors">
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 bg-gradient-to-tr from-blue-500 to-indigo-600"><i class="fas fa-shield-alt text-white text-xs"></i></div>
+                            <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(u.username)}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4"><span class="text-xs font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">${escapeHtml(u.password)}</span></td>
+                    <td class="py-3 px-4"><span class="text-xs font-mono text-slate-600"><i class="fas fa-network-wired text-slate-400 mr-1.5"></i>${escapeHtml(u.ip_address || 'Dynamic')}</span></td>
+                    <td class="py-3 px-4"><span class="text-xs text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">${escapeHtml(u.framed_pool || '—')}</span></td>
+                    <td class="py-3 px-4"><span class="text-xs font-mono text-indigo-650 bg-indigo-50/60 px-2 py-0.5 rounded border border-indigo-100/50"><i class="fas fa-tachometer-alt text-indigo-400 mr-1.5"></i>${escapeHtml(u.rate_limit || '—')}</span></td>
+                    <td class="py-3 px-4">${statusBadge}</td>
+                    <td class="py-3 px-4 text-right">
+                        <div class="flex justify-end gap-1.5">
+                            <button onclick="openEditModal('${escapeHtml(u.username)}', '${escapeHtml(u.ip_address || '')}', '${escapeHtml(u.framed_pool || '')}', '${escapeHtml(u.rate_limit || '')}')" 
+                                    class="w-8 h-8 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Edit User">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            <button onclick="deleteUser('${escapeHtml(u.username)}')" 
+                                    class="w-8 h-8 bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Hapus User">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        const start = (vpnPage - 1) * vpnLimit + 1;
+        const end = Math.min(start + data.users.length - 1, vpnTotal);
+        updatePagination(start, end, vpnTotal);
+
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-red-500 font-bold"><i class="fas fa-exclamation-triangle mr-2"></i>Error: ${e.message}</td></tr>`;
+    }
+}
+
+function updatePagination(start, end, total) {
+    document.getElementById('vpnStart').textContent = start;
+    document.getElementById('vpnEnd').textContent = end;
+    document.getElementById('vpnTotal').textContent = total;
+
+    const prevBtn = document.getElementById('vpnPrev');
+    const nextBtn = document.getElementById('vpnNext');
+    prevBtn.disabled = vpnPage <= 1;
+    nextBtn.disabled = end >= total;
+
+    // Render page numbers
+    const totalPages = Math.ceil(total / vpnLimit);
+    const numsDiv = document.getElementById('vpnPageNums');
+    numsDiv.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= vpnPage - 1 && i <= vpnPage + 1)) {
+            const btn = document.createElement('button');
+            btn.textContent = i;
+            btn.className = `px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${i === vpnPage ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`;
+            btn.onclick = () => vpnChangePage(i);
+            numsDiv.appendChild(btn);
+        } else if (i === 2 || i === totalPages - 1) {
+            const span = document.createElement('span');
+            span.textContent = '...';
+            span.className = 'px-1 py-1.5 text-xs text-gray-400';
+            numsDiv.appendChild(span);
+        }
+    }
+}
+
+function vpnChangePage(newPage) {
+    vpnPage = newPage;
+    loadVpnUsers();
+}
+
+function openAddModal() {
+    document.getElementById('addForm').reset();
+    document.getElementById('addModal').classList.remove('hidden');
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+}
+
+async function submitAdd(e) {
+    e.preventDefault();
+    const form = e.target;
+    const body = {
+        username: form.username.value,
+        password: form.password.value,
+        ip_address: form.ip_address.value,
+        framed_pool: form.framed_pool.value,
+        rate_limit: form.rate_limit.value
+    };
+
+    const res = await apiCall('/api/vpn/users/add', {
+        method: 'POST',
+        body: JSON.stringify(body)
+    });
+
+    if (res.success) {
+        showNotification(res.message, 'success');
+        closeAddModal();
+        loadVpnUsers();
+    } else {
+        showNotification(res.error, 'error');
+    }
+}
+
+function openEditModal(username, ip, pool, rate) {
+    const form = document.getElementById('editForm');
+    form.reset();
+    form.username.value = username;
+    form.ip_address.value = ip;
+    form.framed_pool.value = pool;
+    form.rate_limit.value = rate;
+
+    document.getElementById('editUserLabel').textContent = username;
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+async function submitEdit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const username = form.username.value;
+    const body = {
+        ip_address: form.ip_address.value,
+        framed_pool: form.framed_pool.value,
+        rate_limit: form.rate_limit.value
+    };
+    if (form.password.value) {
+        body.password = form.password.value;
+    }
+
+    const res = await apiCall(`/api/vpn/users/update/${username}`, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+    });
+
+    if (res.success) {
+        showNotification(res.message, 'success');
+        closeEditModal();
+        loadVpnUsers();
+    } else {
+        showNotification(res.error, 'error');
+    }
+}
+
+async function deleteUser(username) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus user VPN "${username}"?`)) return;
+
+    const res = await apiCall(`/api/vpn/users/delete/${username}`, {
+        method: 'DELETE'
+    });
+
+    if (res.success) {
+        showNotification(res.message, 'success');
+        loadVpnUsers();
+    } else {
+        showNotification(res.error, 'error');
+    }
+}
+
+// Search input handling
+document.getElementById('vpnSearch').addEventListener('input', () => {
+    clearTimeout(vpnSearchTimeout);
+    vpnSearchTimeout = setTimeout(() => {
+        vpnPage = 1;
+        loadVpnUsers();
+    }, 300);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadVpnUsers();
+});
+</script>

@@ -1,0 +1,3790 @@
+from flask import Flask, render_template, request, flash, redirect, url_for, jsonify, session
+from flask_socketio import SocketIO, emit
+import psycopg2
+from psycopg2 import pool as psycopg2_pool
+import time
+from config import Config
+from werkzeug.security import check_password_hash, generate_password_hash
+import functools
+from datetime import datetime, timedelta, timezone
+import traceback
+import os
+import subprocess
+from werkzeug.utils import secure_filename
+from flask import send_file
+import re
+import psutil
+import threading
+import io
+import requests
+import pyotp
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect, CSRFError
+
+# === TELEGRAM NOTIFICATION ===
+def _send_telegram_worker(message, reply_markup=None):
+    token, chat_id = '', ''
+    env_path = '/app/.telegram.env'
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith('TELEGRAM_BOT_TOKEN='):
+                    token = line.strip().split('=', 1)[1]
+                elif line.startswith('TELEGRAM_CHAT_ID='):
+                    chat_id = line.strip().split('=', 1)[1]
+    if not token or not chat_id:
+        return
+    try:
+        import json as _json
+        data = {'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'}
+        if reply_markup:
+            data['reply_markup'] = reply_markup
+        payload = _json.dumps(data)
+        subprocess.run(
+            ['curl', '-s', '-m', '10', '-X', 'POST',
+             f'https://api.telegram.org/bot{token}/sendMessage',
+             '-H', 'Content-Type: application/json',
+             '-d', payload],
+             capture_output=True, timeout=12
+        )
+    except Exception as e:
+        print(f"Telegram error: {e}")
+
+def send_telegram_notification(message, reply_markup=None):
+    import threading
+    threading.Thread(target=_send_telegram_worker, args=(message, reply_markup), daemon=True).start()
+
+app = Flask(__name__)
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_PERMANENT'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config.from_object(Config)
+
+# Load persisted Telegram settings (saved via UI)
+_telegram_env = '/app/.telegram.env'
+if os.path.exists(_telegram_env):
+    with open(_telegram_env) as _f:
+        for _line in _f:
+            if '=' in _line:
+                _k, _v = _line.strip().split('=', 1)
+                app.config[_k] = _v
+
+# Initialize SocketIO
+_allowed_origins = os.getenv('ALLOWED_ORIGINS', '*')
+socketio = SocketIO(app, cors_allowed_origins=_allowed_origins if _allowed_origins == '*' else _allowed_origins.split(','), async_mode='eventlet')
+
+# Initialize Rate Limiter (Redis-backed, shared across gunicorn workers)
+_redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri=_redis_url)
+
+# Initialize CSRF Protection
+# API routes (/api/*) are exempt — they're protected by @login_required + session cookie
+app.config['WTF_CSRF_CHECK_DEFAULT'] = False
+csrf = CSRFProtect(app)
+
+@app.after_request
+def add_no_cache(response):
+    if 'text/html' in response.content_type:
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+    return response
+
+@app.before_request
+def csrf_protect():
+    # Only enforce CSRF on state-changing form submissions (non-API)
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        if not request.path.startswith('/api/'):
+            csrf.protect()
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    return jsonify({'success': False, 'error': 'CSRF token missing or invalid'}), 400
+
+# === BACKUP & RESTORE CONFIGURATION ===
+BACKUP_FOLDER = os.getenv('BACKUP_FOLDER', '/app/backups')
+ALLOWED_BACKUP_EXTENSIONS = {'sql', 'backup'}
+
+def ensure_backup_folder():
+    if not os.path.exists(BACKUP_FOLDER):
+        os.makedirs(BACKUP_FOLDER)
+
+def allowed_backup_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_BACKUP_EXTENSIONS
+
+def format_file_size(size_bytes):
+    if size_bytes == 0:
+        return '0 B'
+    size_names = ['B', 'KB', 'MB', 'GB']
+    i = 0
+    while size_bytes >= 1024 and i < len(size_names) - 1:
+        size_bytes /= 1024.0
+        i += 1
+    return f"{size_bytes:.2f} {size_names[i]}"
+
+# === LOGIN REQUIRED DECORATOR ===
+def login_required(f):
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            if request.path.startswith('/api/'):
+                return jsonify({'success': False, 'error': 'Session expired'}), 401
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# === DATABASE CONNECTION ===
+# === DATABASE CONNECTION POOL ===
+_db_pool = None
+
+def get_db_pool():
+    global _db_pool
+    if _db_pool is None:
+        _db_pool = psycopg2_pool.ThreadedConnectionPool(
+            minconn=3, maxconn=10,
+            host=app.config['DB_HOST'],
+            database=app.config['DB_NAME'],
+            user=app.config['DB_USER'],
+            password=app.config['DB_PASSWORD'],
+            port=app.config['DB_PORT']
+        )
+
+    return _db_pool
+
+def get_db_connection():
+    return get_db_pool().getconn()
+
+def execute_query(query, params=None, fetch=True):
+    pool = get_db_pool()
+    conn = pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        if fetch:
+            result = cur.fetchall()
+            columns = [desc[0] for desc in cur.description]
+            cur.close()
+            return [dict(zip(columns, row)) for row in result]
+        else:
+            conn.commit()
+            cur.close()
+            return True
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        pool.putconn(conn)
+
+# === HELPER FUNCTIONS ===
+def get_request_data():
+    try:
+        if request.is_json:
+            return request.get_json()
+        else:
+            data = request.form.to_dict()
+            for key in data:
+                if data[key] == '':
+                    data[key] = None
+            return data
+    except Exception as e:
+        print(f"DEBUG: Error getting request data: {str(e)}")
+        return {}
+
+def convert_data_limit_to_bytes(data_limit_str):
+    """Convert data limit string (e.g., '10GB', '500MB') to bytes"""
+    if not data_limit_str:
+        return None
+    try:
+        data_limit_str = data_limit_str.strip().upper()
+        match = re.match(r'^(\d+(?:\.\d+)?)\s*([KMGT]?B?)$', data_limit_str)
+        if not match:
+            return None
+        value = float(match.group(1))
+        unit = match.group(2)
+        
+        multipliers = {
+            'B': 1, 'KB': 1024, 'MB': 1024 ** 2, 'GB': 1024 ** 3, 'TB': 1024 ** 4,
+            'K': 1024, 'M': 1024 ** 2, 'G': 1024 ** 3, 'T': 1024 ** 4
+        }
+        multiplier = multipliers.get(unit, 1)
+        return int(value * multiplier)
+    except Exception as e:
+        print(f"DEBUG: Error converting data limit: {str(e)}")
+        return None
+
+# === NAS HEALTH MONITOR ===
+def ping_nas(ip_address):
+    """
+    Cek konektivitas NAS: ICMP ping dulu, jika gagal coba TCP ke port umum router.
+    """
+    import socket as _socket
+
+    # 1. Coba ICMP ping
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", "1", ip_address],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=1.5
+        )
+        if result.returncode == 0:
+            return "online"
+    except Exception:
+        pass
+
+    # 2. Jika ping gagal (mungkin ICMP diblokir), coba TCP ke port umum router (Winbox, API, HTTP)
+    for port in [8291, 8728, 80]:
+        try:
+            sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+            sock.settimeout(0.5)
+            if sock.connect_ex((ip_address, port)) == 0:
+                sock.close()
+                return "online"
+            sock.close()
+        except Exception:
+            pass
+
+    return "offline"
+
+
+# Background cleanup thread dihapus - berbahaya karena menghapus session PPPoE aktif
+# yang bisa online berhari-hari. Gunakan /api/sessions/fix-stale untuk mark stale secara manual.
+
+# === AUTHENTICATION ROUTES ===
+@app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        mfa_code = request.form.get('mfa_code')
+        
+        user = execute_query("SELECT * FROM admin_users WHERE username = %s AND is_active = TRUE", (username,))
+        
+        if user and check_password_hash(user[0]['password_hash'], password):
+            # Check MFA
+            if user[0]['is_mfa_enabled']:
+                if not mfa_code:
+                    return render_template('login.html', mfa_required=True, username=username, password=password)
+                
+                totp = pyotp.TOTP(user[0]['mfa_secret'])
+                if not totp.verify(mfa_code):
+                    flash('Invalid MFA code', 'error')
+                    return render_template('login.html', mfa_required=True, username=username, password=password)
+            
+            session['user_id'] = user[0]['id']
+            session['username'] = user[0]['username']
+            session['role'] = user[0]['role']
+            
+            execute_query("UPDATE admin_users SET last_login = NOW() WHERE id = %s", (user[0]['id'],), fetch=False)
+            
+            send_telegram_notification(f"🔔 <b>Admin Login</b>\nUser: {username}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            flash('Login successful!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password', 'error')
+            # Brute force detection: track failed attempts per IP via Redis
+            try:
+                import redis as redis_lib
+                r = redis_lib.from_url(_redis_url)
+                ip = request.remote_addr
+                key = f'failed_login:{ip}'
+                attempts = r.incr(key)
+                r.expire(key, 600)  # reset setelah 10 menit
+                if attempts == 5:
+                    send_telegram_notification(
+                        f"⚠️ <b>Brute Force Detected</b>\n"
+                        f"IP: <code>{ip}</code>\n"
+                        f"Username dicoba: <code>{username}</code>\n"
+                        f"Gagal: {attempts}x dalam 10 menit\n"
+                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+            except Exception as e:
+                print(f"Brute force tracking error: {e}")
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You have been logged out', 'info')
+    return redirect(url_for('login'))
+
+# === PROFILE ROUTES ===
+@app.route('/profile')
+@login_required
+def profile_page():
+    return render_template('profile.html')
+
+@app.route('/api/mfa/setup', methods=['POST'])
+@login_required
+def api_mfa_setup():
+    try:
+        secret = pyotp.random_base32()
+        user = execute_query("SELECT username FROM admin_users WHERE id = %s", (session['user_id'],))[0]
+        provisioning_url = pyotp.totp.TOTP(secret).provisioning_uri(
+            name=user['username'], 
+            issuer_name="RADIUS Manager"
+        )
+        # We store secret temporarily in session for verification
+        session['temp_mfa_secret'] = secret
+        
+        return jsonify({
+            'success': True, 
+            'secret': secret,
+            'provisioning_url': provisioning_url
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/mfa/verify', methods=['POST'])
+@login_required
+def api_mfa_verify():
+    try:
+        data = get_request_data()
+        code = data.get('code')
+        secret = session.get('temp_mfa_secret')
+        
+        if not secret:
+            return jsonify({'success': False, 'error': 'Session expired, please restart setup'})
+            
+        totp = pyotp.TOTP(secret)
+        if totp.verify(code):
+            execute_query("UPDATE admin_users SET mfa_secret = %s, is_mfa_enabled = TRUE WHERE id = %s", 
+                         (secret, session['user_id']), fetch=False)
+            session.pop('temp_mfa_secret', None)
+            return jsonify({'success': True, 'message': 'MFA enabled successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Invalid verification code'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/telegram/settings', methods=['GET'])
+@login_required
+def api_telegram_settings_get():
+    return jsonify({
+        'bot_token': app.config.get('TELEGRAM_BOT_TOKEN', ''),
+        'chat_id': app.config.get('TELEGRAM_CHAT_ID', '')
+    })
+
+@app.route('/api/telegram/settings', methods=['POST'])
+@login_required
+def api_telegram_settings_save():
+    try:
+        data = get_request_data()
+        bot_token = data.get('bot_token', '').strip()
+        chat_id = data.get('chat_id', '').strip()
+
+        # Update runtime config
+        app.config['TELEGRAM_BOT_TOKEN'] = bot_token
+        app.config['TELEGRAM_CHAT_ID'] = chat_id
+
+        # Persist to .env file so it survives gunicorn reload
+        env_path = '/app/.telegram.env'
+        with open(env_path, 'w') as f:
+            f.write(f"TELEGRAM_BOT_TOKEN={bot_token}\n")
+            f.write(f"TELEGRAM_CHAT_ID={chat_id}\n")
+
+        return jsonify({'success': True, 'message': 'Telegram settings saved'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/telegram/test', methods=['POST'])
+@login_required
+def api_telegram_test():
+    import json as _json
+
+    env_path = '/app/.telegram.env'
+    token, chat_id = '', ''
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith('TELEGRAM_BOT_TOKEN='):
+                    token = line.strip().split('=', 1)[1]
+                elif line.startswith('TELEGRAM_CHAT_ID='):
+                    chat_id = line.strip().split('=', 1)[1]
+
+    if not token or not chat_id:
+        return jsonify({'success': False, 'error': 'Bot Token atau Chat ID belum dikonfigurasi'}), 400
+
+    try:
+        msg = f"✅ <b>Test Notification</b>\nRADIUS Manager terhubung ke Telegram!\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        payload = _json.dumps({'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'})
+        # Gunakan curl via subprocess untuk bypass eventlet monkey-patch sepenuhnya
+        result = subprocess.run(
+            ['curl', '-s', '-m', '10', '-X', 'POST',
+             f'https://api.telegram.org/bot{token}/sendMessage',
+             '-H', 'Content-Type: application/json',
+             '-d', payload],
+            capture_output=True, text=True, timeout=12
+        )
+        resp = _json.loads(result.stdout)
+        if resp.get('ok'):
+            return jsonify({'success': True, 'message': 'Pesan test berhasil dikirim ke Telegram!'})
+        else:
+            return jsonify({'success': False, 'error': f"Telegram: {resp.get('description', 'Unknown error')}"}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/change-password', methods=['POST'])
+@login_required
+def api_change_password():
+    try:
+        data = get_request_data()
+        current_password = data['current_password']
+        new_password = data['new_password']
+        
+        user = execute_query("SELECT * FROM admin_users WHERE id = %s", (session['user_id'],))
+        
+        if not user or not check_password_hash(user[0]['password_hash'], current_password):
+            return jsonify({'success': False, 'error': 'Current password is incorrect'})
+        
+        new_password_hash = generate_password_hash(new_password)
+        execute_query("UPDATE admin_users SET password_hash = %s WHERE id = %s", 
+                     (new_password_hash, session['user_id']), fetch=False)
+        
+        return jsonify({'success': True, 'message': 'Password updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+# === MAIN ROUTES ===
+@app.route('/')
+@login_required
+def dashboard():
+    return render_template('dashboard.html')
+
+@app.route('/nas')
+@login_required
+def nas_page():
+    return render_template('nas.html')
+
+@app.route('/users')
+@login_required
+def users_page():
+    return render_template('users.html')
+
+
+@app.route('/sessions')
+@login_required
+def sessions_page():
+    return render_template('sessions.html')
+
+@app.route('/logs')
+@login_required
+def logs_page():
+    return render_template('logs.html')
+
+@app.route('/backup')
+@login_required
+def backup_page():
+    return render_template('backup/index.html')
+
+# === API ROUTES ===
+@app.route('/api/stats')
+@login_required
+def api_stats():
+    try:
+        # PPPoE Stats (Users not in ipoe, vpn, or 8021x groups)
+        pppoe_users = execute_query("""
+            SELECT COUNT(*) as count FROM radcheck c 
+            WHERE c.attribute = 'Cleartext-Password' 
+            AND NOT EXISTS (
+                SELECT 1 FROM radusergroup g 
+                WHERE LOWER(g.username) = LOWER(c.username) 
+                AND g.groupname IN ('ipoe', 'vpn', '8021x')
+            )
+        """)[0]['count']
+        
+        pppoe_sessions = execute_query("""
+            SELECT COUNT(*) as count FROM radacct a 
+            WHERE a.acctstoptime IS NULL 
+            AND NOT EXISTS (
+                SELECT 1 FROM radusergroup g 
+                WHERE LOWER(g.username) = LOWER(a.username) 
+                AND g.groupname IN ('ipoe', 'vpn', '8021x')
+            ) 
+            AND NOT EXISTS (
+                SELECT 1 FROM hotspot_vouchers h 
+                WHERE LOWER(h.username) = LOWER(a.username)
+            )
+        """)[0]['count']
+        
+        # IPoE Stats
+        ipoe_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'ipoe'")[0]['count']
+        ipoe_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'ipoe' WHERE a.acctstoptime IS NULL")[0]['count']
+
+        # Hotspot Stats
+        hotspot_users = execute_query("SELECT COUNT(*) as count FROM hotspot_vouchers WHERE deleted_at IS NULL")[0]['count']
+        hotspot_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a WHERE a.acctstoptime IS NULL AND EXISTS (SELECT 1 FROM hotspot_vouchers h WHERE LOWER(h.username) = LOWER(a.username))")[0]['count']
+
+        # VPN Stats
+        vpn_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'vpn'")[0]['count']
+        vpn_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'vpn' WHERE a.acctstoptime IS NULL")[0]['count']
+
+        # 802.1X Stats
+        x8021x_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = '8021x'")[0]['count']
+        x8021x_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = '8021x' WHERE a.acctstoptime IS NULL")[0]['count']
+
+        total_users = pppoe_users + ipoe_users + hotspot_users + vpn_users + x8021x_users
+        active_sessions = pppoe_sessions + ipoe_sessions + hotspot_sessions + vpn_sessions + x8021x_sessions
+        online_users = execute_query("SELECT COUNT(DISTINCT username) as count FROM radacct WHERE acctstoptime IS NULL")[0]['count']
+        today_auth = execute_query("SELECT COUNT(*) as count FROM radpostauth WHERE DATE(authdate AT TIME ZONE 'Asia/Jakarta') = CURRENT_DATE")[0]['count']
+
+        try:
+            total_nas = execute_query("SELECT COUNT(*) as count FROM nas")[0]['count']
+        except:
+            total_nas = 0
+
+        return jsonify({
+            'pppoe_users': pppoe_users,
+            'pppoe_sessions': pppoe_sessions,
+            'ipoe_users': ipoe_users,
+            'ipoe_sessions': ipoe_sessions,
+            'hotspot_users': hotspot_users,
+            'hotspot_sessions': hotspot_sessions,
+            'vpn_users': vpn_users,
+            'vpn_sessions': vpn_sessions,
+            'x8021x_users': x8021x_users,
+            'x8021x_sessions': x8021x_sessions,
+            'total_users': total_users,
+            'active_sessions': active_sessions,
+            'online_users': online_users,
+            'today_auth': today_auth,
+            'total_nas': total_nas
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# === NAS API ROUTES ===
+@app.route('/api/nas')
+@login_required
+def api_nas():
+    try:
+        nas_list = execute_query("""
+            SELECT n.*,
+                   COUNT(r.acctsessionid) as session_count
+            FROM nas n
+            LEFT JOIN radacct r ON HOST(r.nasipaddress) = n.nasname AND r.acctstoptime IS NULL
+            GROUP BY n.id
+            ORDER BY n.id
+        """)
+        return jsonify(nas_list)
+    except Exception as e:
+        if 'relation "nas" does not exist' in str(e):
+            return jsonify([])
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/nas/add', methods=['POST'])
+@login_required
+def api_add_nas():
+    try:
+        data = get_request_data()
+        
+        try:
+            execute_query("SELECT limit_proxy_state, require_ma FROM nas LIMIT 1")
+            execute_query("""
+                INSERT INTO nas (nasname, shortname, type, ports, secret, server, community, description, limit_proxy_state, require_ma)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'auto', 'auto')
+            """, (data['nasname'], data['shortname'], data['type'], data['ports'], data['secret'],
+                  data.get('server', ''), data.get('community', ''), data.get('description', '')), fetch=False)
+        except:
+            execute_query("""
+                INSERT INTO nas (nasname, shortname, type, ports, secret, server, community, description)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (data['nasname'], data['shortname'], data['type'], data['ports'], data['secret'],
+                  data.get('server', ''), data.get('community', ''), data.get('description', '')), fetch=False)
+        
+        send_telegram_notification(f"🖥️ <b>NAS Added</b>\nName: {data['nasname']}\nShort: {data['shortname']}\nType: {data['type']}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        return jsonify({'success': True, 'message': 'NAS added successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/nas/edit/<int:nas_id>', methods=['PUT'])
+@login_required
+def api_edit_nas(nas_id):
+    try:
+        data = get_request_data()
+        execute_query("""
+            UPDATE nas SET nasname=%s, shortname=%s, type=%s, ports=%s, secret=%s, description=%s
+            WHERE id=%s
+        """, (data['nasname'], data['shortname'], data['type'], int(data['ports']),
+              data['secret'], data.get('description', ''), nas_id), fetch=False)
+        return jsonify({'success': True, 'message': 'NAS updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/nas/delete/<int:nas_id>', methods=['DELETE'])
+@login_required
+def api_delete_nas(nas_id):
+    try:
+        nas_info = execute_query("SELECT nasname, shortname FROM nas WHERE id = %s", (nas_id,))
+        execute_query("DELETE FROM nas WHERE id = %s", (nas_id,), fetch=False)
+        if nas_info:
+            send_telegram_notification(f"🗑️ <b>NAS Deleted</b>\nName: {nas_info[0]['nasname']}\nShort: {nas_info[0]['shortname']}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        return jsonify({'success': True, 'message': 'NAS deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# === NAS HEALTH MONITOR API ROUTE ===
+@app.route('/api/nas/status', methods=['GET'])
+@login_required  # Menambahkan dekorator login_required untuk keamanan
+def get_nas_status():
+    """
+    API endpoint untuk mendapatkan status (online/offline) semua NAS.
+    Memerlukan autentikasi.
+    """
+    try:
+        # Ambil data NAS dari database menggunakan fungsi yang sudah ada
+        nas_list = execute_query("SELECT * FROM nas ORDER BY id")
+        if not nas_list:
+            return jsonify({'success': True, 'nas_status': []})
+            
+        import eventlet
+        pool = eventlet.GreenPool(50)  # Memproses check ping secara paralel untuk performa cepat
+        
+        def _check_single_nas(nas):
+            status = ping_nas(nas['nasname'])
+            return {
+                'id': nas['id'],
+                'nasname': nas['nasname'],
+                'shortname': nas['shortname'],
+                'status': status
+            }
+            
+        nas_status_list = list(pool.imap(_check_single_nas, nas_list))
+        return jsonify({'success': True, 'nas_status': nas_status_list})
+
+    except Exception as e:
+        # Jika tabel 'nas' tidak ada, kembalikan array kosong
+        if 'relation "nas" does not exist' in str(e):
+            return jsonify({'success': True, 'nas_status': []})
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# === USER API ROUTES ===
+@app.route('/api/users')
+@login_required
+def api_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+        
+        # Base query for data
+        data_query = """
+            SELECT c.id, c.username, c.attribute, c.op, c.value as password,
+                   (SELECT value FROM radreply r1 WHERE r1.username = c.username AND r1.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
+                   (SELECT value FROM radreply r2 WHERE r2.username = c.username AND r2.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
+                   (SELECT value FROM radreply r3 WHERE r3.username = c.username AND r3.attribute = 'Session-Timeout' LIMIT 1) as session_timeout,
+                   (SELECT value FROM radreply r4 WHERE r4.username = c.username AND r4.attribute = 'Idle-Timeout' LIMIT 1) as idle_timeout,
+                   (SELECT value FROM radreply r5 WHERE r5.username = c.username AND r5.attribute = 'Mikrotik-Total-Limit' LIMIT 1) as data_limit,
+                   (SELECT COUNT(*) FROM radacct a WHERE a.username = c.username AND a.acctstoptime IS NULL) as active_sessions
+            FROM radcheck c
+            WHERE c.attribute = 'Cleartext-Password'
+            AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'ipoe')
+        """
+        
+        # Base query for count
+        count_query = "SELECT COUNT(*) as total FROM radcheck c WHERE c.attribute = 'Cleartext-Password' AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'ipoe')"
+
+        params = []
+        if search:
+            data_query += " AND c.username ILIKE %s"
+            count_query += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+            
+        data_query += " ORDER BY c.username LIMIT %s OFFSET %s"
+        data_params = params + [limit, offset]
+        
+        users = execute_query(data_query, tuple(data_params))
+        total_count = execute_query(count_query, tuple(params))[0]['total']
+        
+        return jsonify({
+            'users': users,
+            'total': total_count,
+            'page': page,
+            'limit': limit,
+            'total_pages': (total_count + limit - 1) // limit
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/add', methods=['POST'])
+@login_required
+def api_add_user():
+    try:
+        data = get_request_data()
+        
+        # Insert password
+        execute_query("""
+            INSERT INTO radcheck (username, attribute, op, value)
+            VALUES (%s, 'Cleartext-Password', ':=', %s)
+        """, (data['username'], data['password']), fetch=False)
+        
+        # PPP attributes
+        ppp_attributes = [
+            ('Framed-Protocol', ':=', 'PPP'),
+            ('Service-Type', ':=', 'Framed-User'),
+            ('Framed-Compression', ':=', 'Van-Jacobson-TCP-IP')
+        ]
+        
+        for attr, op, value in ppp_attributes:
+            execute_query("""
+                INSERT INTO radreply (username, attribute, op, value)
+                VALUES (%s, %s, %s, %s)
+            """, (data['username'], attr, op, value), fetch=False)
+        
+        # Optional attributes
+        if data.get('ip_address'):
+            execute_query("""
+                INSERT INTO radreply (username, attribute, op, value)
+                VALUES (%s, 'Framed-IP-Address', ':=', %s)
+            """, (data['username'], data['ip_address']), fetch=False)
+        
+        if data.get('rate_limit'):
+            execute_query("""
+                INSERT INTO radreply (username, attribute, op, value)
+                VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)
+            """, (data['username'], data['rate_limit']), fetch=False)
+        
+        if data.get('session_timeout'):
+            execute_query("""
+                INSERT INTO radreply (username, attribute, op, value)
+                VALUES (%s, 'Session-Timeout', ':=', %s)
+            """, (data['username'], data['session_timeout']), fetch=False)
+        
+        if data.get('idle_timeout'):
+            execute_query("""
+                INSERT INTO radreply (username, attribute, op, value)
+                VALUES (%s, 'Idle-Timeout', ':=', %s)
+            """, (data['username'], data['idle_timeout']), fetch=False)
+        
+        if data.get('data_limit'):
+            data_limit_bytes = convert_data_limit_to_bytes(data['data_limit'])
+            if data_limit_bytes:
+                execute_query("""
+                    INSERT INTO radreply (username, attribute, op, value)
+                    VALUES (%s, 'Mikrotik-Total-Limit', ':=', %s)
+                """, (data['username'], str(data_limit_bytes)), fetch=False)
+        
+        send_telegram_notification(f"👤 <b>New User Created</b>\nUsername: {data['username']}\nIP: {data.get('ip_address', 'Dynamic')}\nRate: {data.get('rate_limit', 'Not set')}")
+        return jsonify({'success': True, 'message': 'User added successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/update/<username>', methods=['PUT'])
+@login_required
+def api_update_user(username):
+    try:
+        data = get_request_data()
+
+        if data.get('ip_address') is not None:
+            execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Framed-IP-Address'", (username,), fetch=False)
+            if data['ip_address']:
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)",
+                             (username, data['ip_address']), fetch=False)
+
+        if data.get('rate_limit') is not None:
+            execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Mikrotik-Rate-Limit'", (username,), fetch=False)
+            if data['rate_limit']:
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)",
+                             (username, data['rate_limit']), fetch=False)
+
+        if data.get('session_timeout') is not None:
+            execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Session-Timeout'", (username,), fetch=False)
+            if data['session_timeout']:
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Session-Timeout', ':=', %s)",
+                             (username, data['session_timeout']), fetch=False)
+
+        if data.get('idle_timeout') is not None:
+            execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Idle-Timeout'", (username,), fetch=False)
+            if data['idle_timeout']:
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Idle-Timeout', ':=', %s)",
+                             (username, data['idle_timeout']), fetch=False)
+
+        if data.get('data_limit'):
+            data_limit_bytes = convert_data_limit_to_bytes(data['data_limit'])
+            if data_limit_bytes:
+                execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Mikrotik-Total-Limit'", (username,), fetch=False)
+                execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Total-Limit', ':=', %s)",
+                             (username, str(data_limit_bytes)), fetch=False)
+
+        if data.get('password'):
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'",
+                         (data['password'], username), fetch=False)
+
+        # Kirim CoA-Request jika rate_limit berubah dan user sedang online
+        coa_total = 0
+        if data.get('rate_limit'):
+            active_sessions = execute_query("""
+                SELECT acctsessionid, nasipaddress FROM radacct
+                WHERE username = %s AND acctstoptime IS NULL
+            """, (username,))
+            for s in active_sessions:
+                nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+                secret = nas[0]['secret'] if nas else 'radiussecret'
+                send_coa_update_async(s['nasipaddress'], s['acctsessionid'], secret, data['rate_limit'])
+                coa_total += 1
+
+        msg = 'User updated successfully'
+        if coa_total > 0:
+            msg += f' | CoA sent to {coa_total} active session(s)'
+        elif data.get('rate_limit'):
+            msg += ' | User not online, CoA not sent'
+
+        return jsonify({'success': True, 'message': msg})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/throttle/<username>', methods=['POST'])
+@login_required
+def api_throttle_user(username):
+    """Throttle user ke bandwidth rendah via CoA tanpa disconnect"""
+    try:
+        data = get_request_data()
+        rate_limit = data.get('rate_limit', '512k/512k')  # default throttle 512kbps
+
+        active_sessions = execute_query("""
+            SELECT acctsessionid, nasipaddress FROM radacct
+            WHERE username = %s AND acctstoptime IS NULL
+        """, (username,))
+
+        if not active_sessions:
+            return jsonify({'success': False, 'error': 'User not online'}), 404
+
+        coa_sent = 0
+        for s in active_sessions:
+            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+            secret = nas[0]['secret'] if nas else 'radiussecret'
+            if send_coa_update(s['nasipaddress'], s['acctsessionid'], secret, rate_limit):
+                coa_sent += 1
+
+        return jsonify({
+            'success': True,
+            'message': f'Throttled to {rate_limit} | {coa_sent}/{len(active_sessions)} sessions updated'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/unthrottle/<username>', methods=['POST'])
+@login_required
+def api_unthrottle_user(username):
+    """Restore bandwidth user ke rate_limit asli via CoA"""
+    try:
+        rate_limit = execute_query("""
+            SELECT value FROM radreply WHERE username = %s AND attribute = 'Mikrotik-Rate-Limit'
+        """, (username,))
+
+        if not rate_limit:
+            return jsonify({'success': False, 'error': 'No rate limit configured for this user'}), 404
+
+        original_rate = rate_limit[0]['value']
+        active_sessions = execute_query("""
+            SELECT acctsessionid, nasipaddress FROM radacct
+            WHERE username = %s AND acctstoptime IS NULL
+        """, (username,))
+
+        if not active_sessions:
+            return jsonify({'success': False, 'error': 'User not online'}), 404
+
+        coa_sent = 0
+        for s in active_sessions:
+            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+            secret = nas[0]['secret'] if nas else 'radiussecret'
+            if send_coa_update(s['nasipaddress'], s['acctsessionid'], secret, original_rate):
+                coa_sent += 1
+
+        return jsonify({
+            'success': True,
+            'message': f'Restored to {original_rate} | {coa_sent}/{len(active_sessions)} sessions updated'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/delete/<int:user_id>', methods=['DELETE'])
+@login_required
+def api_delete_user(user_id):
+    try:
+        user = execute_query("SELECT username FROM radcheck WHERE id = %s", (user_id,))
+        if user:
+            username = user[0]['username']
+            execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+            execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+            send_telegram_notification(f"🗑️ <b>User Deleted</b>\nUsername: {username}")
+            return jsonify({'success': True, 'message': 'User deleted successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/users/delete/by-username/<username>', methods=['DELETE'])
+@login_required
+def api_delete_user_by_username(username):
+    try:
+        user = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if user:
+            execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+            execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+            send_telegram_notification(f"🗑️ <b>User Deleted</b>\nUsername: {username}")
+            return jsonify({'success': True, 'message': 'User deleted successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# === SESSION API ROUTES ===
+@app.route('/api/sessions')
+@login_required
+def api_sessions():
+    try:
+        sessions = execute_query("""
+            SELECT DISTINCT ON (username, acctsessionid)
+                   radacctid, acctsessionid, acctuniqueid, username,
+                   nasipaddress, nasportid, nasporttype, acctstarttime,
+                   acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets,
+                   calledstationid, callingstationid, framedipaddress,
+                   framedprotocol, servicetype, connectinfo_start,
+                   CASE WHEN acctstoptime IS NULL THEN 'active' ELSE 'inactive' END as status
+            FROM radacct
+            WHERE acctstoptime IS NULL
+            ORDER BY username, acctsessionid, acctstarttime DESC
+        """)
+        return jsonify(sessions)
+    except Exception as e:
+        print(f"Error in api_sessions: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/cleanup', methods=['POST'])
+@login_required
+def api_cleanup_sessions():
+    try:
+        # Hanya hapus session yang benar-benar stale:
+        # acctstoptime IS NULL DAN tidak ada interim-update dalam 30 menit terakhir
+        # (bukan berdasarkan acctstarttime - user PPPoE bisa online berhari-hari)
+        deleted = execute_query("""
+            DELETE FROM radacct 
+            WHERE acctstoptime IS NULL 
+            AND acctupdatetime < NOW() - INTERVAL '30 minutes'
+            RETURNING radacctid
+        """)
+        
+        count = len(deleted) if deleted else 0
+        return jsonify({'success': True, 'message': f'{count} stale sessions cleaned up (no update for 30+ minutes)'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sessions/fix-stale', methods=['POST'])
+@login_required
+def api_fix_stale_sessions():
+    """Mark session stale (set acctstoptime) jika tidak ada interim-update dalam 15 menit.
+    Lebih aman dari delete - data tetap ada untuk audit."""
+    try:
+        threshold = int(request.json.get('minutes', 15)) if request.is_json else 15
+        threshold = max(5, min(threshold, 1440))  # clamp 5 menit - 24 jam
+        updated = execute_query("""
+            UPDATE radacct 
+            SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
+            WHERE acctstoptime IS NULL 
+            AND acctupdatetime < NOW() - (INTERVAL '1 minute' * %s)
+            RETURNING radacctid, username
+        """, (threshold,))
+        
+        count = len(updated) if updated else 0
+        return jsonify({'success': True, 'message': f'{count} stale sessions marked as disconnected', 'count': count})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def _send_coa_packet(nas_ip, secret, packet_type, attributes):
+    """Kirim CoA/Disconnect packet via radclient di freeradius container"""
+    try:
+        # Gunakan newline-separated attributes
+        attr_lines = '\n'.join(f'{k} = "{v}"' for k, v in attributes.items())
+        # Jalankan docker exec secara langsung tanpa sh -c / pipeline untuk menghindari RCE
+        cmd = [
+            'docker', 'exec', '-i', 'freeradius-server',
+            'radclient', '-t', '3', '-r', '1', f'{nas_ip}:3799', packet_type, secret
+        ]
+        result = subprocess.run(
+            cmd, input=f"{attr_lines}\n", capture_output=True, text=True, timeout=6
+        )
+        return result.stdout
+    except Exception as e:
+        print(f"CoA error ({nas_ip}): {e}")
+        return ''
+
+def send_coa_disconnect(nas_ip, session_id, nas_secret, framed_ip=None):
+    if framed_ip:
+        out = _send_coa_packet(nas_ip, nas_secret, 'disconnect', {
+            'Framed-IP-Address': framed_ip, 'NAS-IP-Address': nas_ip
+        })
+        if 'Disconnect-ACK' in out:
+            return True
+    # Fallback: Acct-Session-Id (PPPoE)
+    out = _send_coa_packet(nas_ip, nas_secret, 'disconnect', {
+        'Acct-Session-Id': session_id, 'NAS-IP-Address': nas_ip
+    })
+    return 'Disconnect-ACK' in out
+
+def send_coa_update(nas_ip, session_id, nas_secret, rate_limit):
+    out = _send_coa_packet(nas_ip, nas_secret, 'coa', {
+        'Acct-Session-Id': session_id, 'NAS-IP-Address': nas_ip,
+        'Mikrotik-Rate-Limit': rate_limit
+    })
+    return 'CoA-ACK' in out
+
+def send_coa_update_async(nas_ip, session_id, nas_secret, rate_limit):
+    """Kirim CoA di background thread agar tidak block response"""
+    t = threading.Thread(target=send_coa_update, args=(nas_ip, session_id, nas_secret, rate_limit), daemon=True)
+    t.start()
+
+@app.route('/api/sessions/disconnect/<session_id>', methods=['POST'])
+@login_required
+def api_disconnect_session(session_id):
+    try:
+        session_data = execute_query("""
+            SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct 
+            WHERE acctsessionid = %s AND acctstoptime IS NULL
+        """, (session_id,))
+
+        if not session_data:
+            return jsonify({'success': False, 'error': 'Session not found'}), 404
+
+        nas_ip = session_data[0]['nasipaddress']
+        nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (nas_ip,))
+        secret = nas[0]['secret'] if nas else 'radiussecret'
+
+        # Kirim CoA Disconnect ke MikroTik
+        coa_sent = send_coa_disconnect(nas_ip, session_id, secret, framed_ip=session_data[0].get('framedipaddress'))
+
+        # Update database
+        execute_query("""
+            UPDATE radacct 
+            SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
+            WHERE acctsessionid = %s
+        """, (session_id,), fetch=False)
+
+        msg = 'Session disconnected (CoA sent to NAS)' if coa_sent else 'Session marked disconnected (CoA failed, user may still be online)'
+        send_telegram_notification(f"🔌 <b>Session Disconnected</b>\nUsername: {session_data[0].get('username', '-')}\nNAS: {nas_ip}\nBy: {session.get('username','admin')}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        return jsonify({'success': True, 'message': msg, 'coa_sent': coa_sent})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sessions/disconnect-user/<username>', methods=['POST'])
+@login_required
+def api_disconnect_user_sessions(username):
+    try:
+        sessions = execute_query("""
+            SELECT acctsessionid, nasipaddress FROM radacct 
+            WHERE username = %s AND acctstoptime IS NULL
+        """, (username,))
+
+        coa_success = 0
+        for s in sessions:
+            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+            secret = nas[0]['secret'] if nas else 'radiussecret'
+            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret):
+                coa_success += 1
+            execute_query("""
+                UPDATE radacct 
+                SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
+                WHERE acctsessionid = %s
+            """, (s['acctsessionid'],), fetch=False)
+
+        return jsonify({
+            'success': True,
+            'message': f'Disconnected {len(sessions)} sessions for {username} ({coa_success} CoA sent)'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sessions/duplicates')
+@login_required
+def api_sessions_duplicates():
+    try:
+        dupes = execute_query("""
+            SELECT username, COUNT(*) as session_count,
+                   array_agg(acctsessionid ORDER BY acctstarttime DESC) as session_ids,
+                   array_agg(nasipaddress ORDER BY acctstarttime DESC) as nas_ips,
+                   array_agg(framedipaddress ORDER BY acctstarttime DESC) as framed_ips,
+                   array_agg(acctstarttime ORDER BY acctstarttime DESC) as start_times
+            FROM radacct
+            WHERE acctstoptime IS NULL
+            GROUP BY username
+            HAVING COUNT(*) > 1
+            ORDER BY session_count DESC, username
+        """)
+        return jsonify(dupes or [])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sessions/disconnect-expired', methods=['POST'])
+@login_required
+def api_disconnect_expired():
+    """Disconnect semua sesi aktif milik user yang sudah expired (trigger manual)."""
+    try:
+        expired_sessions = execute_query("""
+            SELECT a.acctsessionid, a.nasipaddress, a.username
+            FROM radacct a
+            JOIN radcheck rc ON LOWER(rc.username) = LOWER(a.username)
+                AND rc.attribute = 'Expiration'
+            WHERE a.acctstoptime IS NULL
+              AND TO_TIMESTAMP(rc.value, 'Mon DD YYYY HH24:MI:SS') < NOW()
+        """)
+        if not expired_sessions:
+            return jsonify({'success': True, 'message': 'Tidak ada sesi expired yang aktif', 'count': 0})
+
+        coa_ok = 0
+        for s in expired_sessions:
+            nas_ip = str(s['nasipaddress'])
+            nas_row = execute_query("SELECT secret FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
+            secret = nas_row[0]['secret'] if nas_row else 'testing123'
+            if send_coa_disconnect(nas_ip, s['acctsessionid'], secret):
+                coa_ok += 1
+            execute_query("""
+                UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Session-Timeout'
+                WHERE acctsessionid = %s AND acctstoptime IS NULL
+            """, (s['acctsessionid'],), fetch=False)
+
+        return jsonify({
+            'success': True,
+            'message': f'{len(expired_sessions)} sesi expired di-disconnect ({coa_ok} CoA sent)',
+            'count': len(expired_sessions)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sessions/duplicates/disconnect', methods=['POST'])
+@login_required
+def api_disconnect_duplicates():
+    """Disconnect semua session duplikat, sisakan yang terbaru per username."""
+    try:
+        dupes = execute_query("""
+            WITH ranked AS (
+                SELECT acctsessionid, nasipaddress, username,
+                       ROW_NUMBER() OVER (PARTITION BY username ORDER BY acctstarttime DESC) AS rn
+                FROM radacct WHERE acctstoptime IS NULL
+            )
+            SELECT acctsessionid, nasipaddress, username FROM ranked WHERE rn > 1
+        """)
+        if not dupes:
+            return jsonify({'success': True, 'message': 'Tidak ada session duplikat', 'count': 0})
+
+        coa_success = 0
+        for s in dupes:
+            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+            secret = nas[0]['secret'] if nas else 'radiussecret'
+            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret):
+                coa_success += 1
+            execute_query("""
+                UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
+                WHERE acctsessionid = %s
+            """, (s['acctsessionid'],), fetch=False)
+
+        return jsonify({
+            'success': True,
+            'message': f'{len(dupes)} session duplikat di-disconnect ({coa_success} CoA sent)',
+            'count': len(dupes)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/logs')
+@login_required
+def api_logs():
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))
+        search = request.args.get('search', '')
+        reply_filter = request.args.get('reply', '')
+        offset = (page - 1) * limit
+
+        where_clauses = []
+        params = []
+
+        if search:
+            where_clauses.append("username ILIKE %s")
+            params.append(f'%{search}%')
+        if reply_filter:
+            where_clauses.append("reply = %s")
+            params.append(reply_filter)
+
+        where_sql = ('WHERE ' + ' AND '.join(where_clauses)) if where_clauses else ''
+
+        logs = execute_query(f"""
+            SELECT id, username, reply,
+                   TO_CHAR(authdate AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') as authdate,
+                   calledstationid, callingstationid
+            FROM radpostauth
+            {where_sql}
+            ORDER BY authdate DESC
+            LIMIT %s OFFSET %s
+        """, tuple(params + [limit, offset]))
+
+        total = execute_query(f"SELECT COUNT(*) as total FROM radpostauth {where_sql}", tuple(params))[0]['total']
+
+        return jsonify({
+            'logs': logs,
+            'total': total,
+            'page': page,
+            'total_pages': (total + limit - 1) // limit
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# === DASHBOARD API ROUTES - FIXED ===
+
+@app.route('/api/auth-activity')
+@login_required
+def api_auth_activity():
+    """Get authentication activity for the last 30 minutes - FIXED COUNTING"""
+    try:
+        activity = execute_query("""
+            WITH minutes AS (
+                SELECT generate_series(
+                    DATE_TRUNC('minute', NOW() - INTERVAL '30 minutes'),
+                    DATE_TRUNC('minute', NOW()),
+                    INTERVAL '1 minute'
+                ) AS minute
+            )
+            SELECT 
+                TO_CHAR(m.minute, 'HH24:MI') as time_label,
+                COUNT(p.id) as attempts
+            FROM minutes m
+            LEFT JOIN radpostauth p ON DATE_TRUNC('minute', p.authdate) = m.minute
+            GROUP BY m.minute, time_label
+            ORDER BY m.minute
+        """)
+        
+        labels = [item['time_label'] for item in activity]
+        data = [item['attempts'] for item in activity]
+        
+        return jsonify({'labels': labels, 'data': data})
+    except Exception as e:
+        print(f"Error in auth activity: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'labels': [], 'data': []})
+
+@app.route('/api/sessions-by-nas')
+@login_required
+def api_sessions_by_nas():
+    """Get session distribution by NAS device - FIXED with HOST() function"""
+    try:
+        # Gunakan fungsi HOST() untuk menghilangkan /32 dari alamat IP INET
+        # sehingga bisa dibandingkan dengan nasname yang bertipe TEXT
+        sessions = execute_query("""
+            SELECT COALESCE(n.shortname, n.nasname, 'Unknown') as nasname,
+                   COUNT(r.acctsessionid) as session_count
+            FROM radacct r
+            LEFT JOIN nas n ON HOST(r.nasipaddress) = n.nasname
+            WHERE r.acctstoptime IS NULL
+            GROUP BY COALESCE(n.shortname, n.nasname, 'Unknown')
+            ORDER BY session_count DESC
+        """)
+        
+        labels = []
+        data = []
+        for item in sessions:
+            labels.append(item['nasname'])
+            data.append(item['session_count'])
+        
+        return jsonify({'labels': labels, 'data': data})
+    except Exception as e:
+        print(f"Error in sessions by NAS: {str(e)}")
+        # Jika terjadi error, tetap kembalikan struktur yang benar agar frontend tidak error
+        return jsonify({'labels': ['Error'], 'data': [0]})
+
+@app.route('/api/recent-activity')
+@login_required
+def api_recent_activity():
+    """Get recent authentication activity - FIXED TIMEZONE ISSUE"""
+    try:
+        activity = execute_query("""
+            SELECT username, reply, authdate, 
+                   calledstationid, callingstationid
+            FROM radpostauth
+            WHERE authdate >= NOW() - INTERVAL '30 minutes'
+            ORDER BY authdate DESC
+            LIMIT 10
+        """)
+        
+        formatted_activity = []
+        # Get current time with timezone awareness
+        now = datetime.now(timezone.utc)
+        
+        for item in activity:
+            is_success = item['reply'] == 'Access-Accept'
+            icon = 'check-circle' if is_success else 'x-circle'
+            color = 'green' if is_success else 'red'
+            text = f"User {item['username']} {'login successful' if is_success else 'login failed'}"
+            
+            # Make authdate timezone-aware if it isn't already
+            authdate = item['authdate']
+            if authdate.tzinfo is None:
+                authdate = authdate.replace(tzinfo=timezone.utc)
+            
+            # Calculate time difference
+            time_diff = now - authdate
+            
+            if time_diff.total_seconds() < 60:
+                time_text = 'Just now'
+            else:
+                minutes = int(time_diff.total_seconds() / 60)
+                time_text = f"{minutes} min ago"
+            
+            formatted_activity.append({
+                'type': color,
+                'icon': icon,
+                'text': text,
+                'time': time_text,
+                'color': color,
+                'username': item['username'],
+                'reply': item['reply'],
+                'calledstationid': item.get('calledstationid', ''),
+                'callingstationid': item.get('callingstationid', '')
+            })
+        
+        return jsonify(formatted_activity)
+    except Exception as e:
+        print(f"Error in recent activity: {str(e)}")
+        return jsonify([])
+
+@app.route('/api/system-metrics')
+@login_required
+def api_system_metrics():
+    """Get system performance metrics"""
+    try:
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        
+        try:
+            db_connections = execute_query("""
+                SELECT count(*) as connections 
+                FROM pg_stat_activity 
+                WHERE state = 'active'
+            """)[0]['connections']
+        except:
+            db_connections = 0
+        
+        try:
+            disk_usage = psutil.disk_usage(BACKUP_FOLDER)
+            disk_percent = (disk_usage.used / disk_usage.total) * 100
+        except:
+            disk_usage = type('obj', (object,), {'used': 0, 'total': 1})()
+            disk_percent = 0
+        
+        return jsonify({
+            'cpu_percent': round(cpu_percent, 1),
+            'memory_percent': round(memory.percent, 1),
+            'memory_used': f"{round(memory.used / (1024**3), 1)}GB",
+            'memory_total': f"{round(memory.total / (1024**3), 1)}GB",
+            'db_connections': db_connections,
+            'db_max_connections': 100,
+            'disk_percent': round(disk_percent, 1),
+            'disk_used': f"{round(disk_usage.used / (1024**3), 1)}GB",
+            'disk_total': f"{round(disk_usage.total / (1024**3), 1)}GB"
+        })
+    except Exception as e:
+        print(f"Error in system metrics: {str(e)}")
+        return jsonify({
+            'cpu_percent': 0, 'memory_percent': 0,
+            'memory_used': '0GB', 'memory_total': '0GB',
+            'db_connections': 0, 'db_max_connections': 100,
+            'disk_percent': 0, 'disk_used': '0GB', 'disk_total': '0GB'
+        })
+
+# === BACKUP API ROUTES (shortened for space) ===
+# ... (include all backup routes from original code)
+
+@app.route('/api/users/<username>/device')
+@login_required
+def api_user_device(username):
+    """Query GenieACS NBI untuk info device berdasarkan pppoeUsername"""
+    try:
+        GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+        query = f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}'
+        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber'
+        resp = requests.get(
+            f'{GENIEACS_NBI}/devices',
+            params={'query': query, 'projection': projection},
+            timeout=5
+        )
+        devices = resp.json()
+        if not devices:
+            return jsonify({'found': False, 'message': 'Device not found in GenieACS'})
+
+        d = devices[0]
+        vp = d.get('VirtualParameters', {})
+        di = d.get('DeviceInfo', {})
+        dev_id = d.get('_deviceId', {})
+
+        def val(obj):
+            return obj.get('_value', 'N/A') if isinstance(obj, dict) else 'N/A'
+
+        rx = val(vp.get('RXPower', {}))
+        try:
+            rx_float = float(rx)
+            if rx_float >= -15:
+                rx_status = 'good'
+            elif rx_float >= -25:
+                rx_status = 'warning'
+            else:
+                rx_status = 'bad'
+        except (ValueError, TypeError):
+            rx_status = 'unknown'
+
+        return jsonify({
+            'found': True,
+            'serial': val(vp.get('getSerialNumber', {})) or dev_id.get('_SerialNumber', 'N/A'),
+            'manufacturer': dev_id.get('_Manufacturer', 'N/A'),
+            'model': dev_id.get('_ProductClass', 'N/A'),
+            'firmware': val(di.get('SoftwareVersion', {})),
+            'rx_power': rx,
+            'rx_status': rx_status,
+            'pppoe_ip': val(vp.get('pppoeIP', {})),
+            'device_uptime': val(vp.get('getdeviceuptime', {})),
+            'ppp_uptime': val(vp.get('getpppuptime', {})),
+            'temperature': val(vp.get('gettemp', {})),
+            'pon_mode': val(vp.get('getponmode', {})),
+            'last_inform': d.get('_lastInform', 'N/A'),
+        })
+    except requests.exceptions.ConnectionError:
+        return jsonify({'found': False, 'message': 'GenieACS tidak dapat dihubungi'}), 503
+    except Exception as e:
+        return jsonify({'found': False, 'message': str(e)}), 500
+
+
+@app.route('/health')
+def health():
+    return 'OK'
+
+# === TAMBAHKAN KODE INI KE app.py ANDA ===
+
+# Tambahkan import ini di bagian atas file, bersama import lainnya
+import io
+
+# === BACKUP API ROUTES (LENGKAP) ===
+
+@app.route('/api/backup/list')
+@login_required
+def api_list_backups():
+    """List all available backup files"""
+    try:
+        # Fungsi ini sudah ada di file Anda, pastikan sudah didefinisikan
+        ensure_backup_folder() 
+        
+        backups = []
+        
+        if os.path.exists(BACKUP_FOLDER):
+            for filename in os.listdir(BACKUP_FOLDER):
+                if allowed_backup_file(filename):
+                    file_path = os.path.join(BACKUP_FOLDER, filename)
+                    if os.path.isfile(file_path):
+                        # Dapatkan informasi file
+                        stats = os.stat(file_path)
+                        size_bytes = stats.st_size
+                        created_at = datetime.fromtimestamp(stats.st_ctime).strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        backups.append({
+                            'filename': filename,
+                            'created_at': created_at,
+                            'size': size_bytes,
+                            'size_human': format_file_size(size_bytes)
+                        })
+        
+        # Urutkan dari yang terbaru
+        backups.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        return jsonify({'success': True, 'backups': backups})
+    except Exception as e:
+        print(f"Error listing backups: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/backup/create', methods=['POST'])
+@login_required
+def api_create_backup():
+    """Create a new database backup"""
+    try:
+        ensure_backup_folder()
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"radius_backup_{timestamp}.sql"
+        filepath = os.path.join(BACKUP_FOLDER, filename)
+        
+        # Get database connection info from config
+        db_host = app.config['DB_HOST']
+        db_name = app.config['DB_NAME']
+        db_user = app.config['DB_USER']
+        db_password = app.config['DB_PASSWORD']
+        db_port = app.config['DB_PORT']
+        
+        # Create pg_dump command - hanya tabel user dan NAS, exclude session/log
+        cmd = [
+            'pg_dump',
+            f'--host={db_host}',
+            f'--port={db_port}',
+            f'--username={db_user}',
+            f'--dbname={db_name}',
+            '--no-password',
+            '--clean',
+            '--if-exists',
+            '--format=plain',
+            '--table=radcheck',
+            '--table=radreply',
+            '--table=nas',
+            '--file=' + filepath
+        ]
+        
+        # Set PGPASSWORD environment variable for pg_dump
+        env = os.environ.copy()
+        env['PGPASSWORD'] = db_password
+        
+        # Execute pg_dump command
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True, 
+                'message': 'Backup created successfully',
+                'filename': filename
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'error': f"pg_dump failed: {result.stderr}"
+            }), 500
+            
+    except Exception as e:
+        print(f"Error creating backup: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/backup/download/<filename>')
+@login_required
+def api_download_backup(filename):
+    """Download a specific backup file"""
+    try:
+        # Validate filename
+        if not allowed_backup_file(filename) or secure_filename(filename) != filename:
+            return jsonify({'success': False, 'error': 'Invalid file name or path'}), 400
+        
+        filepath = os.path.join(BACKUP_FOLDER, filename)
+        
+        if not os.path.exists(filepath) or not os.path.isfile(filepath):
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        return send_file(
+            filepath, 
+            as_attachment=True, 
+            download_name=filename
+        )
+    except Exception as e:
+        print(f"Error downloading backup: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/backup/delete/<filename>', methods=['DELETE'])
+@login_required
+def api_delete_backup(filename):
+    """Delete a specific backup file"""
+    try:
+        # Validate filename
+        if not allowed_backup_file(filename) or secure_filename(filename) != filename:
+            return jsonify({'success': False, 'error': 'Invalid file name or path'}), 400
+        
+        filepath = os.path.join(BACKUP_FOLDER, filename)
+        
+        if not os.path.exists(filepath) or not os.path.isfile(filepath):
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        os.remove(filepath)
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Backup deleted successfully'
+        })
+    except Exception as e:
+        print(f"Error deleting backup: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/backup/upload', methods=['POST'])
+@login_required
+def api_upload_backup():
+    """Upload a backup file"""
+    try:
+        ensure_backup_folder()
+        
+        if 'backup_file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file part'}), 400
+        
+        file = request.files['backup_file']
+        
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No selected file'}), 400
+        
+        if file and allowed_backup_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(BACKUP_FOLDER, filename)
+            
+            # Save the file
+            file.save(filepath)
+            
+            return jsonify({
+                'success': True, 
+                'message': 'Backup uploaded successfully',
+                'filename': filename
+            })
+        else:
+            return jsonify({'success': False, 'error': 'File type not allowed'}), 400
+            
+    except Exception as e:
+        print(f"Error uploading backup: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/backup/restore', methods=['POST'])
+@login_required
+def api_restore_backup():
+    """Restore database from a backup file"""
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        
+        if not filename:
+            return jsonify({'success': False, 'error': 'Filename is required'}), 400
+        
+        # Validate filename
+        if not allowed_backup_file(filename) or secure_filename(filename) != filename:
+            return jsonify({'success': False, 'error': 'Invalid file name or path'}), 400
+        
+        filepath = os.path.join(BACKUP_FOLDER, filename)
+        
+        if not os.path.exists(filepath) or not os.path.isfile(filepath):
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        # Get database connection info from config
+        db_host = app.config['DB_HOST']
+        db_name = app.config['DB_NAME']
+        db_user = app.config['DB_USER']
+        db_password = app.config['DB_PASSWORD']
+        db_port = app.config['DB_PORT']
+        
+        # psql untuk restore format plain SQL
+        cmd = [
+            'psql',
+            f'--host={db_host}',
+            f'--port={db_port}',
+            f'--username={db_user}',
+            f'--dbname={db_name}',
+            '--no-password',
+            '--file=' + filepath
+        ]
+        
+        # Set PGPASSWORD environment variable for psql
+        env = os.environ.copy()
+        env['PGPASSWORD'] = db_password
+        
+        # Execute psql command
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True, 
+                'message': 'Database restored successfully'
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'error': f"psql failed: {result.stderr}"
+            }), 500
+            
+    except Exception as e:
+        print(f"Error restoring backup: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# === INTEGRATIONS API ===
+@app.route('/integrations')
+@login_required
+def integrations_page():
+    return render_template('integrations.html')
+
+@app.route('/api/integrations')
+@login_required
+def api_integrations():
+    try:
+        rows = execute_query("SELECT id, name, type, host, port, username, description, is_active, created_at FROM integrations ORDER BY id")
+        return jsonify(rows or [])
+    except Exception as e:
+        if 'does not exist' in str(e):
+            return jsonify([])
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/integrations/add', methods=['POST'])
+@login_required
+def api_add_integration():
+    data = request.get_json()
+    try:
+        execute_query("""
+            INSERT INTO integrations (name, type, host, port, username, password, description, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
+              data['username'], data['password'], data.get('description',''), data.get('is_active', True)), fetch=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/integrations/edit/<int:iid>', methods=['PUT'])
+@login_required
+def api_edit_integration(iid):
+    data = request.get_json()
+    try:
+        if data.get('password'):
+            execute_query("""
+                UPDATE integrations SET name=%s, type=%s, host=%s, port=%s, username=%s, password=%s, description=%s, is_active=%s
+                WHERE id=%s
+            """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
+                  data['username'], data['password'], data.get('description',''), data.get('is_active', True), iid), fetch=False)
+        else:
+            execute_query("""
+                UPDATE integrations SET name=%s, type=%s, host=%s, port=%s, username=%s, description=%s, is_active=%s
+                WHERE id=%s
+            """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
+                  data['username'], data.get('description',''), data.get('is_active', True), iid), fetch=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/integrations/delete/<int:iid>', methods=['DELETE'])
+@login_required
+def api_delete_integration(iid):
+    try:
+        execute_query("DELETE FROM integrations WHERE id=%s", (iid,), fetch=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/integrations/test/<int:iid>', methods=['POST'])
+@login_required
+def api_test_integration(iid):
+    try:
+        rows = execute_query("SELECT * FROM integrations WHERE id=%s", (iid,))
+        if not rows:
+            return jsonify({'success': False, 'error': 'Integration not found'}), 404
+        ig = rows[0]
+        if ig['type'] == 'mikrotik':
+            import librouteros
+            api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+            identity = list(api('/system/identity/print'))
+            api.close()
+            return jsonify({'success': True, 'message': f"Connected! Identity: {identity[0].get('name','?')}"})
+        return jsonify({'success': False, 'error': 'Unsupported type'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# === HOTSPOT USERS ===
+
+
+
+
+
+
+
+
+@app.route('/api/mikrotik/active')
+@login_required
+def api_mikrotik_active():
+    """Query /ppp active + /interface/print dari satu integrasi Mikrotik (read-only)"""
+    import librouteros
+    router_id = request.args.get('router_id', type=int)
+    try:
+        if router_id:
+            integrations = execute_query("SELECT * FROM integrations WHERE id=%s AND type='mikrotik' AND is_active=true", (router_id,)) or []
+        else:
+            integrations = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true ORDER BY id LIMIT 1") or []
+    except Exception:
+        integrations = []
+
+    results = []
+    for ig in integrations:
+        try:
+            api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+            active = list(api('/ppp/active/print'))
+            ifaces = list(api('/interface/print'))
+            api.close()
+
+            iface_map = {}
+            for iface in ifaces:
+                if iface.get('type') != 'pppoe-in':
+                    continue
+                iname = iface.get('name', '').strip('<>')
+                uname = iname[6:] if iname.startswith('pppoe-') else iname
+                iface_map[uname] = {
+                    'rx_byte': int(iface.get('rx-byte', 0)),
+                    'tx_byte': int(iface.get('tx-byte', 0)),
+                }
+
+            for s in active:
+                uname = s.get('name', '')
+                idata = iface_map.get(uname, {})
+                results.append({
+                    'router': ig['name'],
+                    'router_host': ig['host'],
+                    'router_id': ig['id'],
+                    'name': uname,
+                    'address': s.get('address', ''),
+                    'uptime': s.get('uptime', ''),
+                    'rx_byte': idata.get('rx_byte', 0),
+                    'tx_byte': idata.get('tx_byte', 0),
+                    'caller_id': s.get('caller-id', ''),
+                    'service': s.get('service', ''),
+                    'session_id': s.get('.id', ''),
+                })
+        except Exception as e:
+            results.append({'router': ig['name'], 'router_host': ig['host'], 'error': str(e)})
+        except Exception as e:
+            results.append({'router': ig['name'], 'router_host': ig['host'], 'error': str(e)})
+
+    return jsonify({'success': True, 'data': results, 'total': len([r for r in results if 'error' not in r])})
+
+@app.route('/api/ipoe/dhcp-leases')
+@login_required
+def api_ipoe_dhcp_leases():
+    """Ambil DHCP lease dari semua MikroTik, gabungkan dengan data RADIUS"""
+    import librouteros
+    integrations = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true ORDER BY id") or []
+    leases = {}
+    errors = []
+    for ig in integrations:
+        try:
+            api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+            raw = list(api('/ip/dhcp-server/lease/print'))
+            api.close()
+            for l in raw:
+                mac = l.get('mac-address', '').lower()
+                if not mac:
+                    continue
+                flags = ''
+                if l.get('radius'): flags += 'R'
+                if l.get('dynamic'): flags += 'D'
+                if l.get('blocked'): flags += 'B'
+                leases[mac] = {
+                    'router': ig['name'],
+                    'router_id': ig['id'],
+                    'address': l.get('active-address') or l.get('address', ''),
+                    'mac_address': mac,
+                    'client_id': l.get('active-client-id') or l.get('client-id', ''),
+                    'host_name': l.get('host-name', ''),
+                    'server': l.get('active-server') or l.get('server', ''),
+                    'status': l.get('status', ''),
+                    'expires_after': l.get('expires-after', ''),
+                    'last_seen': l.get('last-seen', ''),
+                    'rate_limit': l.get('rate-limit', ''),
+                    'flags': flags,
+                }
+        except Exception as e:
+            errors.append({'router': ig['name'], 'error': str(e)})
+
+    # Gabungkan dengan data RADIUS (radreply)
+    if leases:
+        macs = list(leases.keys())
+        placeholders = ','.join(['%s'] * len(macs))
+        radius_data = execute_query(
+            f"SELECT username, attribute, value FROM radreply WHERE username IN ({placeholders}) AND attribute IN ('Framed-IP-Address','Mikrotik-Rate-Limit','Framed-Pool')",
+            tuple(macs)
+        ) or []
+        for row in radius_data:
+            mac = row['username']
+            if mac in leases:
+                if row['attribute'] == 'Framed-IP-Address':
+                    leases[mac]['radius_ip'] = row['value']
+                elif row['attribute'] == 'Mikrotik-Rate-Limit':
+                    leases[mac]['radius_rate'] = row['value']
+                elif row['attribute'] == 'Framed-Pool':
+                    leases[mac]['radius_pool'] = row['value']
+
+    return jsonify({'success': True, 'leases': list(leases.values()), 'errors': errors})
+
+@app.route('/api/ipoe/stats')
+@login_required
+def api_ipoe_stats():
+    try:
+        total = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'ipoe'")[0]['count']
+        online = execute_query("""
+            SELECT COUNT(DISTINCT a.username) as count 
+            FROM radacct a 
+            INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'ipoe'
+            WHERE a.acctstoptime IS NULL
+        """)[0]['count']
+        return jsonify({'total': total, 'online': online})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================
+# IPoE ROUTES (MAC-based RADIUS auth)
+# ============================================================
+
+@app.route('/ipoe-users')
+@login_required
+def ipoe_users_page():
+    return render_template('ipoe-users.html')
+
+@app.route('/api/ipoe/users')
+@login_required
+def api_ipoe_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+
+        base_where = "c.attribute = 'Cleartext-Password' AND EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'ipoe')"
+        params = []
+        if search:
+            base_where += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+
+        data_query = f"""
+            SELECT c.id, c.username, c.username as mac_address, c.value as password,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-Pool' LIMIT 1) as framed_pool,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Description' LIMIT 1) as name,
+                   (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
+            FROM radcheck c WHERE {base_where}
+            ORDER BY c.id DESC LIMIT %s OFFSET %s
+        """
+        count_query = f"SELECT COUNT(*) as total FROM radcheck c WHERE {base_where}"
+
+        users = execute_query(data_query, tuple(params + [limit, offset]))
+        total = execute_query(count_query, tuple(params))[0]['total']
+        return jsonify({'users': users, 'total': total, 'page': page, 'limit': limit,
+                        'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ipoe/users/add', methods=['POST'])
+@login_required
+def api_ipoe_add_user():
+    try:
+        data = get_request_data()
+        username = (data.get('mac_address') or data.get('username', '')).strip().lower()
+        password = data.get('password', username).strip() or username
+        rate_limit = data.get('rate_limit', '').strip()
+        framed_pool = (data.get('ip_pool') or data.get('framed_pool', '')).strip()
+        ip_address = data.get('ip_address', '').strip()
+        name = data.get('name', '').strip()
+
+        if not username:
+            return jsonify({'success': False, 'error': 'Username (MAC) wajib diisi'}), 400
+
+        existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if existing:
+            return jsonify({'success': False, 'error': 'Username sudah ada'}), 400
+
+        execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)",
+                      (username, password), fetch=False)
+        execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, 'ipoe', 1) ON CONFLICT DO NOTHING",
+                      (username,), fetch=False)
+        if rate_limit:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)",
+                          (username, rate_limit), fetch=False)
+        if framed_pool:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-Pool', ':=', %s)",
+                          (username, framed_pool), fetch=False)
+        if ip_address:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)",
+                          (username, ip_address), fetch=False)
+        if name:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Description', ':=', %s)",
+                          (username, name), fetch=False)
+
+        return jsonify({'success': True, 'message': 'IPoE user berhasil ditambahkan'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ipoe/users/update/<username>', methods=['PUT'])
+@login_required
+def api_ipoe_update_user(username):
+    try:
+        data = get_request_data()
+        if data.get('password'):
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'",
+                          (data['password'], username), fetch=False)
+        for attr, key in [('Mikrotik-Rate-Limit', 'rate_limit'), ('Framed-Pool', 'framed_pool'), ('Framed-IP-Address', 'ip_address'), ('Description', 'name')]:
+            if key in data:
+                execute_query("DELETE FROM radreply WHERE username = %s AND attribute = %s", (username, attr), fetch=False)
+                if data[key]:
+                    execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, %s, ':=', %s)",
+                                  (username, attr, data[key]), fetch=False)
+        return jsonify({'success': True, 'message': 'IPoE user berhasil diupdate'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ipoe/users/delete/<username>', methods=['DELETE'])
+@login_required
+def api_ipoe_delete_user(username):
+    try:
+        execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = 'ipoe'", (username,), fetch=False)
+        return jsonify({'success': True, 'message': f'IPoE user {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ipoe/get-name')
+@app.route('/api/ipoe/get-name/<mac>')
+def api_ipoe_get_name(mac=None):
+    """Endpoint publik untuk diakses MikroTik Lease Script.
+    Menerima parameter 'mac' via path atau query dan membalas dengan format: name;rate_limit."""
+    try:
+        if mac is None:
+            mac = request.args.get('mac', '').strip().lower()
+        else:
+            mac = mac.strip().lower()
+
+        if not mac:
+            return "Name-Not-Found; ", 400
+        
+        # Bersihkan MAC address dari separator (hanya sisakan alfanumerik)
+        clean_mac = "".join(c for c in mac if c.isalnum())
+        
+        # Query ke database mencari nama (Description) dan rate limit (Mikrotik-Rate-Limit)
+        rows = execute_query("""
+            SELECT attribute, value FROM radreply 
+            WHERE regexp_replace(LOWER(username), '[^a-z0-9]', '', 'g') = %s 
+            AND attribute IN ('Description', 'Mikrotik-Rate-Limit')
+        """, (clean_mac,))
+        
+        name = ""
+        rate_limit = ""
+        for r in rows:
+            if r['attribute'] == 'Description':
+                name = r['value'].strip()
+            elif r['attribute'] == 'Mikrotik-Rate-Limit':
+                rate_limit = r['value'].strip()
+                
+        # Format name
+        if name:
+            name = name.replace(" ", "-")
+            safe_name = "".join(c for c in name if c.isalnum() or c == '-')
+        else:
+            safe_name = f"IPoE-{clean_mac}"
+            
+        return f"{safe_name};{rate_limit}"
+    except Exception as e:
+        return f"Error-{str(e)}; ", 500
+
+# ============================================================
+# VPN ROUTES
+# ============================================================
+
+@app.route('/vpn-users')
+@login_required
+def vpn_users_page():
+    return render_template('vpn-users.html')
+
+@app.route('/api/vpn/users')
+@login_required
+def api_vpn_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+
+        base_where = "c.attribute = 'Cleartext-Password' AND EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'vpn')"
+        params = []
+        if search:
+            base_where += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+
+        data_query = f"""
+            SELECT c.id, c.username, c.value as password,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-Pool' LIMIT 1) as framed_pool,
+                   (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
+            FROM radcheck c WHERE {base_where}
+            ORDER BY c.id DESC LIMIT %s OFFSET %s
+        """
+        count_query = f"SELECT COUNT(*) as total FROM radcheck c WHERE {base_where}"
+
+        users = execute_query(data_query, tuple(params + [limit, offset]))
+        total = execute_query(count_query, tuple(params))[0]['total']
+        return jsonify({'users': users, 'total': total, 'page': page, 'limit': limit,
+                        'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/vpn/users/add', methods=['POST'])
+@login_required
+def api_vpn_add_user():
+    try:
+        data = get_request_data()
+        username = data.get('username', '').strip().lower()
+        password = data.get('password', '').strip()
+        rate_limit = data.get('rate_limit', '').strip()
+        framed_pool = data.get('framed_pool', '').strip()
+        ip_address = data.get('ip_address', '').strip()
+
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Username dan Password wajib diisi'}), 400
+
+        existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if existing:
+            return jsonify({'success': False, 'error': 'Username sudah ada'}), 400
+
+        execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)",
+                      (username, password), fetch=False)
+        execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, 'vpn', 1) ON CONFLICT DO NOTHING",
+                      (username,), fetch=False)
+        if rate_limit:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)",
+                          (username, rate_limit), fetch=False)
+        if framed_pool:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-Pool', ':=', %s)",
+                          (username, framed_pool), fetch=False)
+        if ip_address:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)",
+                          (username, ip_address), fetch=False)
+
+        return jsonify({'success': True, 'message': 'VPN user berhasil ditambahkan'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/vpn/users/update/<username>', methods=['PUT'])
+@login_required
+def api_vpn_update_user(username):
+    try:
+        data = get_request_data()
+        if data.get('password'):
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'",
+                          (data['password'], username), fetch=False)
+        for attr, key in [('Mikrotik-Rate-Limit', 'rate_limit'), ('Framed-Pool', 'framed_pool'), ('Framed-IP-Address', 'ip_address')]:
+            if key in data:
+                execute_query("DELETE FROM radreply WHERE username = %s AND attribute = %s", (username, attr), fetch=False)
+                if data[key]:
+                    execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, %s, ':=', %s)",
+                                  (username, attr, data[key]), fetch=False)
+        return jsonify({'success': True, 'message': 'VPN user berhasil diupdate'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/vpn/users/delete/<username>', methods=['DELETE'])
+@login_required
+def api_vpn_delete_user(username):
+    try:
+        execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = 'vpn'", (username,), fetch=False)
+        return jsonify({'success': True, 'message': f'VPN user {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================
+# 802.1X ROUTES
+# ============================================================
+
+@app.route('/8021x-users')
+@login_required
+def x8021x_users_page():
+    return render_template('8021x-users.html')
+
+@app.route('/api/8021x/users')
+@login_required
+def api_x8021x_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+
+        base_where = "c.attribute = 'Cleartext-Password' AND EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = '8021x')"
+        params = []
+        if search:
+            base_where += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+
+        data_query = f"""
+            SELECT c.id, c.username, c.value as password,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
+                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-Pool' LIMIT 1) as framed_pool,
+                   (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
+            FROM radcheck c WHERE {base_where}
+            ORDER BY c.id DESC LIMIT %s OFFSET %s
+        """
+        count_query = f"SELECT COUNT(*) as total FROM radcheck c WHERE {base_where}"
+
+        users = execute_query(data_query, tuple(params + [limit, offset]))
+        total = execute_query(count_query, tuple(params))[0]['total']
+        return jsonify({'users': users, 'total': total, 'page': page, 'limit': limit,
+                        'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/8021x/users/add', methods=['POST'])
+@login_required
+def api_x8021x_add_user():
+    try:
+        data = get_request_data()
+        username = data.get('username', '').strip().lower()
+        password = data.get('password', '').strip()
+        rate_limit = data.get('rate_limit', '').strip()
+        framed_pool = data.get('framed_pool', '').strip()
+        ip_address = data.get('ip_address', '').strip()
+
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Username dan Password wajib diisi'}), 400
+
+        existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if existing:
+            return jsonify({'success': False, 'error': 'Username sudah ada'}), 400
+
+        execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)",
+                      (username, password), fetch=False)
+        execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, '8021x', 1) ON CONFLICT DO NOTHING",
+                      (username,), fetch=False)
+        if rate_limit:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)",
+                          (username, rate_limit), fetch=False)
+        if framed_pool:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-Pool', ':=', %s)",
+                          (username, framed_pool), fetch=False)
+        if ip_address:
+            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)",
+                          (username, ip_address), fetch=False)
+
+        return jsonify({'success': True, 'message': '802.1X user berhasil ditambahkan'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/8021x/users/update/<username>', methods=['PUT'])
+@login_required
+def api_x8021x_update_user(username):
+    try:
+        data = get_request_data()
+        if data.get('password'):
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'",
+                          (data['password'], username), fetch=False)
+        for attr, key in [('Mikrotik-Rate-Limit', 'rate_limit'), ('Framed-Pool', 'framed_pool'), ('Framed-IP-Address', 'ip_address')]:
+            if key in data:
+                execute_query("DELETE FROM radreply WHERE username = %s AND attribute = %s", (username, attr), fetch=False)
+                if data[key]:
+                    execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, %s, ':=', %s)",
+                                  (username, attr, data[key]), fetch=False)
+        return jsonify({'success': True, 'message': '802.1X user berhasil diupdate'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/8021x/users/delete/<username>', methods=['DELETE'])
+@login_required
+def api_x8021x_delete_user(username):
+    try:
+        execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = '8021x'", (username,), fetch=False)
+        return jsonify({'success': True, 'message': f'802.1X user {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# === AKHIRI KODE TAMBAHAN ===
+
+# === SOCKET IO EVENTS ===
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+    emit('status', {'data': 'Connected'})
+
+def background_metrics():
+    """Emit system metrics every 5 seconds via socketio background task"""
+    while True:
+        try:
+            metrics = api_system_metrics_data()
+            socketio.emit('system_metrics', metrics)
+        except Exception as e:
+            print(f"Error in background metrics: {e}")
+        socketio.sleep(5)
+
+def api_system_metrics_data():
+    """Helper to get system metrics without request context"""
+    cpu_percent = psutil.cpu_percent()
+    memory = psutil.virtual_memory()
+    return {
+        'cpu_percent': round(cpu_percent, 1),
+        'memory_percent': round(memory.percent, 1),
+        'db_connections': 0,
+        'db_max_connections': 100,
+        'disk_percent': 0
+    }
+
+# Start background task using socketio (safe with eventlet)
+socketio.start_background_task(background_metrics)
+
+def background_stale_sessions():
+    """Mark stale sessions setelah 24 jam tidak ada interim-update.
+    Interval panjang agar tidak mengganggu penghitungan sqlcounter untuk voucher aktif."""
+    socketio.sleep(60)
+    while True:
+        try:
+            execute_query("""
+                UPDATE radacct
+                SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
+                WHERE acctstoptime IS NULL
+                AND acctupdatetime < NOW() - INTERVAL '24 hours'
+            """, fetch=False)
+        except Exception as e:
+            print(f"[stale-session-cleaner] Error: {e}")
+        socketio.sleep(300)
+
+socketio.start_background_task(background_stale_sessions)
+
+
+def background_expired_disconnect():
+    """Setiap 60 detik: disconnect sesi aktif milik user yang Expiration-nya sudah lewat, lalu hapus akun."""
+    socketio.sleep(30)
+    while True:
+        try:
+            expired_sessions = execute_query("""
+                SELECT a.acctsessionid, a.nasipaddress, a.username, a.framedipaddress
+                FROM radacct a
+                JOIN radcheck rc ON LOWER(rc.username) = LOWER(a.username) AND rc.attribute = 'Expiration'
+                WHERE a.acctstoptime IS NULL
+                  AND to_timestamp(rc.value, 'Mon DD YYYY HH24:MI:SS') < NOW()
+            """)
+            for s in (expired_sessions or []):
+                nas_ip = str(s['nasipaddress'])
+                nas_row = execute_query("SELECT secret FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
+                secret = nas_row[0]['secret'] if nas_row else 'testing123'
+                ok = send_coa_disconnect(nas_ip, s['acctsessionid'], secret, framed_ip=s.get('framedipaddress'))
+                execute_query("UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Session-Timeout' WHERE acctsessionid = %s AND acctstoptime IS NULL",
+                              (s['acctsessionid'],), fetch=False)
+                print(f"[expired-disconnect] {s['username']} @ {nas_ip} | CoA={'OK' if ok else 'FAIL'}")
+
+            execute_query("""
+                DELETE FROM radcheck WHERE username IN (
+                    SELECT rc.username FROM radcheck rc
+                    WHERE rc.attribute = 'Expiration'
+                      AND to_timestamp(rc.value, 'Mon DD YYYY HH24:MI:SS') < NOW()
+                      AND NOT EXISTS (SELECT 1 FROM radacct a WHERE a.username = rc.username AND a.acctstoptime IS NULL)
+                )
+            """, fetch=False)
+            execute_query("""
+                DELETE FROM radreply WHERE username NOT IN (
+                    SELECT username FROM radcheck WHERE attribute = 'Cleartext-Password'
+                )
+            """, fetch=False)
+            execute_query("""
+                DELETE FROM radusergroup WHERE username NOT IN (
+                    SELECT username FROM radcheck WHERE attribute = 'Cleartext-Password'
+                )
+            """, fetch=False)
+        except Exception as e:
+            print(f"[expired-disconnect] Error: {e}")
+        socketio.sleep(60)
+
+socketio.start_background_task(background_expired_disconnect)
+
+
+_nas_last_status = {}
+
+def background_nas_monitor():
+    """Memantau status ping ke setiap IP NAS setiap 1 menit dan mengirim notifikasi Telegram jika berubah."""
+    print("[nas-monitor] Thread initialized, sleeping 15s for stability...")
+    socketio.sleep(15) # Tunggu 15 detik saat startup agar koneksi stabil
+    print("[nas-monitor] Thread starting active monitoring...")
+    while True:
+        try:
+            nas_list = execute_query("SELECT nasname, shortname FROM nas")
+            for nas in (nas_list or []):
+                nas_ip = nas['nasname']
+                nas_name = nas['shortname'] or nas_ip
+                
+                # Gunakan fungsi ping_nas yang lebih tangguh (ping + port check)
+                is_online = (ping_nas(nas_ip) == "online")
+                
+                prev_status = _nas_last_status.get(nas_ip)
+                if prev_status is not None:
+                    # Jika status berubah dari ONLINE ke OFFLINE
+                    if prev_status and not is_online:
+                        time_str = datetime.now().strftime('%H:%M')
+                        
+                        # Hitung estimasi pelanggan PPPoE/IPoE yang terputus dari radacct aktif
+                        affected_res = execute_query("""
+                            SELECT COUNT(DISTINCT username) as count FROM radacct 
+                            WHERE nasipaddress = %s AND acctstoptime IS NULL
+                        """, (nas_ip,))
+                        affected_count = affected_res[0]['count'] if affected_res else 0
+                        
+                        msg = (
+                            f"⚠️ <b>[ALERT]</b> NAS \"<b>{nas_name}</b>\" (<code>{nas_ip}</code>) terdeteksi <b>OFFLINE</b> pada <b>{time_str} WIB</b>.\n\n"
+                            f"🚨 <b>Estimasi Dampak:</b> Sekitar <b>{affected_count} pelanggan</b> terputus koneksinya.\n"
+                            f"Mohon segera periksa perangkat atau koneksi uplink!"
+                        )
+                        reply_markup = {
+                            "inline_keyboard": [
+                                [
+                                    {"text": "⚡ Cek Ping Ulang", "callback_data": f"ping_nas:{nas_ip}"},
+                                    {"text": "🖥️ Buka Web Dashboard", "url": "https://radius.access.daragroup.cloud/nas"}
+                                ]
+                            ]
+                        }
+                        send_telegram_notification(msg, reply_markup=reply_markup)
+                        _nas_last_status[nas_ip] = False
+                    # Jika status berubah dari OFFLINE ke ONLINE
+                    elif not prev_status and is_online:
+                        msg = f"✅ <b>[RESOLVED]</b> NAS \"<b>{nas_name}</b>\" (<code>{nas_ip}</code>) kembali <b>ONLINE</b>."
+                        send_telegram_notification(msg)
+                        _nas_last_status[nas_ip] = True
+                else:
+                    # Inisialisasi awal
+                    _nas_last_status[nas_ip] = is_online
+        except Exception as e:
+            print(f"[nas-monitor] Error: {e}")
+            
+        socketio.sleep(60)
+
+def background_telegram_bot():
+    """Mendengar pesan Telegram masuk (bot polling) untuk melayani perintah teknisi secara interaktif."""
+    print("[telegram-bot] Thread initialized, sleeping 20s for stability...")
+    socketio.sleep(20) # Tunggu agar startup stabil
+    print("[telegram-bot] Thread starting active polling...")
+    offset = 0
+    
+    while True:
+        try:
+            # Muat token Telegram
+            token = app.config.get('TELEGRAM_BOT_TOKEN')
+            if not token:
+                env_path = '/app/.telegram.env'
+                if os.path.exists(env_path):
+                    with open(env_path) as f:
+                        for line in f:
+                            if line.startswith('TELEGRAM_BOT_TOKEN='):
+                                token = line.split('=', 1)[1].strip()
+                                app.config['TELEGRAM_BOT_TOKEN'] = token
+                                break
+            
+            if not token:
+                print("[telegram-bot] Warning: TELEGRAM_BOT_TOKEN not found!")
+                socketio.sleep(10)
+                continue
+                
+            # Long polling updates dari Telegram API
+            url = f"https://api.telegram.org/bot{token}/getUpdates"
+            params = {'offset': offset, 'timeout': 15}
+            print(f"[telegram-bot] Polling updates with offset={offset}...")
+            resp = requests.get(url, params=params, timeout=20)
+            if resp.status_code != 200:
+                socketio.sleep(5)
+                continue
+                
+            updates = resp.json().get('result', [])
+            for update in updates:
+                offset = update['update_id'] + 1
+                
+                # Memproses Interaksi Tombol Callback Query
+                if 'callback_query' in update:
+                    cb = update['callback_query']
+                    cb_id = cb.get('id')
+                    cb_data = cb.get('data', '')
+                    cb_chat_id = cb.get('message', {}).get('chat', {}).get('id')
+                    
+                    try:
+                        requests.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery", data={
+                            'callback_query_id': cb_id
+                        }, timeout=3)
+                    except:
+                        pass
+                        
+                    if cb_data and cb_chat_id:
+                        if cb_data.startswith('ping_nas:'):
+                            nas_ip = cb_data.split(':', 1)[1]
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': cb_chat_id,
+                                'text': f"⚡ Sedang menguji ping ulang ke IP <code>{nas_ip}</code>...",
+                                'parse_mode': 'HTML'
+                            }, timeout=5)
+                            
+                            status = ping_nas(nas_ip)
+                            status_emoji = "🟢 ONLINE" if status == "online" else "🔴 OFFLINE"
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': cb_chat_id,
+                                'text': f"⚡ <b>Hasil Ping Ulang:</b>\nIP: <code>{nas_ip}</code>\nStatus: <b>{status_emoji}</b>",
+                                'parse_mode': 'HTML'
+                            }, timeout=5)
+                            
+                        elif cb_data.startswith('kick_session:'):
+                            username = cb_data.split(':', 1)[1]
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': cb_chat_id,
+                                'text': f"⚡ Sedang memproses pemutusan sesi (CoA/Disconnect-Request) untuk pelanggan <code>{username}</code>...",
+                                'parse_mode': 'HTML'
+                            }, timeout=5)
+                            
+                            try:
+                                sessions = execute_query("""
+                                    SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct 
+                                    WHERE username = %s AND acctstoptime IS NULL
+                                """, (username,))
+                                
+                                if not sessions:
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': cb_chat_id,
+                                        'text': f"⚠️ <b>Tidak ada sesi aktif:</b> Pelanggan <code>{username}</code> saat ini sedang offline di RADIUS.",
+                                        'parse_mode': 'HTML'
+                                    }, timeout=5)
+                                else:
+                                    coa_success = 0
+                                    for s in sessions:
+                                        nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
+                                        secret = nas[0]['secret'] if nas else 'radiussecret'
+                                        if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret, framed_ip=s.get('framedipaddress')):
+                                            coa_success += 1
+                                        execute_query("""
+                                            UPDATE radacct 
+                                            SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
+                                            WHERE acctsessionid = %s
+                                        """, (s['acctsessionid'],), fetch=False)
+                                    
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': cb_chat_id,
+                                        'text': f"✅ <b>Sesi Pelanggan Berhasil Diputus!</b>\n• Username: <code>{username}</code>\n• Jumlah Sesi Diputus: <b>{len(sessions)}</b> (MikroTik CoA: {coa_success} terkirim).\n\nPelanggan akan secara otomatis melakukan dial-up ulang dalam beberapa detik.",
+                                        'parse_mode': 'HTML'
+                                    }, timeout=5)
+                            except Exception as ex:
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': cb_chat_id,
+                                    'text': f"❌ <b>Gagal Kick Sesi:</b> {ex}",
+                                    'parse_mode': 'HTML'
+                                }, timeout=5)
+                                
+                        elif cb_data.startswith('reboot_ont:'):
+                            username = cb_data.split(':', 1)[1]
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': cb_chat_id,
+                                'text': f"🔄 Sedang me-reboot ONT untuk user <code>{username}</code> via CWMP (GenieACS)...",
+                                'parse_mode': 'HTML'
+                            }, timeout=5)
+                            
+                            try:
+                                GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+                                query_str = f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}'
+                                resp_acs = requests.get(
+                                    f'{GENIEACS_NBI}/devices',
+                                    params={'query': query_str, 'projection': '_id'},
+                                    timeout=3
+                                )
+                                devices = resp_acs.json()
+                                if not devices:
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': cb_chat_id,
+                                        'text': f"❌ <b>Gagal:</b> ONT untuk user <code>{username}</code> tidak ditemukan di GenieACS.",
+                                        'parse_mode': 'HTML'
+                                    }, timeout=5)
+                                else:
+                                    d = devices[0]
+                                    device_id = d.get('_id')
+                                    if not device_id:
+                                        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                            'chat_id': cb_chat_id,
+                                            'text': f"❌ <b>Gagal:</b> ID Perangkat tidak valid di GenieACS.",
+                                            'parse_mode': 'HTML'
+                                        }, timeout=5)
+                                    else:
+                                        import urllib.parse
+                                        reboot_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
+                                        try:
+                                            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, timeout=15)
+                                            if resp_reboot.status_code in (200, 201, 202):
+                                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                                    'chat_id': cb_chat_id,
+                                                    'text': f"🚀 <b>Perintah Reboot Terkirim!</b>\nONT untuk user <code>{username}</code> berhasil di-reboot via CWMP.",
+                                                    'parse_mode': 'HTML'
+                                                }, timeout=5)
+                                            else:
+                                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                                    'chat_id': cb_chat_id,
+                                                    'text': f"❌ <b>Gagal:</b> Respon GenieACS API: {resp_reboot.status_code}",
+                                                    'parse_mode': 'HTML'
+                                                }, timeout=5)
+                                        except requests.exceptions.Timeout:
+                                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                                'chat_id': cb_chat_id,
+                                                'text': f"⏳ <b>Koneksi Lambat:</b> Hubungan langsung ke ONT <code>{username}</code> melampaui batas waktu, namun <b>perintah reboot telah masuk antrean</b> di GenieACS dan akan dijalankan otomatis saat ONT terhubung.",
+                                                'parse_mode': 'HTML'
+                                            }, timeout=5)
+                            except Exception as ex:
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': cb_chat_id,
+                                    'text': f"❌ <b>Error:</b> {ex}",
+                                    'parse_mode': 'HTML'
+                                }, timeout=5)
+                    continue
+                    
+                message = update.get('message', {})
+                text = message.get('text', '').strip()
+                chat_id = message.get('chat', {}).get('id')
+                
+                if not text or not chat_id:
+                    continue
+                    
+                # Hanya layani perintah yang dimulai dengan /
+                if not text.startswith('/'):
+                    continue
+                    
+                parts = text.split(None, 1)
+                cmd = parts[0].lower()
+                arg = parts[1].strip() if len(parts) > 1 else ""
+                
+                # Perintah /start atau /help
+                if cmd in ('/start', '/help'):
+                    help_msg = (
+                        "🤖 <b>RADIUS & ACS Telegram Bot</b>\n"
+                        "Layanan interaktif untuk Teknisi / Admin:\n\n"
+                        "➡️ <b>/cek [username]</b> : Cek status online, IP, MAC, dan Redaman ONT.\n"
+                        "➡️ <b>/reboot_ont [username]</b> : Reboot ONT pelanggan secara remote via CWMP.\n"
+                        "➡️ <b>/nas</b> : Cek status kesehatan seluruh router NAS MikroTik."
+                    )
+                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                        'chat_id': chat_id,
+                        'text': help_msg,
+                        'parse_mode': 'HTML'
+                    })
+                    continue
+                
+                # Perintah /nas
+                if cmd == '/nas':
+                    try:
+                        nas_list = execute_query("SELECT nasname, shortname FROM nas ORDER BY id")
+                        if not nas_list:
+                            nas_msg = "🖥️ Tidak ada router NAS yang terdaftar."
+                        else:
+                            nas_msg = "🖥️ <b>Status Kesehatan NAS Router:</b>\n\n"
+                            for nas in nas_list:
+                                ip = nas['nasname']
+                                name = nas['shortname'] or ip
+                                is_online = (ping_nas(ip) == "online")
+                                status_emoji = "🟢 ONLINE" if is_online else "🔴 OFFLINE"
+                                nas_msg += f"• <b>{name}</b> ({ip}) : {status_emoji}\n"
+                        
+                        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                            'chat_id': chat_id,
+                            'text': nas_msg,
+                            'parse_mode': 'HTML'
+                        })
+                    except Exception as e:
+                        print(f"Error /nas Telegram command: {e}")
+                    continue
+                
+                # Perintah /cek [username]
+                if cmd == '/cek':
+                    if not arg:
+                        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                            'chat_id': chat_id,
+                            'text': "⚠️ Format salah. Contoh: <code>/cek customer_pppoe</code>",
+                            'parse_mode': 'HTML'
+                        })
+                        continue
+                        
+                    username = arg.strip()
+                    
+                    # 1. Query PostgreSQL untuk status sesi RADIUS
+                    session_res = execute_query("""
+                        SELECT * FROM radacct 
+                        WHERE username = %s 
+                        ORDER BY acctstarttime DESC LIMIT 1
+                    """, (username,))
+                    
+                    is_online = False
+                    nas_ip = "N/A"
+                    nas_name = "N/A"
+                    framed_ip = "N/A"
+                    mac_address = "N/A"
+                    uptime_str = "N/A"
+                    session_days = 0
+                    
+                    if session_res:
+                        s = session_res[0]
+                        if s.get('acctstoptime') is None:
+                            is_online = True
+                            start_time = s.get('acctstarttime')
+                            if start_time:
+                                now = datetime.now(start_time.tzinfo) if start_time.tzinfo else datetime.now()
+                                diff = now - start_time
+                                hours, remainder = divmod(diff.seconds, 3600)
+                                minutes, seconds = divmod(remainder, 60)
+                                uptime_str = f"{diff.days}d {hours}h {minutes}m"
+                                session_days = diff.days
+                        
+                        nas_ip = s.get('nasipaddress', 'N/A')
+                        framed_ip = s.get('framedipaddress', 'N/A')
+                        mac_address = s.get('callingstationid', 'N/A')
+                        
+                        # Dapatkan nama NAS
+                        nas_info = execute_query("SELECT shortname FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
+                        if nas_info:
+                            nas_name = nas_info[0]['shortname'] or nas_ip
+                    
+                    # 2. Query GenieACS NBI untuk detail redaman ONT
+                    acs_found = False
+                    acs_data = {}
+                    try:
+                        GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+                        query_str = f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}'
+                        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,VirtualParameters.RXPower,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime'
+                        resp_acs = requests.get(
+                            f'{GENIEACS_NBI}/devices',
+                            params={'query': query_str, 'projection': projection},
+                            timeout=3
+                        )
+                        devices = resp_acs.json()
+                        if devices:
+                            d = devices[0]
+                            vp = d.get('VirtualParameters', {})
+                            dev_id = d.get('_deviceId', {})
+                            
+                            def val(obj):
+                                return obj.get('_value', 'N/A') if isinstance(obj, dict) else 'N/A'
+                            
+                            rx = val(vp.get('RXPower', {}))
+                            rx_status_emoji = "🟢 Bagus"
+                            try:
+                                rx_float = float(rx)
+                                if rx_float >= -15:
+                                    rx_status_emoji = "🟢 Bagus (Optimum)"
+                                elif rx_float >= -25:
+                                    rx_status_emoji = "🟡 Sedang (Normal)"
+                                else:
+                                    rx_status_emoji = "🔴 Buruk (Loss/Drop)"
+                            except:
+                                rx_status_emoji = "⚪ Unknown"
+                                
+                            # Cek flat atau nested uptime parameters dari TR-069
+                            ont_uptime_sec = None
+                            igd_uptime = d.get('InternetGatewayDevice', {}).get('DeviceInfo', {}).get('UpTime', {})
+                            dev_uptime = d.get('Device', {}).get('DeviceInfo', {}).get('UpTime', {})
+                            
+                            if isinstance(igd_uptime, dict) and '_value' in igd_uptime:
+                                ont_uptime_sec = igd_uptime['_value']
+                            elif isinstance(dev_uptime, dict) and '_value' in dev_uptime:
+                                ont_uptime_sec = dev_uptime['_value']
+                            elif 'InternetGatewayDevice.DeviceInfo.UpTime' in d:
+                                val_obj = d['InternetGatewayDevice.DeviceInfo.UpTime']
+                                ont_uptime_sec = val_obj.get('_value') if isinstance(val_obj, dict) else val_obj
+                            elif 'Device.DeviceInfo.UpTime' in d:
+                                val_obj = d['Device.DeviceInfo.UpTime']
+                                ont_uptime_sec = val_obj.get('_value') if isinstance(val_obj, dict) else val_obj
+                                
+                            ont_uptime_str = "N/A"
+                            ont_uptime_days = 0
+                            if ont_uptime_sec is not None:
+                                try:
+                                    uptime_val = int(ont_uptime_sec)
+                                    ont_uptime_days = uptime_val // 86400
+                                    hours, remainder = divmod(uptime_val % 86400, 3600)
+                                    minutes, _ = divmod(remainder, 60)
+                                    ont_uptime_str = f"{ont_uptime_days}d {hours}h {minutes}m"
+                                except:
+                                    pass
+                                
+                            acs_found = True
+                            acs_data = {
+                                'serial': val(vp.get('getSerialNumber', {})) or dev_id.get('_SerialNumber', 'N/A'),
+                                'manufacturer': dev_id.get('_Manufacturer', 'N/A'),
+                                'model': dev_id.get('_ProductClass', 'N/A'),
+                                'rx_power': rx,
+                                'rx_status_emoji': rx_status_emoji,
+                                'temperature': val(vp.get('gettemp', {})),
+                                'pon_mode': val(vp.get('getponmode', {})),
+                                'ont_uptime_str': ont_uptime_str,
+                                'ont_uptime_days': ont_uptime_days
+                            }
+                    except Exception as e:
+                        print(f"GenieACS query error inside Telegram Bot: {e}")
+                    
+                    # 3. Formulasikan Balasan HTML & Smart Diagnostics
+                    status_str = "🟢 <b>ONLINE</b>" if is_online else "🔴 <b>OFFLINE</b>"
+                    
+                    reply = (
+                        f"👤 <b>Informasi Pelanggan:</b>\n"
+                        f"• Username: <code>{username}</code>\n"
+                        f"• Status Sesi: {status_str}\n"
+                    )
+                    
+                    if session_res:
+                        reply += (
+                            f"• Router NAS: <b>{nas_name}</b> (<code>{nas_ip}</code>)\n"
+                            f"• IP Address: <code>{framed_ip}</code>\n"
+                            f"• MAC Address: <code>{mac_address}</code>\n"
+                            f"• Sesi Aktif Uptime: <code>{uptime_str}</code>\n"
+                        )
+                    else:
+                        reply += "• <i>Log Sesi RADIUS tidak ditemukan.</i>\n"
+                        
+                    reply += "\n📌 <b>Informasi ONT (GenieACS):</b>\n"
+                    if acs_found:
+                        reply += (
+                            f"• SN / Model: <code>{acs_data['serial']}</code> ({acs_data['manufacturer']} {acs_data['model']})\n"
+                            f"• Redaman (RxPower): <b>{acs_data['rx_power']} dBm</b> ({acs_data['rx_status_emoji']})\n"
+                            f"• Uptime Perangkat: <code>{acs_data['ont_uptime_str']}</code>\n"
+                            f"• Temperatur: <code>{acs_data['temperature']} °C</code>\n"
+                            f"• Mode PON: <code>{acs_data['pon_mode']}</code>\n"
+                        )
+                    else:
+                        reply += "• <i>Data ONT tidak ditemukan di GenieACS.</i>\n"
+                        
+                    # === NOC SMART DIAGNOSTICS & RECOMMENDATIONS ===
+                    recommendations = []
+                    
+                    if acs_found:
+                        try:
+                            rx_float = float(acs_data['rx_power'])
+                            if rx_float < -27.0:
+                                recommendations.append(f"⚠️ <b>Redaman Buruk ({rx_float} dBm):</b> Sinyal berada di bawah batas normal (-27 dBm). Disarankan pengecekan sambungan fisik atau redrop kabel optik.")
+                        except:
+                            pass
+                            
+                        if acs_data.get('ont_uptime_days', 0) > 60:
+                            recommendations.append(f"💡 <b>ONT Uptime Tinggi ({acs_data['ont_uptime_days']} hari):</b> Perangkat ONT aktif terlalu lama tanpa reboot. Disarankan me-reboot ONT untuk optimalisasi kinerja memori.")
+                            
+                    if is_online and session_days > 60:
+                        recommendations.append(f"🔌 <b>Sesi RADIUS Tinggi ({session_days} hari):</b> Sesi dial-up aktif terlalu lama tanpa refresh. Disarankan 'Kick Session' agar mendapat alokasi IP & rute segar.")
+                        
+                    if recommendations:
+                        reply += "\n🧠 <b>Rekomendasi Pintar (NOC Diagnostic):</b>\n"
+                        for rec in recommendations:
+                            reply += f"• {rec}\n"
+                            
+                    # Tambahkan Tombol Interaktif
+                    buttons = []
+                    if is_online:
+                        buttons.append({"text": "⚡ Kick Session", "callback_data": f"kick_session:{username}"})
+                    if acs_found:
+                        buttons.append({"text": "🔄 Reboot ONT", "callback_data": f"reboot_ont:{username}"})
+                        
+                    payload = {
+                        'chat_id': chat_id,
+                        'text': reply,
+                        'parse_mode': 'HTML'
+                    }
+                    
+                    if buttons:
+                        import json as _json
+                        payload['reply_markup'] = _json.dumps({"inline_keyboard": [buttons]})
+                        
+                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data=payload)
+                    continue
+                    
+                # Perintah /reboot_ont [username]
+                if cmd == '/reboot_ont':
+                    if not arg:
+                        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                            'chat_id': chat_id,
+                            'text': "⚠️ Format salah. Contoh: <code>/reboot_ont customer_pppoe</code>",
+                            'parse_mode': 'HTML'
+                        })
+                        continue
+                        
+                    username = arg.strip()
+                    
+                    # 1. Cari device_id di GenieACS
+                    GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+                    query_str = f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}'
+                    try:
+                        resp_acs = requests.get(
+                            f'{GENIEACS_NBI}/devices',
+                            params={'query': query_str, 'projection': '_id'},
+                            timeout=3
+                        )
+                        devices = resp_acs.json()
+                        if not devices:
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': chat_id,
+                                'text': f"❌ <b>Gagal:</b> ONT untuk user <code>{username}</code> tidak ditemukan di GenieACS.",
+                                'parse_mode': 'HTML'
+                            })
+                            continue
+                            
+                        d = devices[0]
+                        device_id = d.get('_id')
+                        if not device_id:
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': chat_id,
+                                'text': f"❌ <b>Gagal:</b> ID Perangkat tidak valid di GenieACS.",
+                                'parse_mode': 'HTML'
+                            })
+                            continue
+                            
+                        # 2. Kirim task reboot ke GenieACS NBI (timeout 15s)
+                        import urllib.parse
+                        reboot_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
+                        try:
+                            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, timeout=15)
+                            if resp_reboot.status_code in (200, 201, 202):
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': f"🚀 <b>Perintah Reboot Terkirim!</b>\nONT untuk user <code>{username}</code> berhasil di-reboot via CWMP (GenieACS).",
+                                    'parse_mode': 'HTML'
+                                })
+                            else:
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': f"❌ <b>Gagal:</b> Respon GenieACS API: {resp_reboot.status_code}",
+                                    'parse_mode': 'HTML'
+                                })
+                        except requests.exceptions.Timeout:
+                            # Jika timeout, task reboot sebenarnya sudah tersimpan di GenieACS
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': chat_id,
+                                'text': f"⏳ <b>Koneksi Lambat:</b> Hubungan langsung (Connection Request) ke ONT <code>{username}</code> melampaui batas waktu tunggu (timeout), namun <b>perintah reboot telah masuk antrean</b> di GenieACS dan akan otomatis dijalankan saat ONT terhubung.",
+                                'parse_mode': 'HTML'
+                            })
+                    except Exception as e:
+                        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                            'chat_id': chat_id,
+                            'text': f"❌ <b>Error:</b> {e}",
+                            'parse_mode': 'HTML'
+                        })
+                    continue
+                    
+        except Exception as e:
+            print(f"[telegram-bot] Error: {e}")
+            
+        socketio.sleep(2)
+
+socketio.start_background_task(background_nas_monitor)
+socketio.start_background_task(background_telegram_bot)
+
+
+# === BACKGROUND OPTICAL HEALTH MONITOR (CRON/PERIODIC TASK) ===
+
+def init_ont_table():
+    try:
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.ont_health_issues (
+                username VARCHAR(100) PRIMARY KEY,
+                serial VARCHAR(100),
+                model VARCHAR(100),
+                manufacturer VARCHAR(100),
+                rx_power VARCHAR(20),
+                temperature VARCHAR(20),
+                last_inform VARCHAR(100),
+                detected_at TIMESTAMP DEFAULT NOW()
+            )
+        """, fetch=False)
+        print("[init-db] ont_health_issues table initialized successfully.")
+    except Exception as e:
+        print(f"[init-db] Error creating ont_health_issues table: {e}")
+
+init_ont_table()
+
+def background_optical_health_scan():
+    """Scan seluruh ONT di GenieACS setiap 1 jam untuk mendeteksi sinyal buruk"""
+    socketio.sleep(45) # Tunggu startup stabil
+    print("[optical-health-scan] Thread active.")
+    while True:
+        try:
+            GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+            projection = '_deviceId,_lastInform,VirtualParameters.RXPower,VirtualParameters.pppoeUsername,VirtualParameters.gettemp,VirtualParameters.getSerialNumber'
+            resp = requests.get(
+                f'{GENIEACS_NBI}/devices',
+                params={'projection': projection},
+                timeout=15
+            )
+            devices = resp.json()
+            if isinstance(devices, list):
+                bad_onts = []
+                
+                def val(obj):
+                    if isinstance(obj, dict):
+                        return obj.get('_value', 'N/A')
+                    return obj if obj is not None else 'N/A'
+                
+                # Bersihkan data lama agar tidak menumpuk status yang sudah normal
+                execute_query("DELETE FROM ont_health_issues", fetch=False)
+                
+                for d in devices:
+                    vp = d.get('VirtualParameters', {})
+                    dev_id = d.get('_deviceId', {})
+                    
+                    username = val(vp.get('pppoeUsername'))
+                    rx = val(vp.get('RXPower'))
+                    temp = val(vp.get('gettemp'))
+                    serial = val(vp.get('getSerialNumber')) or dev_id.get('_SerialNumber', 'N/A')
+                    model = dev_id.get('_ProductClass', 'N/A')
+                    manufacturer = dev_id.get('_Manufacturer', 'N/A')
+                    
+                    if username == 'N/A' and rx == 'N/A':
+                        continue
+                        
+                    try:
+                        rx_clean = rx.replace('dBm', '').strip()
+                        rx_float = float(rx_clean)
+                        # Sinyal dianggap buruk jika di atas -25 dBm (redaman buruk)
+                        if rx_float < -25.0:
+                            # Use username if valid, otherwise fallback to unconfigured-serial
+                            db_username = username.strip() if (username and username != 'N/A' and username.strip()) else f"unconfigured-{serial}"
+                            execute_query("""
+                                INSERT INTO ont_health_issues (username, serial, model, manufacturer, rx_power, temperature, last_inform)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (username) DO UPDATE 
+                                SET rx_power = EXCLUDED.rx_power, temperature = EXCLUDED.temperature, last_inform = EXCLUDED.last_inform, detected_at = NOW()
+                            """, (db_username, serial, model, manufacturer, rx, temp, d.get('_lastInform', 'N/A')), fetch=False)
+                            
+                            display_name = username.strip() if (username and username != 'N/A' and username.strip()) else f"SN: {serial} (Belum Dial)"
+                            bad_onts.append((display_name, rx))
+                    except (ValueError, TypeError):
+                        pass
+
+                
+                # Jika ada ONT baru bermasalah, kirim notifikasi Telegram!
+                if bad_onts:
+                    time_str = datetime.now().strftime('%H:%M WIB')
+                    msg = f"⚠️ <b>[NOC ALERT]</b> Terdeteksi <b>{len(bad_onts)} ONT pelanggan</b> memiliki redaman buruk (di atas -25 dBm):\n\n"
+                    for uname, rx_val in bad_onts[:10]: # Batasi maks 10 agar tidak kepanjangan
+                        msg += f"• 👤 <code>{uname}</code> | Sinyal: <b>{rx_val} dBm</b>\n"
+                    if len(bad_onts) > 10:
+                        msg += f"• <i>...dan {len(bad_onts) - 10} perangkat lainnya.</i>\n"
+                    msg += f"\nSilakan periksa halaman <b>Kesehatan ONT</b> di Web Dashboard untuk detail lebih lanjut!"
+                    
+                    reply_markup = {
+                        "inline_keyboard": [
+                            [{"text": "🖥️ Buka Dashboard Kesehatan ONT", "url": "https://radius.access.daragroup.cloud/optical-health"}]
+                        ]
+                    }
+                    send_telegram_notification(msg, reply_markup=reply_markup)
+                    
+        except Exception as e:
+            print(f"[optical-health-scan] Error: {e}")
+            
+        socketio.sleep(3600)
+
+socketio.start_background_task(background_optical_health_scan)
+
+
+
+
+
+# === HOTSPOT API ROUTES ===
+import secrets as _secrets
+import string as _string
+
+def _gen_voucher_code(length=10):
+    chars = _string.ascii_uppercase + _string.digits
+    return ''.join(_secrets.choice(chars) for _ in range(length))
+
+HOTSPOT_PACKAGES = {
+    '3h':  {'name': 'Quick 3 Jam',  'seconds': 10800},
+    '1d':  {'name': 'Daily 24 Jam', 'seconds': 86400},
+    '7d':  {'name': 'Weekly 7 Hari', 'seconds': 604800},
+    '30d': {'name': 'Monthly Unlimited', 'seconds': 2592000},
+}
+
+@app.route('/hotspot-users')
+@login_required
+def hotspot_users_page():
+    return render_template('hotspot-users.html')
+
+@app.route('/api/hotspot/vouchers')
+@login_required
+def api_hotspot_vouchers():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+        status = request.args.get('status', '')  # active, expired, unused
+
+        where = "deleted_at IS NULL"
+        params = []
+
+        if status == 'unused':
+            where += " AND first_login IS NULL"
+        elif status == 'active':
+            where += " AND first_login IS NOT NULL AND expires_at > NOW()"
+        elif status == 'expired':
+            where += " AND expires_at IS NOT NULL AND expires_at <= NOW()"
+
+        if search:
+            where += " AND (voucher_code ILIKE %s OR username ILIKE %s)"
+            params += [f'%{search}%', f'%{search}%']
+
+        rows = execute_query(f"""
+            SELECT id, voucher_code, username, password, package_name, rate_limit,
+                   first_login, expires_at, locked_mac, created_at,
+                   CASE
+                       WHEN first_login IS NULL THEN 'unused'
+                       WHEN expires_at > NOW() THEN 'active'
+                       ELSE 'expired'
+                   END AS status,
+                   CASE
+                       WHEN expires_at IS NOT NULL AND expires_at > NOW()
+                       THEN EXTRACT(EPOCH FROM (expires_at - NOW()))::INTEGER
+                       ELSE 0
+                   END AS remaining_seconds
+            FROM hotspot_vouchers
+            WHERE {where}
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+        """, tuple(params + [limit, offset]))
+
+        total = execute_query(f"SELECT COUNT(*) as total FROM hotspot_vouchers WHERE {where}", tuple(params))[0]['total']
+
+        return jsonify({'vouchers': rows, 'total': total, 'page': page,
+                        'limit': limit, 'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/hotspot/vouchers/generate', methods=['POST'])
+@login_required
+def api_hotspot_generate():
+    try:
+        data = get_request_data()
+        pkg_key = data.get('package', '1d')
+        rate_limit = data.get('rate_limit', '').strip()
+        count = min(int(data.get('count', 1)), 100)
+
+        pkg = HOTSPOT_PACKAGES.get(pkg_key)
+        if not pkg:
+            return jsonify({'success': False, 'error': 'Paket tidak valid'}), 400
+
+        generated = []
+        for _ in range(count):
+            code = _gen_voucher_code()
+            username = f"hs-{code.lower()}"
+            password = _gen_voucher_code(8)
+            execute_query("""
+                INSERT INTO hotspot_vouchers (voucher_code, username, password, duration_seconds, package_name, rate_limit)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (code, username, password, pkg['seconds'], pkg['name'], rate_limit), fetch=False)
+            generated.append({'voucher_code': code, 'username': username, 'password': password,
+                               'package': pkg['name']})
+
+        return jsonify({'success': True, 'vouchers': generated})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/hotspot/vouchers/create', methods=['POST'])
+@login_required
+def api_hotspot_create():
+    try:
+        data = get_request_data()
+        code = data.get('voucher_code', '').strip().upper()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        pkg_key = data.get('package', '1d')
+        rate_limit = data.get('rate_limit', '').strip()
+
+        if not code:
+            code = _gen_voucher_code()
+        
+        if not username:
+            username = f"hs-{code.lower()}"
+            
+        if not password:
+            password = _gen_voucher_code(8)
+
+        pkg = HOTSPOT_PACKAGES.get(pkg_key)
+        if not pkg:
+            return jsonify({'success': False, 'error': 'Paket tidak valid'}), 400
+
+        # Cek duplikat username atau voucher_code
+        dup = execute_query("""
+            SELECT id FROM hotspot_vouchers 
+            WHERE (username = %s OR voucher_code = %s) AND deleted_at IS NULL
+        """, (username, code))
+        if dup:
+            return jsonify({'success': False, 'error': 'Username atau Kode Voucher sudah terdaftar'}), 400
+
+        execute_query("""
+            INSERT INTO hotspot_vouchers (voucher_code, username, password, duration_seconds, package_name, rate_limit)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (code, username, password, pkg['seconds'], pkg['name'], rate_limit), fetch=False)
+
+        return jsonify({
+            'success': True, 
+            'voucher': {
+                'voucher_code': code,
+                'username': username,
+                'password': password,
+                'package': pkg['name'],
+                'rate_limit': rate_limit
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/hotspot/vouchers/delete/<int:vid>', methods=['DELETE'])
+@login_required
+def api_hotspot_delete(vid):
+    try:
+        execute_query("UPDATE hotspot_vouchers SET deleted_at = NOW() WHERE id = %s", (vid,), fetch=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/hotspot/vouchers/delete-expired', methods=['DELETE'])
+@login_required
+def api_hotspot_delete_expired():
+    try:
+        result = execute_query("""
+            UPDATE hotspot_vouchers SET deleted_at = NOW()
+            WHERE expires_at IS NOT NULL AND expires_at <= NOW() AND deleted_at IS NULL
+            RETURNING id
+        """)
+        return jsonify({'success': True, 'deleted': len(result) if result else 0})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/hotspot/packages')
+@login_required
+def api_hotspot_packages():
+    return jsonify(HOTSPOT_PACKAGES)
+
+
+# === NEW MONITORING FEATURES ===
+
+# 1. Optical Health Scan (GenieACS)
+@app.route('/optical-health')
+@login_required
+def optical_health_page():
+    return render_template('optical-health.html')
+
+@app.route('/api/acs/reboot/<username>', methods=['POST'])
+@login_required
+def api_acs_reboot_user(username):
+    try:
+        GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+        query_str = f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}'
+        resp_acs = requests.get(
+            f'{GENIEACS_NBI}/devices',
+            params={'query': query_str, 'projection': '_id'},
+            timeout=3
+        )
+        devices = resp_acs.json()
+        if not devices:
+            return jsonify({'success': False, 'error': f'ONT untuk user {username} tidak ditemukan di GenieACS'}), 404
+            
+        device_id = devices[0].get('_id')
+        if not device_id:
+            return jsonify({'success': False, 'error': 'ID Perangkat tidak valid di GenieACS'}), 400
+            
+        import urllib.parse
+        reboot_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
+        
+        try:
+            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, timeout=10)
+            if resp_reboot.status_code in (200, 201, 202):
+                return jsonify({'success': True, 'message': 'Perintah reboot berhasil terkirim!'})
+            else:
+                return jsonify({'success': False, 'error': f'ACS API error: {resp_reboot.status_code}'}), 500
+        except requests.exceptions.Timeout:
+            return jsonify({'success': True, 'message': 'Koneksi lambat, namun perintah reboot telah masuk antrean di GenieACS.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/acs/optical-health/issues')
+@login_required
+def api_optical_health_issues():
+    try:
+        rows = execute_query("""
+            SELECT username, serial, model, manufacturer, rx_power, temperature,
+                   TO_CHAR(detected_at, 'YYYY-MM-DD HH24:MI:SS') as detected_at,
+                   last_inform, 'critical' as rx_status
+            FROM ont_health_issues
+            ORDER BY detected_at DESC
+        """) or []
+        
+        # Set rx_status dynamically based on signal value
+        for r in rows:
+            rx = r['rx_power']
+            rx_status = 'critical'
+            try:
+                rx_clean = rx.replace('dBm', '').strip()
+                rx_float = float(rx_clean)
+                if rx_float >= -15.0:
+                    rx_status = 'good'
+                elif rx_float >= -25.0:
+                    rx_status = 'warning'
+                else:
+                    rx_status = 'critical'
+            except (ValueError, TypeError):
+                if 'loss' in str(rx).lower():
+                    rx_status = 'critical'
+                else:
+                    rx_status = 'unknown'
+            r['rx_status'] = rx_status
+            
+        return jsonify({
+            'success': True,
+            'devices': rows
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/acs/optical-health')
+
+@login_required
+def api_optical_health():
+    try:
+        GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeUsername,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber'
+        
+        resp = requests.get(
+            f'{GENIEACS_NBI}/devices',
+            params={'projection': projection},
+            timeout=8
+        )
+        devices = resp.json()
+        if not isinstance(devices, list):
+            return jsonify({'success': False, 'error': 'Respon tidak valid dari GenieACS'}), 500
+            
+        results = []
+        stats = {'total': 0, 'good': 0, 'warning': 0, 'critical': 0, 'unknown': 0}
+        
+        def val(obj):
+            if isinstance(obj, dict):
+                return obj.get('_value', 'N/A')
+            return obj if obj is not None else 'N/A'
+            
+        for d in devices:
+            vp = d.get('VirtualParameters', {})
+            di = d.get('DeviceInfo', {})
+            dev_id = d.get('_deviceId', {})
+            
+            username = val(vp.get('pppoeUsername'))
+            rx = val(vp.get('RXPower'))
+            temp = val(vp.get('gettemp'))
+            pon_mode = val(vp.get('getponmode'))
+            serial = val(vp.get('getSerialNumber')) or dev_id.get('_SerialNumber', 'N/A')
+            model = dev_id.get('_ProductClass', 'N/A')
+            manufacturer = dev_id.get('_Manufacturer', 'N/A')
+            
+            # Filter device yang bukan ONT (tidak punya pppoeUsername dan tidak punya RXPower)
+            if username == 'N/A' and rx == 'N/A':
+                continue
+                
+            rx_status = 'unknown'
+            rx_float = None
+            if rx != 'N/A':
+                try:
+                    rx_clean = rx.replace('dBm', '').strip()
+                    rx_float = float(rx_clean)
+                    if rx_float >= -15.0:
+                        rx_status = 'good'
+                        stats['good'] += 1
+                    elif rx_float >= -25.0:
+                        rx_status = 'warning'
+                        stats['warning'] += 1
+                    else:
+                        rx_status = 'critical'
+                        stats['critical'] += 1
+                except (ValueError, TypeError):
+                    rx_status = 'unknown'
+                    stats['unknown'] += 1
+            else:
+                stats['unknown'] += 1
+                
+            stats['total'] += 1
+            results.append({
+                'deviceId': d.get('_id'),
+                'username': username,
+                'serial': serial,
+                'model': model,
+                'manufacturer': manufacturer,
+                'rx_power': rx,
+                'rx_float': rx_float,
+                'rx_status': rx_status,
+                'temperature': temp,
+                'pon_mode': pon_mode,
+                'last_inform': d.get('_lastInform', 'N/A')
+            })
+            
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'devices': results
+        })
+    except requests.exceptions.ConnectionError:
+        return jsonify({'success': False, 'error': 'GenieACS tidak dapat dihubungi'}), 503
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# 2. Visual IPAM & Monitoring IP Pool
+@app.route('/ipam')
+@login_required
+def ipam_page():
+    return render_template('ipam.html')
+
+@app.route('/api/ipam/pools')
+@login_required
+def api_ipam_pools():
+    import ipaddress
+    import librouteros
+    
+    def parse_ip_range(range_str):
+        ips = []
+        try:
+            for part in range_str.split(','):
+                part = part.strip()
+                if '/' in part:
+                    net = ipaddress.ip_network(part, strict=False)
+                    for ip in net.hosts():
+                        ips.append(str(ip))
+                elif '-' in part:
+                    start_str, end_str = part.split('-')
+                    start_str = start_str.strip()
+                    end_str = end_str.strip()
+                    if '.' not in end_str:
+                        prefix = start_str.rsplit('.', 1)[0]
+                        end_str = f"{prefix}.{end_str}"
+                    start_ip = ipaddress.IPv4Address(start_str)
+                    end_ip = ipaddress.IPv4Address(end_str)
+                    curr = start_ip
+                    while curr <= end_ip:
+                        ips.append(str(curr))
+                        curr += 1
+                else:
+                    ips.append(str(ipaddress.IPv4Address(part)))
+        except Exception:
+            pass
+        return ips
+
+    try:
+        # Get active IP allocations from active RADIUS sessions
+        active_sessions = execute_query("""
+            SELECT username, framedipaddress 
+            FROM radacct 
+            WHERE acctstoptime IS NULL AND framedipaddress IS NOT NULL
+        """) or []
+        
+        # Mapping IP to username
+        active_ips = {s['framedipaddress']: s['username'] for s in active_sessions}
+        
+        # Get Mikrotik integrations
+        integrations = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true ORDER BY id") or []
+        
+        pools_data = []
+        errors = []
+        
+        for ig in integrations:
+            try:
+                api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+                
+                # Fetch Mikrotik IP Pools & DHCP leases
+                mk_pools = list(api('/ip/pool/print'))
+                mk_leases = list(api('/ip/dhcp-server/lease/print'))
+                mk_ppp_active = list(api('/ppp/active/print'))
+                api.close()
+                
+                # Add DHCP leases to active IP map if not already present
+                for l in mk_leases:
+                    ip = l.get('active-address') or l.get('address')
+                    host = l.get('host-name') or l.get('mac-address') or 'DHCP Client'
+                    if ip and ip not in active_ips:
+                        active_ips[ip] = f"DHCP: {host}"
+                        
+                for p in mk_ppp_active:
+                    ip = p.get('address')
+                    name = p.get('name')
+                    if ip and ip not in active_ips:
+                        active_ips[ip] = name
+
+                for pool in mk_pools:
+                    ranges = pool.get('ranges', '')
+                    name = pool.get('name', 'Unnamed Pool')
+                    all_ips = parse_ip_range(ranges)
+                    
+                    used_ips = []
+                    free_ips = []
+                    
+                    # Cap visual grid to 1024 IPs to prevent memory crash
+                    render_grid = len(all_ips) <= 1024
+                    
+                    for ip in all_ips:
+                        user = active_ips.get(ip)
+                        ip_obj = {'ip': ip, 'status': 'used' if user else 'free', 'username': user or ''}
+                        if user:
+                            used_ips.append(ip_obj)
+                        else:
+                            free_ips.append(ip_obj)
+                            
+                    pools_data.append({
+                        'router': ig['name'],
+                        'pool_name': name,
+                        'ranges': ranges,
+                        'total_ips': len(all_ips),
+                        'used_count': len(used_ips),
+                        'free_count': len(free_ips),
+                        'render_grid': render_grid,
+                        # Send grid data only if render_grid is True, otherwise empty
+                        'grid': (used_ips + free_ips)[:1024] if render_grid else []
+                    })
+            except Exception as e:
+                errors.append({'router': ig['name'], 'error': str(e)})
+                
+        # If no MikroTik integration, try to reconstruct virtual pool from RADIUS configuration/active sessions
+        if not pools_data:
+            # Gather unique subnets from radacct active ips
+            detected_ips = list(active_ips.keys())
+            subnets = {}
+            for ip in detected_ips:
+                try:
+                    parts = ip.split('.')
+                    if len(parts) == 4:
+                        subnet = f"{parts[0]}.{parts[1]}.{parts[2]}"
+                        if subnet not in subnets:
+                            subnets[subnet] = []
+                        subnets[subnet].append(ip)
+                except Exception:
+                    pass
+            
+            for subnet, ips in subnets.items():
+                grid = []
+                for i in range(1, 255):
+                    ip = f"{subnet}.{i}"
+                    user = active_ips.get(ip)
+                    grid.append({'ip': ip, 'status': 'used' if user else 'free', 'username': user or ''})
+                    
+                used_count = sum(1 for x in grid if x['status'] == 'used')
+                pools_data.append({
+                    'router': 'Server RADIUS (Auto-Detected)',
+                    'pool_name': f"Subnet {subnet}.0/24",
+                    'ranges': f"{subnet}.1-{subnet}.254",
+                    'total_ips': 254,
+                    'used_count': used_count,
+                    'free_count': 254 - used_count,
+                    'render_grid': True,
+                    'grid': grid
+                })
+                
+        return jsonify({
+            'success': True,
+            'pools': pools_data,
+            'errors': errors
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# 3. Live Topology & Ping Status Monitor
+@app.route('/topology')
+@login_required
+def topology_page():
+    return render_template('topology.html')
+
+@app.route('/api/topology/status')
+@login_required
+def api_topology_status():
+    import socket
+    import time
+    import requests
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def check_latency(host, port=None):
+        start = time.perf_counter()
+        try:
+            if port:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(1.0)
+                res = s.connect_ex((host, port))
+                s.close()
+                if res == 0:
+                    return True, int((time.perf_counter() - start) * 1000)
+            else:
+                status = ping_nas(host)
+                if status == 'online':
+                    return True, int((time.perf_counter() - start) * 1000)
+        except Exception:
+            pass
+        return False, 999
+
+    def check_postgres():
+        db_ok = False
+        db_lat = 999
+        start = time.perf_counter()
+        try:
+            execute_query("SELECT 1")
+            db_ok = True
+            db_lat = int((time.perf_counter() - start) * 1000)
+        except Exception:
+            pass
+        return {
+            'id': 'postgres',
+            'name': 'Database Server',
+            'type': 'database',
+            'ip': app.config['DB_HOST'],
+            'online': db_ok,
+            'latency': db_lat,
+            'info': f"PostgreSQL Port {app.config['DB_PORT']}"
+        }
+
+    def check_redis():
+        redis_ok = False
+        redis_lat = 999
+        start = time.perf_counter()
+        try:
+            import redis
+            r_pool = redis.ConnectionPool.from_url(app.config['REDIS_URL'], socket_timeout=1)
+            r = redis.Redis(connection_pool=r_pool)
+            if r.ping():
+                redis_ok = True
+                redis_lat = int((time.perf_counter() - start) * 1000)
+        except Exception:
+            pass
+        return {
+            'id': 'redis',
+            'name': 'Redis Cache & Session',
+            'type': 'redis',
+            'ip': 'localhost',
+            'online': redis_ok,
+            'latency': redis_lat,
+            'info': 'Redis Port 6379'
+        }
+
+    def check_freeradius():
+        radius_ok = False
+        radius_lat = 999
+        for host in ['freeradius', 'freeradius-server', '10.204.0.54']:
+            ok, lat = check_latency(host)
+            if ok:
+                radius_ok = True
+                radius_lat = lat
+                break
+        return {
+            'id': 'freeradius',
+            'name': 'FreeRADIUS Engine',
+            'type': 'radius',
+            'ip': '10.204.0.54',
+            'online': radius_ok,
+            'latency': radius_lat,
+            'info': 'Ports: 1812 (Auth), 1813 (Acct)'
+        }
+
+    def check_genieacs():
+        acs_ok = False
+        acs_lat = 999
+        acs_url = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+        start = time.perf_counter()
+        try:
+            resp = requests.get(f"{acs_url}/devices", params={'limit': 1}, timeout=1.5)
+            if resp.status_code == 200:
+                acs_ok = True
+                acs_lat = int((time.perf_counter() - start) * 1000)
+        except Exception:
+            pass
+        return {
+            'id': 'genieacs',
+            'name': 'GenieACS Server (TR-069)',
+            'type': 'acs',
+            'ip': acs_url.replace('http://', '').split(':')[0],
+            'online': acs_ok,
+            'latency': acs_lat,
+            'info': f"NBI Endpoint: {acs_url}"
+        }
+
+    def check_nas(nas):
+        ip = nas['nasname']
+        name = nas['shortname'] or ip
+        nas_ok, nas_lat = check_latency(ip)
+        
+        try:
+            count_res = execute_query("SELECT COUNT(*) as count FROM radacct WHERE nasipaddress = %s AND acctstoptime IS NULL", (ip,))
+            active_count = count_res[0]['count'] if count_res else 0
+        except Exception:
+            active_count = 0
+            
+        return {
+            'id': f"nas-{nas['id']}",
+            'name': name,
+            'type': 'nas',
+            'ip': ip,
+            'online': nas_ok,
+            'latency': nas_lat,
+            'info': f"Clients: {active_count} active | {nas['description'] or ''}"
+        }
+
+    try:
+        nodes = []
+        
+        # Collect NAS list from db
+        nas_list = execute_query("SELECT id, nasname, shortname, description FROM nas") or []
+        
+        # Execute checks concurrently
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_postgres = executor.submit(check_postgres)
+            future_redis = executor.submit(check_redis)
+            future_freeradius = executor.submit(check_freeradius)
+            future_genieacs = executor.submit(check_genieacs)
+            
+            future_nas_list = [executor.submit(check_nas, nas) for nas in nas_list]
+            
+            # Gather results
+            nodes.append(future_postgres.result())
+            nodes.append(future_redis.result())
+            nodes.append(future_freeradius.result())
+            
+            # Dashboard is always local and online
+            nodes.append({
+                'id': 'dashboard',
+                'name': 'Flask Web Dashboard',
+                'type': 'dashboard',
+                'ip': '0.0.0.0',
+                'online': True,
+                'latency': 0,
+                'info': 'Port 5000 (Running)'
+            })
+            
+            nodes.append(future_genieacs.result())
+            
+            # Gather NAS results
+            for future_nas in future_nas_list:
+                nodes.append(future_nas.result())
+            
+        return jsonify({
+            'success': True,
+            'nodes': nodes
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# === GPON MAP TOPOLOGY API ===
+@app.route('/api/gpon/topology', methods=['GET'])
+@login_required
+def get_gpon_topology():
+    import json
+    file_path = os.path.join(os.path.dirname(__file__), 'gpon_topology.json')
+    if not os.path.exists(file_path):
+        return jsonify({'success': True, 'nodes': [], 'links': []})
+    try:
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+        return jsonify({'success': True, 'nodes': data.get('nodes', []), 'links': data.get('links', [])})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/gpon/topology', methods=['POST'])
+@login_required
+def save_gpon_topology():
+    import json
+    file_path = os.path.join(os.path.dirname(__file__), 'gpon_topology.json')
+    try:
+        data = request.json
+        if not data or 'nodes' not in data or 'links' not in data:
+            return jsonify({'success': False, 'error': 'Invalid request data'}), 400
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=4)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+

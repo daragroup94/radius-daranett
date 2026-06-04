@@ -1,0 +1,563 @@
+{% extends "base.html" %}
+
+{% block title %}Visual IPAM & IP Pool - RADIUS Manager{% endblock %}
+{% block page_title %}Visual IPAM{% endblock %}
+{% block page_subtitle %}Visualisasi Alokasi & IP Address Pool MikroTik & RADIUS{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Font Styling */
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
+    }
+    
+    /* Stat Cards Hover & Shadows */
+    .stat-card-glow {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    /* IP Grid Visualizer */
+    .ip-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+        gap: 4px;
+    }
+    
+    .ip-block {
+        aspect-ratio: 1;
+        border-radius: 6px;
+        font-size: 8px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+    
+    .ip-block:hover {
+        transform: scale(1.2);
+        z-index: 10;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+    
+    .ip-block-free {
+        background-color: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #065f46;
+    }
+    .dark .ip-block-free {
+        background-color: #ecfdf5;
+        border-color: #a7f3d0;
+        color: #065f46;
+    }
+    
+    .ip-block-used {
+        background-color: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+    }
+    .dark .ip-block-used {
+        background-color: #fef2f2;
+        border-color: #fecaca;
+        color: #991b1b;
+    }
+    
+    .ip-block-system {
+        background-color: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        color: #475569;
+        cursor: not-allowed;
+    }
+
+
+    /* Custom Tooltip */
+    .ip-tooltip {
+        visibility: hidden;
+        width: 180px;
+        background-color: #0f172a;
+        color: #fff;
+        text-align: left;
+        border-radius: 8px;
+        padding: 8px 10px;
+        position: absolute;
+        z-index: 100;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -90px;
+        opacity: 0;
+        transition: opacity 0.2s;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+    }
+    
+    .ip-tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #0f172a transparent transparent transparent;
+    }
+    
+    .ip-block:hover .ip-tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    /* Radial gauge SVG path transition */
+    svg circle {
+        transition: stroke-dashoffset 0.8s ease-in-out;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc bg-gradient-to-r from-emerald-500 to-teal-600 mr-4 shadow-lg floating-icon">
+                <i data-lucide="layout-grid" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight text-white">IPAM & Pool Visualizer</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Pantau utilisasi subnet pool dan deteksi ketersediaan alamat IP untuk klien aktif.</p>
+            </div>
+        </div>
+        
+        <div class="z-10 flex gap-2.5 items-center">
+            <!-- Select IP Pool -->
+            <select id="poolSelector" onchange="selectPool()" 
+                    style="background-color: #ffffff !important; color: #1e293b !important; border: 1.5px solid #cbd5e1 !important;"
+                    class="px-4 py-3 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold min-w-[200px]">
+                <option value="">Memuat Pool...</option>
+            </select>
+            <button onclick="loadIPAMData()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-750 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg transition-all hover:scale-[1.02] whitespace-nowrap">
+                <i class="fas fa-sync mr-1.5"></i>
+                <span>Refresh</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- IP Conflicts Banner -->
+    <div id="conflictBanner" class="hidden bg-white dark:bg-slate-800 border-l-4 border-l-rose-500 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm space-y-4">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-450 flex items-center justify-center shadow-sm">
+                <i class="fas fa-exclamation-triangle text-lg"></i>
+            </div>
+            <div>
+                <h4 class="font-extrabold text-sm tracking-tight text-slate-800 dark:text-white">Deteksi Bentrok / Pencurian IP Static</h4>
+                <p class="text-xs text-slate-450 dark:text-slate-400 font-medium">Ditemukan alamat IP static terdaftar aktif pada perangkat dengan MAC address yang tidak cocok.</p>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-semibold text-slate-650 dark:text-slate-400">
+                <thead>
+                    <tr class="border-b border-slate-100 dark:border-slate-750 text-slate-455 font-bold uppercase tracking-wider text-[10px]">
+                        <th class="pb-2">IP Address</th>
+                        <th class="pb-2">Nama Pelanggan</th>
+                        <th class="pb-2">MAC Terdaftar</th>
+                        <th class="pb-2">MAC Aktif (Pencuri)</th>
+                        <th class="pb-2">Router & Interface</th>
+                    </tr>
+                </thead>
+                <tbody id="conflictTableBody" class="divide-y divide-slate-100 dark:divide-slate-750 font-mono text-slate-700 dark:text-slate-300">
+                    <!-- Dynamic Rows -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Stats & Radial Gauge Row -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- Radial Gauge Card -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center justify-between col-span-1">
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">IPAM Utilization</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="utilPercent">0%</p>
+                <p class="text-[10px] text-slate-400 mt-1 font-medium">Kapasitas terpakai dari subnet pool.</p>
+            </div>
+            
+            <!-- SVG Radial Progress -->
+            <div class="relative w-20 h-20">
+                <svg class="w-full h-full transform -rotate-90">
+                    <circle cx="40" cy="40" r="34" stroke="currentColor" stroke-width="6" class="text-slate-100 dark:text-slate-700" fill="transparent"></circle>
+                    <circle cx="40" cy="40" r="34" stroke="currentColor" stroke-width="6" class="text-emerald-500" fill="transparent"
+                            stroke-dasharray="213.6" stroke-dashoffset="213.6" id="radialCircle"></circle>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Total IP -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 shadow-sm">
+                <i data-lucide="hash" class="lucide icon-noc"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total IP Address</p>
+                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statTotal">—</p>
+            </div>
+        </div>
+
+        <!-- Used IP -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 shadow-sm">
+                <i data-lucide="radio" class="lucide icon-noc"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">IP Terpakai (Used)</p>
+                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statUsed">—</p>
+            </div>
+        </div>
+
+        <!-- Free IP -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 shadow-sm">
+                <i data-lucide="check-circle" class="lucide icon-noc"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">IP Tersedia (Free)</p>
+                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statFree">—</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visual Grid Container -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-750 pb-5 mb-6">
+            <div>
+                <h3 class="text-base font-bold text-slate-800 dark:text-white">Peta Subnet IP Address</h3>
+                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5" id="poolSubnetRange">Subnet: —</p>
+            </div>
+            <!-- Legend -->
+            <div class="flex gap-4 text-xs font-semibold">
+                <div class="flex items-center gap-1.5 text-emerald-600">
+                    <div class="w-3.5 h-3.5 bg-[#ecfdf5] border border-[#a7f3d0] rounded"></div> Tersedia (Free)
+                </div>
+                <div class="flex items-center gap-1.5 text-rose-600">
+                    <div class="w-3.5 h-3.5 bg-[#fef2f2] border border-[#fecaca] rounded"></div> Terpakai (Used)
+                </div>
+                <div class="flex items-center gap-1.5 text-slate-500">
+                    <div class="w-3.5 h-3.5 bg-[#f1f5f9] border border-[#cbd5e1] rounded"></div> System (Network/Bcast)
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Render visual IP grid -->
+        <div id="gridContainer" class="ip-grid min-h-[150px]">
+            <div class="col-span-full text-center py-16 text-slate-400">
+                <i class="fas fa-network-wired text-4xl mb-3 opacity-30 animate-pulse"></i>
+                <p class="font-semibold text-xs">Memuat informasi IPAM...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- IP Details Inspector Card -->
+    <div id="ipInspectorCard" class="hidden bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-100 dark:border-slate-750 pb-5 mb-5">
+            <div class="flex items-center gap-3.5">
+                <div id="inspectIcon" class="w-12 h-12 rounded-2xl flex items-center justify-center text-lg shadow-sm">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-800 dark:text-white" id="inspectIPTitle">Detail Inspeksi IP</h3>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5" id="inspectIPSubtitle">Pilih salah satu kotak IP di atas untuk melakukan inspeksi</p>
+                </div>
+            </div>
+            <div class="mt-4 md:mt-0 flex gap-2">
+                <button id="pingInspectBtn" onclick="runInspectPing()" class="bg-indigo-600 hover:bg-indigo-750 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md flex items-center space-x-2 transition-all hover:scale-[1.01]">
+                    <i class="fas fa-ping-pong mr-1.5"></i>
+                    <span>Ping Target</span>
+                </button>
+                <button onclick="closeInspector()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-650 dark:text-slate-300 px-4 py-2.5 rounded-2xl text-xs font-bold">
+                    <span>Tutup</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Details List -->
+            <div class="col-span-1 space-y-4 text-xs font-bold text-slate-650 dark:text-slate-400">
+                <div class="bg-slate-50 dark:bg-slate-850/50 p-4 rounded-2xl space-y-3">
+                    <div class="flex justify-between">
+                        <span>Status Alokasi:</span>
+                        <span id="inspectStatusText" class="text-slate-800 dark:text-white">—</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Client Terdaftar:</span>
+                        <span id="inspectClientText" class="text-slate-800 dark:text-white font-mono text-right break-all max-w-[150px]">—</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Live Ping Output -->
+            <div class="col-span-2">
+                <div class="bg-slate-900 border border-slate-800 text-emerald-450 font-mono text-xs p-4 rounded-2xl min-h-[100px] max-h-[200px] overflow-y-auto" id="inspectPingConsole">
+                    <p class="text-slate-500">Console ping output... Klik tombol "Ping Target" untuk menguji latensi dan koneksi dari router.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let poolsData = [];
+    let selectedInspectIP = null;
+    let selectedInspectStatus = null;
+
+    async function loadIPAMData() {
+        const grid = document.getElementById('gridContainer');
+        grid.innerHTML = `
+            <div class="col-span-full text-center py-16">
+                <div class="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-slate-400 dark:text-slate-500 font-bold text-xs">Sedang membaca IP pool dari MikroTik & Database...</p>
+            </div>
+        `;
+
+        try {
+            // Jalankan cek konflik IP secara paralel
+            checkConflicts();
+
+            const res = await fetch('/api/ipam/pools');
+            const data = await res.json();
+
+            if (!data.success) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-16 text-red-500">
+                        <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                        <p class="font-bold text-xs">Gagal: ${data.error || 'Server error'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            poolsData = data.pools || [];
+            
+            // Build Pool Selector Option
+            const selector = document.getElementById('poolSelector');
+            selector.innerHTML = poolsData.map((p, idx) => `
+                <option value="${idx}">${p.router} - ${p.pool_name}</option>
+            `).join('');
+
+            selectPool();
+            showNotification('Data IPAM berhasil diperbarui', 'success');
+        } catch (e) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-16 text-red-500">
+                    <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                    <p class="font-bold text-xs">Error: ${e.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    async function checkConflicts() {
+        const banner = document.getElementById('conflictBanner');
+        const tbody = document.getElementById('conflictTableBody');
+        try {
+            const res = await fetch('/api/ipam/conflicts');
+            const data = await res.json();
+            
+            if (data.success && data.conflicts.length > 0) {
+                banner.classList.remove('hidden');
+                tbody.innerHTML = data.conflicts.map(c => `
+                    <tr class="border-b border-slate-100 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-750/30">
+                        <td class="py-2.5 pr-4 font-bold text-slate-800 dark:text-white font-mono">${c.ip}</td>
+                        <td class="py-2.5 pr-4">${c.registered_name}</td>
+                        <td class="py-2.5 pr-4 font-mono text-slate-500 text-xs">${c.registered_mac}</td>
+                        <td class="py-2.5 pr-4 font-mono text-rose-600 dark:text-rose-450 text-xs font-bold">${c.active_mac}</td>
+                        <td class="py-2.5 text-slate-500 text-xs">${c.router} (${c.interface})</td>
+                    </tr>
+                `).join('');
+            } else {
+                banner.classList.add('hidden');
+            }
+        } catch (e) {
+            console.error('IPAM Conflict check error:', e);
+        }
+    }
+
+    function selectPool() {
+        const idx = document.getElementById('poolSelector').value;
+        const grid = document.getElementById('gridContainer');
+        
+        // Sembunyikan detail inspeksi lama saat ganti pool
+        closeInspector();
+
+        if (idx === '' || !poolsData[idx]) return;
+        
+        const pool = poolsData[idx];
+
+        // Stats Display
+        document.getElementById('statTotal').textContent = pool.total_ips;
+        document.getElementById('statUsed').textContent = pool.used_count;
+        document.getElementById('statFree').textContent = pool.free_count;
+        document.getElementById('poolSubnetRange').textContent = `Ranges: ${pool.ranges}`;
+
+        const utilPercent = pool.total_ips > 0 ? Math.round((pool.used_count / pool.total_ips) * 100) : 0;
+        document.getElementById('utilPercent').textContent = `${utilPercent}%`;
+
+        // Update radial circle
+        const circle = document.getElementById('radialCircle');
+        const circumference = 2 * Math.PI * 34; // 213.6
+        const offset = circumference - (utilPercent / 100) * circumference;
+        circle.style.strokeDashoffset = offset;
+
+        // Render Grid
+        if (!pool.render_grid) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-16 text-slate-400">
+                    <i class="fas fa-info-circle text-4xl mb-3 opacity-30"></i>
+                    <p class="font-semibold text-xs">Subnet ini terlalu besar untuk dirender secara visual (> 1024 IP host).</p>
+                    <p class="text-[10px] text-slate-500 mt-1">Utilisasi tetap dipantau melalui widget statistik di atas.</p>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = pool.grid.map(ipObj => {
+            const ipStr = ipObj.ip;
+            const lastOctet = ipStr.split('.').pop();
+            
+            // Check if network (.0) or broadcast (.255)
+            const isSystem = lastOctet === '0' || lastOctet === '255';
+            
+            let statusClass = 'ip-block-free';
+            if (isSystem) statusClass = 'ip-block-system';
+            else if (ipObj.status === 'used') statusClass = 'ip-block-used';
+            
+            let tooltipContent = `<strong>IP: ${ipStr}</strong>`;
+            if (isSystem) {
+                tooltipContent += `<br/><span class="text-xs text-slate-400">Alamat Sistem (Network/Broadcast)</span>`;
+            } else if (ipObj.status === 'used') {
+                tooltipContent += `<br/><span class="text-xs text-slate-400">Klien: ${ipObj.username}</span>`;
+            } else {
+                tooltipContent += `<br/><span class="text-xs text-emerald-400">Status: Tersedia</span>`;
+            }
+
+            const cleanUser = ipObj.username ? ipObj.username.replace(/'/g, "\\'") : '';
+            return `
+                <div class="ip-block ${statusClass}" onclick="inspectIP('${ipStr}', '${ipObj.status}', '${cleanUser}')">
+                    <span>${lastOctet}</span>
+                    <div class="ip-tooltip">${tooltipContent}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function inspectIP(ip, status, username) {
+        selectedInspectIP = ip;
+        selectedInspectStatus = status;
+        
+        const card = document.getElementById('ipInspectorCard');
+        const title = document.getElementById('inspectIPTitle');
+        const icon = document.getElementById('inspectIcon');
+        const statusText = document.getElementById('inspectStatusText');
+        const clientText = document.getElementById('inspectClientText');
+        const pingBtn = document.getElementById('pingInspectBtn');
+        const consoleEl = document.getElementById('inspectPingConsole');
+
+        card.classList.remove('hidden');
+        title.textContent = `Inspeksi IP: ${ip}`;
+        consoleEl.innerHTML = `<p class="text-slate-500 font-mono">Console ping output... Klik tombol "Ping Target" untuk menguji latensi dan koneksi dari router.</p>`;
+
+        if (status === 'system') {
+            statusText.textContent = 'System (Gateway/Network/Broadcast)';
+            statusText.className = 'text-slate-500 font-bold';
+            clientText.textContent = 'N/A';
+            pingBtn.disabled = true;
+            pingBtn.className = 'bg-slate-100 dark:bg-slate-800 text-slate-400 px-4 py-2.5 rounded-2xl text-xs font-bold cursor-not-allowed';
+            icon.className = 'w-12 h-12 rounded-2xl flex items-center justify-center text-lg bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300';
+            icon.innerHTML = '<i class="fas fa-network-wired"></i>';
+        } else if (status === 'used') {
+            statusText.textContent = 'Terpakai (Used)';
+            statusText.className = 'text-rose-600 dark:text-rose-450 font-bold';
+            clientText.textContent = username || 'Unknown Client';
+            pingBtn.disabled = false;
+            pingBtn.className = 'bg-indigo-650 hover:bg-indigo-750 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md flex items-center space-x-2 transition-all hover:scale-[1.01]';
+            icon.className = 'w-12 h-12 rounded-2xl flex items-center justify-center text-lg bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-450';
+            icon.innerHTML = '<i class="fas fa-user-check"></i>';
+        } else {
+            statusText.textContent = 'Tersedia (Free)';
+            statusText.className = 'text-emerald-600 dark:text-emerald-450 font-bold';
+            clientText.textContent = 'None';
+            pingBtn.disabled = false;
+            pingBtn.className = 'bg-indigo-650 hover:bg-indigo-750 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md flex items-center space-x-2 transition-all hover:scale-[1.01]';
+            icon.className = 'w-12 h-12 rounded-2xl flex items-center justify-center text-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-450';
+            icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+        }
+        
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function closeInspector() {
+        document.getElementById('ipInspectorCard').classList.add('hidden');
+        selectedInspectIP = null;
+        selectedInspectStatus = null;
+    }
+
+    async function runInspectPing() {
+        if (!selectedInspectIP) return;
+        const selector = document.getElementById('poolSelector').value;
+        if (selector === '' || !poolsData[selector]) {
+            showNotification('Pilih pool/router terlebih dahulu', 'warning');
+            return;
+        }
+        
+        const routerName = poolsData[selector].router;
+        const pingBtn = document.getElementById('pingInspectBtn');
+        const consoleEl = document.getElementById('inspectPingConsole');
+
+        pingBtn.disabled = true;
+        pingBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Pinging...';
+        consoleEl.innerHTML = `<p class="text-slate-400 font-mono">Pinging ${selectedInspectIP} dari router ${routerName}...</p>`;
+
+        try {
+            const res = await fetch('/api/diagnostics/ping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ router_name: routerName, target: selectedInspectIP, count: 5 })
+            });
+            const d = await res.json();
+            
+            if (!d.success) {
+                consoleEl.innerHTML = `<p class="text-red-500 font-mono">Gagal: ${d.error}</p>`;
+                return;
+            }
+
+            consoleEl.innerHTML = `<p class="text-slate-350 font-mono">PING ${selectedInspectIP} dari MikroTik ${routerName}:</p>`;
+            d.results.forEach((r, idx) => {
+                setTimeout(() => {
+                    if (r.status === 'ok') {
+                        consoleEl.innerHTML += `<p class="font-mono text-emerald-400">Reply from ${r.host}: bytes=${r.size} ttl=${r.ttl} time=${r.time}</p>`;
+                    } else {
+                        consoleEl.innerHTML += `<p class="text-red-400 font-mono">Request timed out / ${r.status}</p>`;
+                    }
+                    consoleEl.scrollTop = consoleEl.scrollHeight;
+                }, idx * 100);
+            });
+        } catch (e) {
+            consoleEl.innerHTML = `<p class="text-red-500 font-mono">Error: ${e.message}</p>`;
+        } finally {
+            setTimeout(() => {
+                pingBtn.disabled = false;
+                pingBtn.innerHTML = '<i class="fas fa-ping-pong mr-1.5"></i>Ping Target';
+            }, 600);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadIPAMData);
+</script>
+{% endblock %}

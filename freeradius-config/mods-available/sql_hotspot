@@ -9,6 +9,7 @@ sql sql_hotspot {
     radius_db = "$ENV{DB_NAME}"
 
     sql_user_name = "%{User-Name}"
+    read_groups = no
 
     # Cek password voucher - hanya return jika voucher valid:
     # 1. Ada di tabel, belum dihapus
@@ -20,7 +21,9 @@ sql sql_hotspot {
         WHERE username = '%{SQL-User-Name}' \
           AND deleted_at IS NULL \
           AND (expires_at IS NULL OR expires_at > NOW()) \
-          AND (locked_mac IS NULL OR locked_mac = '' OR LOWER(locked_mac) = LOWER('%{Calling-Station-Id}'))"
+          AND (locked_mac IS NULL OR locked_mac = '' OR \
+               LOWER(REGEXP_REPLACE(locked_mac, '[^a-f0-9]', '', 'g')) = LOWER(REGEXP_REPLACE(REGEXP_REPLACE('%{Calling-Station-Id}', '^1[:-]', '', 'i'), '[^a-f0-9]', '', 'g')) \
+              )"
 
     # Reply attributes: Session-Timeout (sisa waktu) dan rate limit
     authorize_reply_query = "\
@@ -74,7 +77,7 @@ sql sql_hotspot {
             UPDATE hotspot_vouchers SET \
                 first_login = COALESCE(first_login, NOW()), \
                 expires_at = CASE WHEN first_login IS NULL THEN NOW() + (duration_seconds || ' seconds')::INTERVAL ELSE expires_at END, \
-                locked_mac = COALESCE(NULLIF(locked_mac, ''), NULLIF(LOWER('%{Calling-Station-Id}'), '')) \
+                locked_mac = COALESCE(NULLIF(locked_mac, ''), NULLIF(LOWER(REGEXP_REPLACE(REGEXP_REPLACE('%{Calling-Station-Id}', '^1[:-]', '', 'i'), '[^a-f0-9]', '', 'g')), '')) \
             WHERE username = '%{SQL-User-Name}' AND deleted_at IS NULL; \
             INSERT INTO radpostauth (username, pass, reply, authdate, calledstationid, callingstationid) \
             VALUES ('%{SQL-User-Name}', '%{%{User-Password}:-%{Chap-Password}}', '%{reply:Packet-Type}', NOW(), '%{Called-Station-Id}', '%{Calling-Station-Id}')"

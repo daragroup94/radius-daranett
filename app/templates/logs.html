@@ -82,7 +82,10 @@
         <!-- Controls & Header -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
             <div>
-                <h3 class="text-base font-bold text-slate-880 dark:text-white">RADIUS Events Log</h3>
+                <h3 class="text-base font-bold text-slate-880 dark:text-white flex items-center gap-2">
+                    <span>RADIUS Events Log</span>
+                    <span id="liveBadge" class="hidden px-2 py-0.5 rounded-full text-[9px] bg-rose-500 text-white font-extrabold tracking-wider uppercase animate-pulse">● Live Stream</span>
+                </h3>
                 <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Gunakan filter status dan pencarian username untuk mencari log spesifik.</p>
             </div>
             
@@ -100,8 +103,16 @@
                     <option value="Access-Accept">Accept Only</option>
                     <option value="Access-Reject">Reject Only</option>
                 </select>
+                <!-- Live Tail Toggle -->
+                <div class="flex items-center bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 px-3 py-2 rounded-xl transition-all select-none">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="liveTailToggle" class="sr-only peer" onchange="toggleLiveTail()">
+                        <div class="w-8 h-4 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500"></div>
+                        <span class="ml-2 text-xs font-bold text-slate-600 dark:text-slate-300">Live Tail</span>
+                    </label>
+                </div>
                 <!-- Refresh Button -->
-                <button onclick="currentPage=1;loadLogs()"
+                <button onclick="currentPage=1;loadLogs()" id="refreshButton"
                         class="text-white px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] flex items-center gap-1.5 self-stretch">
                     <i class="fas fa-sync-alt text-[10px]"></i>Refresh
                 </button>
@@ -142,6 +153,8 @@
 <script>
     let currentPage = 1;
     let searchTimeout;
+    let socket = null;
+    let liveTailActive = false;
 
     document.getElementById('logSearch').addEventListener('input', function() {
         clearTimeout(searchTimeout);
@@ -149,12 +162,149 @@
     });
 
     function changePage(page) {
-        if (page < 1) return;
+        if (page < 1 || liveTailActive) return;
         currentPage = page;
         loadLogs();
     }
 
+    function toggleLiveTail() {
+        const toggle = document.getElementById('liveTailToggle');
+        const refreshBtn = document.getElementById('refreshButton');
+        const paginator = document.getElementById('paginationControls');
+        const liveBadge = document.getElementById('liveBadge');
+        
+        liveTailActive = toggle.checked;
+        
+        if (liveTailActive) {
+            // Disable manual controls that clash with live tail
+            refreshBtn.disabled = true;
+            refreshBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            paginator.classList.add('opacity-40', 'pointer-events-none');
+            
+            // Show the live stream badge
+            if (liveBadge) liveBadge.classList.remove('hidden');
+            
+            if (!socket) {
+                socket = io({
+                    transports: ['websocket', 'polling']
+                });
+                
+                socket.on('connect', function() {
+                    console.log('Socket.IO connected');
+                    showNotification('Live Tail terhubung!', 'success');
+                });
+                
+                socket.on('disconnect', function() {
+                    console.log('Socket.IO disconnected');
+                });
+                
+                socket.on('connect_error', function(err) {
+                    console.error('Socket.IO Connection Error:', err);
+                    showNotification('Live Tail gagal terhubung: ' + err.message, 'error');
+                });
+                
+                socket.on('new_auth_log', function(log) {
+                    if (!liveTailActive) return;
+                    
+                    const search = document.getElementById('logSearch').value.toLowerCase();
+                    const reply = document.getElementById('replyFilter').value;
+                    
+                    if (search && !log.username.toLowerCase().includes(search)) return;
+                    if (reply && log.reply !== reply) return;
+                    
+                    const logsList = document.getElementById('logsList');
+                    
+                    // Remove "no logs found" or any placeholders if they exist
+                    if (logsList.querySelector('.opacity-30') || logsList.innerText.includes('Tidak ada log ditemukan')) {
+                        logsList.innerHTML = '';
+                    }
+                    
+                    const isAccept = log.reply === 'Access-Accept';
+                    const isReject = log.reply === 'Access-Reject';
+                    const color = isAccept ? 'green' : isReject ? 'red' : 'yellow';
+                    const icon = isAccept ? 'check-circle' : isReject ? 'times-circle' : 'question-circle';
+                    const themes = {
+                        green: { 
+                            bg: 'bg-emerald-500/5 dark:bg-emerald-500/10', 
+                            border: 'border-emerald-200/50 dark:border-emerald-800/40', 
+                            icon: 'bg-emerald-500 text-white', 
+                            badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+                            textColor: 'text-slate-800 dark:text-white',
+                            subColor: 'text-slate-500 dark:text-slate-400'
+                        },
+                        red:   { 
+                            bg: 'bg-rose-500/5 dark:bg-rose-500/10', 
+                            border: 'border-rose-200/50 dark:border-rose-800/40', 
+                            icon: 'bg-rose-500 text-white', 
+                            badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+                            textColor: 'text-slate-800 dark:text-white',
+                            subColor: 'text-slate-500 dark:text-slate-400'
+                        },
+                        yellow:{ 
+                            bg: 'bg-amber-500/5 dark:bg-amber-500/10', 
+                            border: 'border-amber-200/50 dark:border-amber-800/40', 
+                            icon: 'bg-amber-500 text-white', 
+                            badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                            textColor: 'text-slate-800 dark:text-white',
+                            subColor: 'text-slate-500 dark:text-slate-400'
+                        }
+                    };
+                    const t = themes[color];
+                    
+                    const logHtml = `
+                    <div class="${t.bg} rounded-2xl p-4 border ${t.border} hover:shadow-md transition-all duration-200 animate-pulse">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 ${t.icon} rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                                <i class="fas fa-${icon} text-lg"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex flex-wrap items-center gap-2 mb-1">
+                                    <span class="font-bold ${t.textColor}">${log.username}</span>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${t.badge}">${log.reply || 'Unknown'}</span>
+                                </div>
+                                <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${t.subColor}">
+                                    <span><i class="fas fa-clock mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
+                                    ${log.callingstationid ? `<span><i class="fas fa-laptop mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                    
+                    logsList.insertAdjacentHTML('afterbegin', logHtml);
+                    
+                    if (logsList.children.length > 50) {
+                        logsList.removeChild(logsList.lastChild);
+                    }
+                    
+                    const totalLogs = document.getElementById('totalLogs');
+                    totalLogs.textContent = parseInt(totalLogs.textContent) + 1;
+                });
+            } else {
+                socket.connect();
+            }
+        } else {
+            // Restore regular layout
+            refreshBtn.disabled = false;
+            refreshBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            paginator.classList.remove('opacity-40', 'pointer-events-none');
+            
+            if (liveBadge) liveBadge.classList.add('hidden');
+            
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            currentPage = 1;
+            loadLogs();
+        }
+    }
+
     async function loadLogs() {
+        if (liveTailActive) {
+            console.log('Live Tail active. Ignoring loadLogs request.');
+            return;
+        }
+        
         const logsList = document.getElementById('logsList');
         const search = document.getElementById('logSearch').value;
         const reply = document.getElementById('replyFilter').value;

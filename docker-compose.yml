@@ -16,12 +16,19 @@ services:
     # Traefik Labels
     labels:
       - "traefik.enable=true"
-      # HTTP (Redirect to HTTPS)
       - "traefik.http.routers.radius.entrypoints=web"
       - "traefik.http.routers.radius.rule=Host(`radius.access.daragroup.cloud`)"
       - "traefik.http.routers.radius.middlewares=radius-https-redirect"
       - "traefik.http.middlewares.radius-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.radius-https-redirect.redirectscheme.permanent=true"
+      # IPoE Domain Router (Bypass HTTPS Redirect for /api/ipoe/ paths)
+      - "traefik.http.routers.radius-ipoe.entrypoints=web"
+      - "traefik.http.routers.radius-ipoe.rule=Host(`radius.access.daragroup.cloud`) && PathPrefix(`/api/ipoe/`)"
+      - "traefik.http.routers.radius-ipoe.service=radius-service"
+      # IPoE Raw IP Router (For RouterOS v6 compatibility where URL overrides host header)
+      - "traefik.http.routers.radius-ipoe-ip.entrypoints=web"
+      - "traefik.http.routers.radius-ipoe-ip.rule=Host(`10.100.0.1`) && PathPrefix(`/api/ipoe/`)"
+      - "traefik.http.routers.radius-ipoe-ip.service=radius-service"
       # HTTPS (Secure)
       - "traefik.http.routers.radius-secure.entrypoints=websecure"
       - "traefik.http.routers.radius-secure.rule=Host(`radius.access.daragroup.cloud`)"
@@ -44,6 +51,8 @@ services:
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - FLASK_ENV=${FLASK_ENV}
       - TZ=${TZ}
+      - EVENTLET_NO_GREENDNS=yes
+      - PYTHONUNBUFFERED=1
     # Volumes
     volumes:
       - ./app:/app
@@ -55,6 +64,9 @@ services:
     # Allow adding routes to reach NAS subnets
     cap_add:
       - NET_ADMIN
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     # Network
     networks:
       my-net:

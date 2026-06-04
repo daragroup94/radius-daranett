@@ -41,8 +41,13 @@ authorize {
 
     # Hapus Mikrotik-Rate-Limit dari balasan RADIUS agar MikroTik tidak membuat queue dynamic
     # Kita akan membuat static queue secara manual via Lease Script di MikroTik agar namanya bisa kustom
-    update reply {
-        &Mikrotik-Rate-Limit !* ANY
+    # Hapus Mikrotik-Rate-Limit dari balasan RADIUS HANYA jika ini adalah request DHCP IPoE.
+    # Untuk DHCP, kita membuat static queue secara manual via Lease Script di MikroTik agar namanya bisa kustom.
+    # Untuk Static IP / Non-DHCP, kita tetap kirim Mikrotik-Rate-Limit agar router bisa membuat queue otomatis.
+    if ("%{Called-Station-Id}" =~ /^dhcp/i) {
+        update reply {
+            &Mikrotik-Rate-Limit !* ANY
+        }
     }
 
     # Accept semua MAC address terdaftar tanpa cek password

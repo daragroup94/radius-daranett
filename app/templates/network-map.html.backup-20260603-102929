@@ -1,0 +1,1778 @@
+{% extends "base.html" %}
+
+{% block title %}Network Map - RADIUS Manager{% endblock %}
+{% block page_title %}Peta Jaringan Live NOC{% endblock %}
+{% block page_subtitle %}Visualisasi spasial perangkat NAS dan kesehatan optik ONT pelanggan secara real-time{% endblock %}
+
+{% block extra_css %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<!-- Leaflet Marker Cluster CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+<style>
+    #map {
+        height: 92vh;
+        min-height: 850px;
+        border-radius: 24px;
+        z-index: 10;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
+    }
+    
+    .dark #map {
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Premium Custom Map Popups */
+    .leaflet-popup-content-wrapper {
+        background: rgba(15, 23, 42, 0.9) !important; /* Dark Slate Slate-900 */
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 20px !important;
+        color: #f1f5f9 !important;
+        padding: 5px !important;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3), 0 10px 10px -5px rgba(0,0,0,0.2) !important;
+    }
+    
+    .leaflet-popup-tip {
+        background: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .leaflet-popup-close-button {
+        color: #94a3b8 !important;
+        padding: 8px 12px !important;
+        font-size: 16px !important;
+    }
+    
+    .leaflet-popup-close-button:hover {
+        color: #f87171 !important;
+        background: transparent !important;
+    }
+
+    /* Custom Leaflet Control Panel Styling */
+    .leaflet-bar {
+        border: none !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+    }
+    .leaflet-bar a {
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        transition: all 0.2s ease;
+    }
+    .leaflet-bar a:hover {
+        background-color: #f8fafc !important;
+        color: #3b82f6 !important;
+    }
+    .dark .leaflet-bar a {
+        background-color: #1e293b !important;
+        color: #cbd5e1 !important;
+        border-bottom: 1px solid #334155 !important;
+    }
+    .dark .leaflet-bar a:hover {
+        background-color: #334155 !important;
+        color: #ffffff !important;
+    }
+
+    /* Pulsing Glowing Custom Marker Dots */
+    .glow-marker {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+    .glow-marker-inner {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+        0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0.7); }
+        70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(var(--pulse-color), 0); }
+        100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0); }
+    }
+
+    /* Custom Marker Cluster styles */
+    .custom-cluster {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.2);
+        border: 2px solid rgba(59, 130, 246, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 800;
+        font-size: 14px;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+        backdrop-filter: blur(4px);
+    }
+
+    /* Glassmorphic coordinates setting banner */
+    .map-banner-info {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+    .dark .map-banner-info {
+        background: rgba(30, 41, 59, 0.85);
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* Infrastructure Markers Styling */
+    .infra-marker-icon {
+        background: transparent !important;
+        border: none !important;
+    }
+    .infra-olt {
+        background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%) !important;
+        box-shadow: 0 0 14px rgba(168, 85, 247, 0.5) !important;
+    }
+    .infra-odc {
+        background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%) !important;
+        box-shadow: 0 0 14px rgba(6, 182, 212, 0.5) !important;
+    }
+    .infra-odp {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        box-shadow: 0 0 14px rgba(16, 185, 129, 0.5) !important;
+    }
+    .infra-nas {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+        box-shadow: 0 0 14px rgba(59, 130, 246, 0.5) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc bg-gradient-to-r from-indigo-500 to-purple-600 mr-4 shadow-lg shadow-indigo-500/15 floating-icon">
+                <i data-lucide="map" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Peta Jaringan Spasial</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Monitoring sebaran fisik pelanggan, status router NAS, dan redaman ONT secara real-time.</p>
+            </div>
+        </div>
+        
+        <div class="z-10 flex gap-2 flex-wrap">
+            <a href="/nas" class="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 shadow-md hover:scale-[1.02] text-xs cursor-pointer decoration-none">
+                <i class="fas fa-server"></i>
+                <span>Tambah NAS</span>
+            </a>
+            <button onclick="startAddInfrastructure()" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 shadow-md hover:scale-[1.02] text-xs cursor-pointer">
+                <i class="fas fa-plus"></i>
+                <span>Tambah OLT/ODC/ODP</span>
+            </button>
+            <button onclick="loadMapData()" class="bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 border border-white/10 hover:scale-[1.02] text-xs cursor-pointer">
+                <i class="fas fa-sync-alt" id="refreshMapIcon"></i>
+                <span>Refresh Data</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Settings Banner (Appears when setting location) -->
+    <div id="setLocBanner" class="hidden map-banner-info p-4 rounded-3xl shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 border">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md flex-shrink-0">
+                <i class="fas fa-map-marker-alt text-lg"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs font-bold text-slate-800 dark:text-white">Menentukan Lokasi Baru</p>
+                <p id="setLocMsg" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[280px]"></p>
+            </div>
+        </div>
+        
+        <!-- Manual coordinate paste input for flexibility -->
+        <div class="flex items-center gap-2 flex-1 max-w-md w-full">
+            <input type="text" id="manualCoordsInput" oninput="handleManualCoordsInput()" placeholder="Tempel koordinat / link Google Maps di sini..." 
+                   class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <button onclick="getCurrentGPSLocation()" type="button" title="Gunakan GPS Perangkat Saat Ini"
+                    class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-750 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer border border-slate-200 dark:border-slate-700/80 gap-1.5 flex-shrink-0">
+                <i class="fas fa-location-arrow"></i>
+                <span class="hidden sm:inline">Gunakan GPS</span>
+            </button>
+        </div>
+        
+        <div class="flex gap-2">
+            <button onclick="cancelSetLocation()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-750 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-bold transition-all">Batal</button>
+            <button id="btnSaveLoc" disabled class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold opacity-60 cursor-not-allowed shadow-md transition-all">Simpan Lokasi</button>
+        </div>
+    </div>
+
+    <!-- Add Infrastructure Banner (Appears when adding OLT/ODC/ODP) -->
+    <div id="addInfraBanner" class="hidden map-banner-info p-4 rounded-3xl shadow-lg flex flex-col gap-3 transition-all duration-300 border border-slate-200 dark:border-slate-700/80">
+        <!-- Row 1: Header + Tipe + Ikon -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <div class="w-10 h-10 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-plus-circle text-lg"></i>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs font-bold text-slate-800 dark:text-white">Tambah Infrastruktur Baru</p>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Paste koordinat / link Maps, klik peta, atau geser PIN</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 flex-1">
+                <select id="infraTypeInput" onchange="onInfraTypeChange()"
+                        class="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                    <option value="olt">OLT Pusat (Pusat Transmisi)</option>
+                    <option value="odc">ODC (Cabinet)</option>
+                    <option value="odp">ODP (Splitter Box)</option>
+                    <option value="nas">NAS Router (Custom)</option>
+                </select>
+                <!-- Icon Choice Dropdown -->
+                <select id="infraIconInput" onchange="updateInfraTempIcon()"
+                        class="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                    <option value="fa-network-wired">💻 Network Wired (Default OLT)</option>
+                    <option value="fa-broadcast-tower">📡 Broadcast Tower</option>
+                    <option value="fa-server">🖥️ Server (Central)</option>
+                    <option value="fa-ethernet">🔌 Ethernet Port</option>
+                    <option value="fa-route">🛣️ Router / Route</option>
+                    <option value="fa-box">📦 Box / Cabinet (Default ODC)</option>
+                    <option value="fa-hdd">💾 HDD Rack</option>
+                    <option value="fa-toolbox">🧰 Toolbox / Cabinet</option>
+                    <option value="fa-cubes">🧱 Nodes / Cubes</option>
+                    <option value="fa-sitemap">🌿 Sitemap (Default ODP)</option>
+                    <option value="fa-share-alt">🔀 Share Node / Splitter</option>
+                    <option value="fa-code-branch">🌿 Branching Node</option>
+                    <option value="fa-plug">🔌 Plug / Connect</option>
+                    <option value="fa-wifi">📶 WiFi Signal</option>
+                    <option value="fa-map-pin">📍 Map Pin</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Row 2: Nama + Keterangan + Koordinat -->
+        <div class="flex flex-col sm:flex-row gap-2">
+            <input type="text" id="infraNameInput" placeholder="Nama Alat (cth: ODP-PATI-01)" 
+                   class="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none flex-1">
+            <input type="text" id="infraDetailsInput" placeholder="Keterangan / Notes (Opsional)" 
+                   class="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none flex-1">
+            <!-- Koordinat Input -->
+            <div class="relative flex-1 min-w-[220px]">
+                <input type="text" id="infraCoordsInput"
+                       placeholder="Paste koordinat / link Google Maps..."
+                       oninput="handleInfraCoordInput()"
+                       class="w-full pl-8 pr-3.5 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700/60 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                <i class="fas fa-map-marker-alt absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 text-[10px]"></i>
+            </div>
+        </div>
+
+        <!-- Row 3: Live koordinat display + tombol aksi -->
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <i class="fas fa-crosshairs text-indigo-400 text-[9px]"></i>
+                    <span id="infraCoordDisplay">Belum ada koordinat — klik peta atau isi kolom di atas</span>
+                </span>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="cancelAddInfrastructure()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-750 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer">Batal</button>
+                <button id="btnSaveInfra" onclick="saveInfrastructure()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">Simpan Alat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map & Sidebar Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        
+        <!-- Sidebar Controls & Unmapped List -->
+        <div class="lg:col-span-1 space-y-6">
+            <!-- Filter Controls Card -->
+            <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm space-y-4">
+                <h3 class="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Filter Tampilan Map</h3>
+                <div class="space-y-3">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="chkShowNas" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-blue-500 border-slate-300 rounded focus:ring-blue-400">
+                        <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-server text-blue-500 text-[10px]"></i>NAS Router</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="chkShowGood" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-emerald-500 border-slate-300 rounded focus:ring-emerald-400">
+                        <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-circle text-emerald-500 text-[10px]"></i>Sinyal Bagus (Ok)</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="chkShowWarning" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-amber-500 border-slate-300 rounded focus:ring-amber-400">
+                        <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-circle text-amber-500 text-[10px]"></i>Sinyal Lemah (Warning)</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="chkShowBad" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-rose-500 border-slate-300 rounded focus:ring-rose-400">
+                        <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-circle text-rose-500 text-[10px]"></i>Sinyal Buruk (Critical)</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="chkShowOffline" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-slate-400 border-slate-300 rounded focus:ring-slate-400">
+                        <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-circle text-slate-400 text-[10px]"></i>Pelanggan Offline</span>
+                    </label>
+                    
+                    <!-- Infrastructure Filters Section -->
+                    <div class="border-t border-slate-100 dark:border-slate-700/60 pt-3 mt-3 space-y-3">
+                        <h4 class="text-[10px] font-extrabold text-slate-450 dark:text-slate-500 uppercase tracking-wider mb-2">Alat Infrastruktur</h4>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chkShowOlt" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-purple-600 border-slate-300 rounded focus:ring-purple-400">
+                            <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-network-wired text-purple-650 text-[10px]"></i>OLT Pusat</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chkShowOdc" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-cyan-500 border-slate-300 rounded focus:ring-cyan-400">
+                            <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-box text-cyan-500 text-[10px]"></i>ODC Cabinet</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chkShowOdp" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-emerald-500 border-slate-300 rounded focus:ring-emerald-400">
+                            <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-sitemap text-emerald-500 text-[10px]"></i>ODP Splitter</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chkShowTopology" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-indigo-500 border-slate-300 rounded focus:ring-indigo-400">
+                            <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-project-diagram text-indigo-500 text-[10px]"></i>Jalur Kabel FTTH NOC</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client Management List Card -->
+            <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm flex flex-col" style="max-height: 480px;">
+                <!-- Modern Tab Selection -->
+                <div class="flex border-b border-slate-100 dark:border-slate-700/50 mb-3.5 pb-0.5 gap-4">
+                    <button id="tabUnmapped" onclick="switchSidebarTab('unmapped')" class="text-xs font-extrabold text-blue-500 border-b-2 border-blue-500 pb-2 focus:outline-none transition-all cursor-pointer">
+                        Belum Terpetakan
+                    </button>
+                    <button id="tabMapped" onclick="switchSidebarTab('mapped')" class="text-xs font-extrabold text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 pb-2 focus:outline-none transition-all cursor-pointer">
+                        Sudah Terpetakan
+                    </button>
+                </div>
+                
+                <!-- Search bar for list -->
+                <div class="relative mb-3.5">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+                    <input type="text" id="unmappedSearch" placeholder="Cari user..." oninput="filterUnmappedList()"
+                           class="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-[11px] font-bold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none">
+                </div>
+
+                <!-- Scrollable list -->
+                <div id="unmappedList" class="space-y-2 overflow-y-auto flex-1 pr-1 font-outfit" style="scrollbar-width:thin;">
+                    <div class="text-center py-8 text-slate-400 dark:text-slate-500 text-xs">Loading client list...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- The Map Container -->
+        <div class="lg:col-span-4">
+            <div class="relative">
+                <!-- Search bar on top of the map for flexibility -->
+                <div class="absolute top-4 left-4 z-[1000] flex gap-2 w-64 shadow-lg bg-white dark:bg-slate-800 p-2 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                    <input type="text" id="mapSearchInput" placeholder="Cari lokasi/desa di peta..." 
+                           onkeydown="if(event.key === 'Enter') searchLocation()"
+                           class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-750 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none">
+                    <button onclick="searchLocation()" class="px-3.5 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-md">
+                        <i class="fas fa-search text-[10px]"></i>
+                    </button>
+                </div>
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Leaflet Marker Cluster JS -->
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+<script>
+    let map = null;
+    let nasLayer = L.layerGroup();
+    let infraLayer = L.layerGroup();
+    let topologyLayer = L.layerGroup();
+    let clientsClusterGroup = L.markerClusterGroup({
+        iconCreateFunction: function(cluster) {
+            return L.divIcon({
+                html: '<div class="custom-cluster"><span>' + cluster.getChildCount() + '</span></div>',
+                className: 'custom-cluster-wrapper',
+                iconSize: L.point(40, 40)
+            });
+        },
+        maxClusterRadius: 40
+    });
+
+    let mapData = { nas: [], clients: [], infra: [] };
+    let clientMarkers = {}; // Keep track of client markers
+    let infraMarkers = {}; // Keep track of OLT/ODC/ODP markers
+
+    let setLocationState = {
+        active: false,
+        username: null,
+        nasname: null,
+        tempMarker: null,
+        lat: null,
+        lng: null
+    };
+
+    let addInfraState = {
+        active: false,
+        tempMarker: null,
+        lat: null,
+        lng: null
+    };
+
+    let currentSidebarTab = 'unmapped';
+    let isMapCentered = false;
+
+    // Initialize Map View with Layer Switcher
+    function initMap() {
+        // 1. Define Tile Layers
+        const googleRoadmap = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            attribution: '&copy; Google Maps',
+            maxZoom: 22
+        });
+
+        const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            attribution: '&copy; Google Maps',
+            maxZoom: 22
+        });
+
+        const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+        });
+
+        const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CartoDB &copy; OpenStreetMap',
+            subdomains: 'abcd',
+            maxZoom: 20
+        });
+
+        // Center of map near Pati, ID. Default is Google Roadmap to avoid dark maps!
+        map = L.map('map', {
+            zoomControl: false,
+            layers: [googleRoadmap] 
+        }).setView([-6.75, 111.03], 13);
+        
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // 2. Add Layer Control Switcher
+        const baseMaps = {
+            "Google Maps (Jalan)": googleRoadmap,
+            "Google Satelit (Hybrid)": googleHybrid,
+            "OpenStreetMap Standard": osmStandard,
+            "NOC Mode Gelap": cartoDark
+        };
+        
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+        nasLayer.addTo(map);
+        infraLayer.addTo(map);
+        topologyLayer.addTo(map);
+        clientsClusterGroup.addTo(map);
+
+        // Listen to map click for coordinate selection
+        map.on('click', onMapClick);
+    }
+
+    // Nominatim Geocoding Search (Search village/street)
+    async function searchLocation() {
+        const queryInput = document.getElementById('mapSearchInput').value.trim();
+        if (!queryInput) return;
+        
+        showNotification('Mencari lokasi...', 'info');
+        try {
+            let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryInput)}&limit=3`;
+            let response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'RADIUS-Dashboard/1.0'
+                }
+            });
+            let results = await response.json();
+            
+            // Try fallback search within Pati region if first attempt yields nothing
+            if ((!results || results.length === 0) && !queryInput.toLowerCase().includes('pati')) {
+                const retryQuery = queryInput + ', Pati, Jawa Tengah';
+                url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(retryQuery)}&limit=3`;
+                response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'RADIUS-Dashboard/1.0'
+                    }
+                });
+                results = await response.json();
+            }
+            
+            if (results && results.length > 0) {
+                const lat = parseFloat(results[0].lat);
+                const lon = parseFloat(results[0].lon);
+                map.flyTo([lat, lon], 15);
+                showNotification(`Ditemukan: ${results[0].display_name.split(',')[0]}`, 'success');
+            } else {
+                showNotification('Lokasi tidak ditemukan! Coba masukkan nama desa, jalan, atau koordinat.', 'error');
+            }
+        } catch (e) {
+            console.error('Search location error:', e);
+            showNotification('Gagal melakukan pencarian', 'error');
+        }
+    }
+
+    // Robust coordinate and Google Maps link parser
+    function parseCoordinates(inputStr) {
+        const regexUrl = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+        let match = inputStr.match(regexUrl);
+        if (match) {
+            return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+        }
+        
+        const regexQuery = /[?&](?:q|query|ll|coordinates)=(-?\d+\.\d+),(-?\d+\.\d+)/;
+        match = inputStr.match(regexQuery);
+        if (match) {
+            return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+        }
+
+        const regexCoords = /(-?\d+\.\d+)\s*[\s,;]\s*(-?\d+\.\d+)/;
+        match = inputStr.match(regexCoords);
+        if (match) {
+            const lat = parseFloat(match[1]);
+            const lng = parseFloat(match[2]);
+            if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                return { lat, lng };
+            }
+        }
+        return null;
+    }
+
+    // Handle manual coordinate pasting inside the banner
+    function handleManualCoordsInput() {
+        if (!setLocationState.active) return;
+        
+        const text = document.getElementById('manualCoordsInput').value.trim();
+        if (!text) return;
+        
+        const parsed = parseCoordinates(text);
+        if (parsed) {
+            const lat = parsed.lat;
+            const lng = parsed.lng;
+            
+            setLocationState.lat = lat;
+            setLocationState.lng = lng;
+            
+            map.panTo([lat, lng]);
+            
+            if (setLocationState.tempMarker) {
+                setLocationState.tempMarker.setLatLng([lat, lng]);
+            } else {
+                const tempIcon = L.divIcon({
+                    html: '<i class="fas fa-map-marker-alt text-amber-500 text-4xl animate-bounce"></i>',
+                    className: 'temp-marker-icon',
+                    iconSize: [24, 36],
+                    iconAnchor: [12, 36]
+                });
+                setLocationState.tempMarker = L.marker([lat, lng], { icon: tempIcon, draggable: true }).addTo(map);
+                bindTempMarkerEvents();
+            }
+            
+            const saveBtn = document.getElementById('btnSaveLoc');
+            saveBtn.disabled = false;
+            saveBtn.className = "px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer";
+            saveBtn.onclick = saveCoordinates;
+        }
+    }
+
+    // Capture user GPS coordinates on-site
+    function getCurrentGPSLocation() {
+        if (!setLocationState.active) return;
+        
+        if (!navigator.geolocation) {
+            showNotification('Geolocation tidak didukung oleh browser ini', 'error');
+            return;
+        }
+        
+        showNotification('Mendapatkan lokasi GPS...', 'info');
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                
+                setLocationState.lat = lat;
+                setLocationState.lng = lng;
+                
+                const coordsStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                document.getElementById('manualCoordsInput').value = coordsStr;
+                
+                map.flyTo([lat, lng], 17);
+                
+                if (setLocationState.tempMarker) {
+                    setLocationState.tempMarker.setLatLng([lat, lng]);
+                } else {
+                    const tempIcon = L.divIcon({
+                        html: '<i class="fas fa-map-marker-alt text-amber-500 text-4xl animate-bounce"></i>',
+                        className: 'temp-marker-icon',
+                        iconSize: [24, 36],
+                        iconAnchor: [12, 36]
+                    });
+                    setLocationState.tempMarker = L.marker([lat, lng], { icon: tempIcon, draggable: true }).addTo(map);
+                    bindTempMarkerEvents();
+                }
+                
+                const saveBtn = document.getElementById('btnSaveLoc');
+                saveBtn.disabled = false;
+                saveBtn.className = "px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer";
+                saveBtn.onclick = saveCoordinates;
+                
+                showNotification('GPS didapatkan dan diposisikan!', 'success');
+            },
+            (error) => {
+                console.error('GPS error:', error);
+                let msg = 'Gagal mendapatkan GPS perangkat';
+                if (error.code === error.PERMISSION_DENIED) {
+                    msg = 'Izin akses lokasi/GPS ditolak browser';
+                }
+                showNotification(msg, 'error');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    }
+
+    // Helper to bind drag listeners on the draggable temporary marker
+    function bindTempMarkerEvents() {
+        if (!setLocationState.tempMarker) return;
+        
+        setLocationState.tempMarker.on('drag', function(e) {
+            const pos = e.target.getLatLng();
+            setLocationState.lat = pos.lat;
+            setLocationState.lng = pos.lng;
+            document.getElementById('manualCoordsInput').value = `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`;
+        });
+        
+        setLocationState.tempMarker.on('dragend', function(e) {
+            const pos = e.target.getLatLng();
+            setLocationState.lat = pos.lat;
+            setLocationState.lng = pos.lng;
+            document.getElementById('manualCoordsInput').value = `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`;
+            
+            const saveBtn = document.getElementById('btnSaveLoc');
+            saveBtn.disabled = false;
+            saveBtn.className = "px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer";
+        });
+    }
+
+    // Load map devices, routers and infrastructure data
+    async function loadMapData() {
+        const refreshIcon = document.getElementById('refreshMapIcon');
+        if (refreshIcon) refreshIcon.classList.add('fa-spin');
+        
+        try {
+            // Load routers and client devices
+            const devicesRes = await apiCall('/api/map/devices');
+            
+            // Load infrastructure OLT/ODC/ODP nodes
+            const infraRes = await apiCall('/api/map/infrastructure');
+            
+            if (devicesRes.success && infraRes.success) {
+                mapData.nas = devicesRes.nas;
+                mapData.clients = devicesRes.clients;
+                mapData.infra = infraRes.devices;
+                
+                if (!isMapCentered) {
+                    const firstNas = mapData.nas.find(n => n.latitude && n.longitude);
+                    if (firstNas) {
+                        map.setView([firstNas.latitude, firstNas.longitude], 13);
+                    } else if (mapData.clients.length > 0) {
+                        const firstClient = mapData.clients.find(c => !c.is_simulated && c.latitude && c.longitude);
+                        if (firstClient) {
+                            map.setView([firstClient.latitude, firstClient.longitude], 13);
+                        }
+                    }
+                    isMapCentered = true;
+                }
+                
+                renderMap();
+                renderInfrastructure();
+                renderSidebarList();
+            } else {
+                showNotification('Gagal mengambil data peta atau infrastruktur', 'error');
+            }
+        } catch (e) {
+            console.error('Error loading map data:', e);
+        } finally {
+            if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+        }
+    }
+
+    // Render NAS and clients markers
+    function renderMap() {
+        nasLayer.clearLayers();
+        clientsClusterGroup.clearLayers();
+        clientMarkers = {};
+
+        // 1. Render NAS
+        mapData.nas.forEach(nas => {
+            if (nas.latitude && nas.longitude) {
+                const nasIcon = L.divIcon({
+                    className: 'custom-nas-marker',
+                    html: `
+                        <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg border-2 border-white shadow-blue-500/20 hover:scale-110 transition-transform">
+                            <i class="fas fa-server text-xs"></i>
+                        </div>
+                    `,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+
+                const popupHtml = `
+                    <div class="p-3 w-64 text-slate-200">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="w-7 h-7 rounded-lg bg-blue-500 text-white flex items-center justify-center">
+                                <i class="fas fa-server text-xs"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-white leading-none">${nas.shortname}</p>
+                                <p class="text-[9px] text-slate-400 font-mono mt-0.5">${nas.nasname}</p>
+                            </div>
+                        </div>
+                        <div class="border-t border-slate-700/60 pt-2 text-[10px] space-y-1">
+                            <div class="flex justify-between"><span class="text-slate-400">Tipe NAS:</span><span class="font-bold text-white">${nas.type || 'MikroTik'}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Koordinat:</span><span class="font-mono text-white">${nas.latitude.toFixed(5)}, ${nas.longitude.toFixed(5)}</span></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1.5 mt-3">
+                            <button onclick="startSetLocation(null, '${nas.nasname}', 'NAS: ${nas.shortname}')"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all cursor-pointer">
+                                <i class="fas fa-map-marker-alt mr-1"></i>Pindahkan
+                            </button>
+                            <button onclick="deleteCoordinates(null, '${nas.nasname}')"
+                                    class="bg-slate-800 hover:bg-red-950 text-slate-400 hover:text-red-400 border border-slate-700 text-[9px] py-1.5 rounded-lg font-bold transition-all cursor-pointer">
+                                <i class="fas fa-trash-alt mr-1"></i>Hapus Lokasi
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                const marker = L.marker([nas.latitude, nas.longitude], { icon: nasIcon, draggable: true })
+                    .bindPopup(popupHtml);
+                
+                marker.on('dragend', function(e) {
+                    const newLatLng = e.target.getLatLng();
+                    saveDraggedLocation(null, nas.nasname, newLatLng.lat, newLatLng.lng);
+                });
+
+                nasLayer.addLayer(marker);
+            }
+        });
+
+        // 2. Render Clients
+        mapData.clients.forEach(client => {
+            if (client.is_simulated) return;
+
+            const rxColors = {
+                good: '16, 185, 129',     
+                warning: '245, 158, 11',  
+                bad: '239, 68, 68',       
+            };
+            const col = client.is_online ? (rxColors[client.rx_status] || '16, 185, 129') : '148, 163, 184';
+            
+            const clientIcon = L.divIcon({
+                className: 'custom-client-marker',
+                html: `
+                    <div class="glow-marker" style="background: rgba(${col}, 0.2); border-color: rgba(${col}, 0.8)">
+                        <div class="glow-marker-inner" style="background: rgb(${col}); --pulse-color: ${col}"></div>
+                    </div>
+                `,
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+            });
+
+            const rxColorClass = client.rx_status === 'good' ? 'text-emerald-400' : client.rx_status === 'warning' ? 'text-amber-400' : 'text-rose-500';
+            const statusBadge = client.is_online ? 
+                `<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold rounded-full">Online</span>` :
+                `<span class="px-2 py-0.5 bg-slate-500/10 text-slate-400 text-[9px] font-bold rounded-full">Offline</span>`;
+
+            const popupHtml = `
+                <div class="p-3 w-64 text-slate-200">
+                    <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-700/50">
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs uppercase">
+                                ${client.type.slice(0, 3)}
+                            </div>
+                            <span class="text-xs font-extrabold text-white truncate max-w-[120px]">${client.username}</span>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    
+                    <div class="text-[10px] space-y-1.5">
+                        <div class="flex justify-between"><span class="text-slate-400">Optical RX Power:</span><span class="font-bold ${rxColorClass}">${client.rx_power} dBm</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Temperatur ONT:</span><span class="font-bold text-white">${client.temperature} °C</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Tipe ONT:</span><span class="font-bold text-slate-300 truncate max-w-[120px]">${client.manufacturer} ${client.model}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">NAS Terhubung:</span><span class="font-mono text-slate-300">${client.last_nas}</span></div>
+                    </div>
+                    
+                    <div class="space-y-1.5 mt-3">
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button onclick="startSetLocation('${client.username}', null, 'Client: ${client.username}')"
+                                    class="bg-slate-750 hover:bg-slate-700 text-slate-200 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-600 cursor-pointer">
+                                <i class="fas fa-map-marker-alt mr-1"></i>Pindahkan
+                            </button>
+                            <button onclick="rebootOnt('${client.username}')"
+                                    class="bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all shadow-md cursor-pointer">
+                                <i class="fas fa-sync-alt mr-1"></i>Reboot ONT
+                            </button>
+                        </div>
+                        <button onclick="deleteCustomerCoordinates('${client.username}')"
+                                class="w-full bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-700 cursor-pointer">
+                            <i class="fas fa-trash-alt mr-1"></i>Hapus Lokasi dari Peta
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            const marker = L.marker([client.latitude, client.longitude], { icon: clientIcon, draggable: true })
+                .bindPopup(popupHtml);
+
+            marker.on('dragend', function(e) {
+                const newLatLng = e.target.getLatLng();
+                saveDraggedLocation(client.username, null, newLatLng.lat, newLatLng.lng);
+            });
+
+            clientsClusterGroup.addLayer(marker);
+            clientMarkers[client.username] = marker;
+        });
+
+        updateFilters(); 
+    }
+
+    // Render OLT / ODC / ODP Markers
+    function renderInfrastructure() {
+        infraLayer.clearLayers();
+        infraMarkers = {};
+
+        mapData.infra.forEach(device => {
+            const defaultIcons = {
+                olt: 'fa-network-wired',
+                odc: 'fa-box',
+                odp: 'fa-sitemap',
+                nas: 'fa-server'
+            };
+            const typesMeta = {
+                olt: { label: 'OLT Pusat', colorClass: 'infra-olt' },
+                odc: { label: 'ODC Cabinet', colorClass: 'infra-odc' },
+                odp: { label: 'ODP Splitter Box', colorClass: 'infra-odp' },
+                nas: { label: 'NAS Router (Custom)', colorClass: 'infra-nas' }
+            };
+
+            const meta = typesMeta[device.type] || typesMeta['odp'];
+            const iconClass = device.icon || defaultIcons[device.type] || 'fa-map-pin';
+
+            const infraIcon = L.divIcon({
+                className: 'infra-marker-icon-wrapper',
+                html: `
+                    <div class="w-9 h-9 rounded-2xl ${meta.colorClass} text-white flex items-center justify-center shadow-lg border-2 border-white hover:scale-110 transition-transform">
+                        <i class="fas ${iconClass} text-xs"></i>
+                    </div>
+                `,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+
+            const popupHtml = `
+                <div class="p-3 w-64 text-slate-200">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-7 h-7 rounded-lg ${meta.colorClass} text-white flex items-center justify-center">
+                            <i class="fas ${iconClass} text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-white leading-none">${device.name}</p>
+                            <p class="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider mt-0.5">${meta.label}</p>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-700/60 pt-2 text-[10px] space-y-1">
+                        <div class="flex justify-between"><span class="text-slate-400">Keterangan:</span><span class="text-white font-semibold">${device.details || '-'}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Koordinat:</span><span class="font-mono text-white">${device.latitude.toFixed(6)}, ${device.longitude.toFixed(6)}</span></div>
+                    </div>
+                    <button onclick="deleteInfrastructure(${device.id}, '${device.name}')"
+                            class="mt-3 w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-650 hover:to-rose-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all shadow-md cursor-pointer">
+                        <i class="fas fa-trash-alt mr-1"></i>Hapus Alat ini
+                    </button>
+                </div>
+            `;
+
+            const marker = L.marker([device.latitude, device.longitude], { icon: infraIcon, draggable: true })
+                .bindPopup(popupHtml);
+
+            // Drag and drop positional update for OLT/ODC/ODP
+            marker.on('dragend', function(e) {
+                const newLatLng = e.target.getLatLng();
+                saveDraggedInfraLocation(device.id, newLatLng.lat, newLatLng.lng);
+            });
+
+            infraLayer.addLayer(marker);
+            infraMarkers[device.id] = marker;
+        });
+
+        updateFilters();
+    }
+
+    // Toggle and Switch Sidebar Tabs
+    function switchSidebarTab(tab) {
+        currentSidebarTab = tab;
+        
+        const tabUnmapped = document.getElementById('tabUnmapped');
+        const tabMapped = document.getElementById('tabMapped');
+        
+        if (tab === 'unmapped') {
+            tabUnmapped.className = "text-xs font-extrabold text-blue-500 border-b-2 border-blue-500 pb-2 focus:outline-none transition-all cursor-pointer";
+            tabMapped.className = "text-xs font-extrabold text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 pb-2 focus:outline-none transition-all cursor-pointer";
+        } else {
+            tabMapped.className = "text-xs font-extrabold text-emerald-500 border-b-2 border-emerald-500 pb-2 focus:outline-none transition-all cursor-pointer";
+            tabUnmapped.className = "text-xs font-extrabold text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 pb-2 focus:outline-none transition-all cursor-pointer";
+        }
+        
+        const query = document.getElementById('unmappedSearch').value;
+        renderSidebarList(query);
+    }
+
+    // Render Tabbed List of clients
+    function renderSidebarList(searchQuery = '') {
+        const listDiv = document.getElementById('unmappedList');
+        if (!listDiv) return;
+
+        let clients = [];
+        if (currentSidebarTab === 'unmapped') {
+            clients = mapData.clients.filter(c => c.is_simulated);
+        } else {
+            clients = mapData.clients.filter(c => !c.is_simulated);
+        }
+
+        const filtered = clients.filter(c => c.username.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        let htmlOut = '';
+
+        if (currentSidebarTab === 'unmapped') {
+            const unmappedNas = mapData.nas.filter(n => !n.latitude || !n.longitude);
+            const filteredNas = unmappedNas.filter(n => n.shortname.toLowerCase().includes(searchQuery.toLowerCase()) || n.nasname.toLowerCase().includes(searchQuery.toLowerCase()));
+            
+            if (filteredNas.length > 0) {
+                htmlOut += filteredNas.map(n => `
+                    <div class="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl flex items-center justify-between hover:border-indigo-400/50 transition-all mb-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5 mb-1">
+                                <i class="fas fa-server text-indigo-500 text-[10px]"></i>
+                                <p class="text-xs font-bold text-slate-850 dark:text-slate-200 truncate max-w-[120px]">${n.shortname}</p>
+                            </div>
+                            <span class="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-600 text-[8px] font-extrabold rounded-md uppercase">NAS Belum Terpetakan</span>
+                        </div>
+                        <button onclick="startSetLocation(null, '${n.nasname}', 'NAS: ${n.shortname}')"
+                                title="Set Lokasi di Peta"
+                                class="ml-2 px-2 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-600 hover:text-white rounded-lg text-[9px] font-bold transition-all flex items-center gap-1 border border-indigo-500/20 cursor-pointer flex-shrink-0">
+                            <i class="fas fa-map-marker-alt"></i> Set Lokasi
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        if (filtered.length === 0 && htmlOut === '') {
+            listDiv.innerHTML = `
+                <div class="text-center py-10 text-slate-400 dark:text-slate-550 text-xs">
+                    <i class="fas fa-search text-2xl mb-2 text-slate-400 opacity-60"></i>
+                    <p class="font-bold">Tidak ada data ditemukan</p>
+                </div>
+            `;
+            return;
+        }
+
+        htmlOut += filtered.map(c => {
+            const isOnline = c.is_online;
+            const rxColors = {
+                good: 'bg-emerald-500',
+                warning: 'bg-amber-500',
+                bad: 'bg-rose-500',
+            };
+            const signalDot = isOnline ? (rxColors[c.rx_status] || 'bg-emerald-500') : 'bg-slate-400';
+            
+            if (c.is_simulated) {
+                return `
+                    <div class="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between hover:border-amber-400/50 dark:hover:border-amber-500/30 transition-all">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5 mb-1">
+                                <span class="w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}"></span>
+                                <p class="text-xs font-bold text-slate-850 dark:text-slate-200 truncate max-w-[120px]">${c.username}</p>
+                            </div>
+                            <span class="px-1.5 py-0.5 bg-amber-500/10 text-amber-600 text-[8px] font-extrabold rounded-md uppercase">Belum Terpetakan</span>
+                        </div>
+                        <button onclick="startSetLocation('${c.username}', null, '${c.username}')"
+                                title="Set Lokasi di Peta"
+                                class="ml-2 px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-600 hover:text-white rounded-lg text-[9px] font-bold transition-all flex items-center gap-1 border border-amber-500/20 cursor-pointer flex-shrink-0">
+                            <i class="fas fa-map-marker-alt"></i> Set Lokasi
+                        </button>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between hover:border-blue-400/50 dark:hover:border-blue-500/30 transition-all">
+                        <div class="min-w-0 cursor-pointer flex-1" onclick="flyToClient('${c.username}')">
+                            <div class="flex items-center gap-1.5 mb-1">
+                                <span class="w-1.5 h-1.5 rounded-full ${signalDot}"></span>
+                                <p class="text-xs font-bold text-slate-850 dark:text-slate-200 truncate max-w-[110px]">${c.username}</p>
+                            </div>
+                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">RX: ${c.rx_power} dBm</p>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="flyToClient('${c.username}')"
+                                    title="Tampilkan di Peta"
+                                    class="p-1.5 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-blue-500/10">
+                                <i class="fas fa-crosshairs"></i>
+                            </button>
+                            <button onclick="startSetLocation('${c.username}', null, '${c.username}')"
+                                    title="Pindahkan Lokasi"
+                                    class="p-1.5 bg-slate-100 hover:bg-slate-700 text-slate-500 hover:text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-slate-200 dark:border-slate-700">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </button>
+                            <button onclick="deleteCustomerCoordinates('${c.username}')"
+                                    title="Hapus Lokasi dari Peta"
+                                    class="p-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-red-500/10">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        }).join('');
+
+        listDiv.innerHTML = htmlOut;
+    }
+
+    // Zoom and pan to a client marker on map
+    function flyToClient(username) {
+        const client = mapData.clients.find(c => c.username === username);
+        if (!client) return;
+
+        let filtersUpdated = false;
+        if (!client.is_online) {
+            const chkOffline = document.getElementById('chkShowOffline');
+            if (chkOffline && !chkOffline.checked) {
+                chkOffline.checked = true;
+                filtersUpdated = true;
+            }
+        } else {
+            if (client.rx_status === 'good') {
+                const chkGood = document.getElementById('chkShowGood');
+                if (chkGood && !chkGood.checked) {
+                    chkGood.checked = true;
+                    filtersUpdated = true;
+                }
+            } else if (client.rx_status === 'warning') {
+                const chkWarning = document.getElementById('chkShowWarning');
+                if (chkWarning && !chkWarning.checked) {
+                    chkWarning.checked = true;
+                    filtersUpdated = true;
+                }
+            } else if (client.rx_status === 'bad') {
+                const chkBad = document.getElementById('chkShowBad');
+                if (chkBad && !chkBad.checked) {
+                    chkBad.checked = true;
+                    filtersUpdated = true;
+                }
+            }
+        }
+
+        if (filtersUpdated) {
+            updateFilters();
+        }
+
+        const marker = clientMarkers[username];
+        if (marker) {
+            const latlng = marker.getLatLng();
+            map.flyTo(latlng, 18);
+            setTimeout(() => {
+                marker.openPopup();
+            }, 350);
+        } else {
+            showNotification('Gagal menemukan marker pelanggan di peta.', 'error');
+        }
+    }
+
+    function filterUnmappedList() {
+        const query = document.getElementById('unmappedSearch').value;
+        renderSidebarList(query);
+    }
+
+    // Apply Checkbox Filters (including OLT/ODC/ODP nodes)
+    function updateFilters() {
+        const showNas = document.getElementById('chkShowNas').checked;
+        const showGood = document.getElementById('chkShowGood').checked;
+        const showWarning = document.getElementById('chkShowWarning').checked;
+        const showBad = document.getElementById('chkShowBad').checked;
+        const showOffline = document.getElementById('chkShowOffline').checked;
+
+        const showOlt = document.getElementById('chkShowOlt').checked;
+        const showOdc = document.getElementById('chkShowOdc').checked;
+        const showOdp = document.getElementById('chkShowOdp').checked;
+
+        // Apply NAS Layer visibility
+        if (showNas) {
+            if (!map.hasLayer(nasLayer)) map.addLayer(nasLayer);
+        } else {
+            if (map.hasLayer(nasLayer)) map.removeLayer(nasLayer);
+        }
+
+        // Apply Infrastructure Layer visibility based on specific categories
+        infraLayer.clearLayers();
+        mapData.infra.forEach(device => {
+            if (device.type === 'olt' && !showOlt) return;
+            if (device.type === 'odc' && !showOdc) return;
+            if (device.type === 'odp' && !showOdp) return;
+            if (device.type === 'nas' && !showNas) return;
+
+            const marker = infraMarkers[device.id];
+            if (marker) infraLayer.addLayer(marker);
+        });
+
+        // Apply Clients visibility
+        clientsClusterGroup.clearLayers();
+        mapData.clients.forEach(client => {
+            if (client.is_simulated) return;
+
+            if (!client.is_online) {
+                if (!showOffline) return;
+            } else {
+                if (client.rx_status === 'good' && !showGood) return;
+                if (client.rx_status === 'warning' && !showWarning) return;
+                if (client.rx_status === 'bad' && !showBad) return;
+            }
+
+            const marker = clientMarkers[client.username];
+            if (marker) clientsClusterGroup.addLayer(marker);
+        });
+
+        // Update cable path topology lines dynamically
+        updateTopology();
+    }
+
+    // Dynamic Haversine Geodistance helper
+    function getGeographicalDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Earth radius in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    // Find closest infrastructure device of a certain type
+    function findNearestDevice(lat, lng, type) {
+        let nearest = null;
+        let minDistance = Infinity;
+
+        const showOlt = document.getElementById('chkShowOlt').checked;
+        const showOdc = document.getElementById('chkShowOdc').checked;
+        const showOdp = document.getElementById('chkShowOdp').checked;
+
+        // Ensure we only link to devices that are currently visible/enabled on map
+        if (type === 'olt' && !showOlt) return null;
+        if (type === 'odc' && !showOdc) return null;
+        if (type === 'odp' && !showOdp) return null;
+
+        mapData.infra.forEach(dev => {
+            if (dev.type === type && dev.latitude && dev.longitude) {
+                const dist = getGeographicalDistance(lat, lng, dev.latitude, dev.longitude);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearest = dev;
+                }
+            }
+        });
+        return nearest;
+    }
+
+    // Draw lines mapping OLT -> ODC -> ODP -> ONT (Topology)
+    function updateTopology() {
+        topologyLayer.clearLayers();
+        const showTopology = document.getElementById('chkShowTopology').checked;
+        if (!showTopology) return;
+
+        const showGood = document.getElementById('chkShowGood').checked;
+        const showWarning = document.getElementById('chkShowWarning').checked;
+        const showBad = document.getElementById('chkShowBad').checked;
+        const showOffline = document.getElementById('chkShowOffline').checked;
+
+        // 1. Draw ONT (Clients) to nearest ODP lines
+        mapData.clients.forEach(client => {
+            if (!client.latitude || !client.longitude) return;
+            if (client.is_simulated) return;
+
+            // Skip if the client is filtered out
+            if (!client.is_online) {
+                if (!showOffline) return;
+            } else {
+                if (client.rx_status === 'good' && !showGood) return;
+                if (client.rx_status === 'warning' && !showWarning) return;
+                if (client.rx_status === 'bad' && !showBad) return;
+            }
+
+            const nearestOdp = findNearestDevice(client.latitude, client.longitude, 'odp');
+            if (nearestOdp) {
+                const color = client.is_online ? '#10b981' : '#94a3b8';
+                const line = L.polyline([[client.latitude, client.longitude], [nearestOdp.latitude, nearestOdp.longitude]], {
+                    color: color,
+                    weight: 1.5,
+                    dashArray: '4, 4',
+                    opacity: 0.55
+                }).bindTooltip(`Drop Fiber: ${client.username} &rarr; ${nearestOdp.name} (${client.rx_power} dBm)`, { sticky: true });
+                topologyLayer.addLayer(line);
+            }
+        });
+
+        // 2. Draw ODP to nearest ODC lines
+        mapData.infra.forEach(odp => {
+            if (odp.type !== 'odp' || !odp.latitude || !odp.longitude) return;
+
+            const nearestOdc = findNearestDevice(odp.latitude, odp.longitude, 'odc');
+            if (nearestOdc) {
+                const line = L.polyline([[odp.latitude, odp.longitude], [nearestOdc.latitude, nearestOdc.longitude]], {
+                    color: '#06b6d4', // cyan
+                    weight: 3.0,
+                    opacity: 0.7
+                }).bindTooltip(`Distribusi: ${odp.name} &rarr; ${nearestOdc.name}`, { sticky: true });
+                topologyLayer.addLayer(line);
+            }
+        });
+
+        // 3. Draw ODC to nearest OLT lines
+        mapData.infra.forEach(odc => {
+            if (odc.type !== 'odc' || !odc.latitude || !odc.longitude) return;
+
+            const nearestOlt = findNearestDevice(odc.latitude, odc.longitude, 'olt');
+            if (nearestOlt) {
+                const line = L.polyline([[odc.latitude, odc.longitude], [nearestOlt.latitude, nearestOlt.longitude]], {
+                    color: '#a855f7', // purple/indigo
+                    weight: 4.5,
+                    opacity: 0.8
+                }).bindTooltip(`Feeder Utama: ${odc.name} &rarr; ${nearestOlt.name}`, { sticky: true });
+                topologyLayer.addLayer(line);
+            }
+        });
+    }
+
+    // Start Interactive Location Placement Mode
+    function startSetLocation(username, nasname, displayName) {
+        if (setLocationState.tempMarker) {
+            map.removeLayer(setLocationState.tempMarker);
+        }
+        cancelAddInfrastructure(); // Close infrastructure mode if open
+
+        setLocationState = {
+            active: true,
+            username: username,
+            nasname: nasname,
+            tempMarker: null,
+            lat: null,
+            lng: null
+        };
+
+        document.getElementById('map').style.cursor = 'crosshair';
+
+        const banner = document.getElementById('setLocBanner');
+        const msg = document.getElementById('setLocMsg');
+        const saveBtn = document.getElementById('btnSaveLoc');
+        
+        msg.textContent = `Posisikan PIN untuk ${displayName}`;
+        saveBtn.disabled = true;
+        saveBtn.className = "px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold opacity-60 cursor-not-allowed shadow-md transition-all";
+        
+        let startLat = -6.75;
+        let startLng = 111.03;
+        
+        if (username) {
+            const clientObj = mapData.clients.find(c => c.username === username);
+            if (clientObj) {
+                const nasObj = mapData.nas.find(n => n.nasname === clientObj.last_nas || n.shortname === clientObj.last_nas);
+                if (nasObj && nasObj.latitude && nasObj.longitude) {
+                    startLat = nasObj.latitude;
+                    startLng = nasObj.longitude;
+                }
+                if (clientObj.latitude && !clientObj.is_simulated) {
+                    startLat = clientObj.latitude;
+                    startLng = clientObj.longitude;
+                }
+            }
+        } else if (nasname) {
+            const nasObj = mapData.nas.find(n => n.nasname === nasname);
+            if (nasObj && nasObj.latitude && nasObj.longitude) {
+                startLat = nasObj.latitude;
+                startLng = nasObj.longitude;
+            }
+        } else {
+            const center = map.getCenter();
+            startLat = center.lat;
+            startLng = center.lng;
+        }
+        
+        setLocationState.lat = startLat;
+        setLocationState.lng = startLng;
+        
+        const initialLatLng = L.latLng(startLat, startLng);
+        map.flyTo(initialLatLng, 17);
+        
+        const tempIcon = L.divIcon({
+            html: '<i class="fas fa-map-marker-alt text-amber-500 text-4xl animate-bounce"></i>',
+            className: 'temp-marker-icon',
+            iconSize: [24, 36],
+            iconAnchor: [12, 36]
+        });
+        setLocationState.tempMarker = L.marker(initialLatLng, { icon: tempIcon, draggable: true }).addTo(map);
+        bindTempMarkerEvents();
+        
+        document.getElementById('manualCoordsInput').value = `${startLat.toFixed(6)}, ${startLng.toFixed(6)}`;
+        
+        saveBtn.disabled = false;
+        saveBtn.className = "px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer";
+        saveBtn.onclick = saveCoordinates;
+        
+        banner.classList.remove('hidden');
+        showNotification('Mode set lokasi aktif. Geser PIN kuning atau klik pada peta.', 'warning');
+    }
+
+    // ----------------------------------------------------
+    // ADD INFRASTRUCTURE (OLT / ODC / ODP) INTERACTIVE MODE
+    // ----------------------------------------------------
+    function startAddInfrastructure() {
+        cancelSetLocation(); 
+        if (addInfraState.tempMarker) {
+            map.removeLayer(addInfraState.tempMarker);
+        }
+
+        addInfraState = {
+            active: true,
+            tempMarker: null,
+            lat: null,
+            lng: null
+        };
+
+        document.getElementById('map').style.cursor = 'crosshair';
+        document.getElementById('infraNameInput').value = '';
+        document.getElementById('infraDetailsInput').value = '';
+        document.getElementById('infraCoordsInput').value = '';
+        document.getElementById('infraTypeInput').value = 'olt';
+        document.getElementById('infraIconInput').value = 'fa-network-wired';
+        document.getElementById('infraCoordDisplay').textContent = 'Klik di peta atau paste koordinat untuk menempatkan PIN';
+
+        const banner = document.getElementById('addInfraBanner');
+        banner.classList.remove('hidden');
+
+        // Tempatkan PIN sementara di tengah layar peta
+        const center = map.getCenter();
+        addInfraState.lat = center.lat;
+        addInfraState.lng = center.lng;
+
+        const tempIcon = L.divIcon({
+            html: `
+                <div class="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg border-2 border-white animate-bounce">
+                    <i class="fas fa-plus text-xs"></i>
+                </div>
+            `,
+            className: 'temp-infra-icon-wrapper',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+        });
+
+        addInfraState.tempMarker = L.marker(center, { icon: tempIcon, draggable: true }).addTo(map);
+        bindInfraTempMarkerEvents();
+        updateInfraCoordDisplay(center.lat, center.lng);
+
+        setTimeout(() => {
+            document.getElementById('infraNameInput').focus();
+        }, 100);
+
+        showNotification('Mode tambah infrastruktur aktif! Paste koordinat/link Maps, klik peta, atau geser PIN.', 'info');
+    }
+
+    function onInfraTypeChange() {
+        const type = document.getElementById('infraTypeInput').value;
+        const iconInput = document.getElementById('infraIconInput');
+        
+        if (type === 'olt') iconInput.value = 'fa-network-wired';
+        else if (type === 'odc') iconInput.value = 'fa-box';
+        else if (type === 'odp') iconInput.value = 'fa-sitemap';
+        else if (type === 'nas') iconInput.value = 'fa-server';
+        
+        updateInfraTempIcon();
+    }
+
+    function updateInfraTempIcon() {
+        if (!addInfraState.active || !addInfraState.tempMarker) return;
+
+        const type = document.getElementById('infraTypeInput').value;
+        let iconClass = document.getElementById('infraIconInput').value;
+
+        const defaultIcons = {
+            olt: 'fa-network-wired',
+            odc: 'fa-box',
+            odp: 'fa-sitemap',
+            nas: 'fa-server'
+        };
+
+        if (!iconClass) {
+            iconClass = defaultIcons[type] || 'fa-map-pin';
+        }
+
+        const typesMeta = {
+            olt: { colorClass: 'infra-olt' },
+            odc: { colorClass: 'infra-odc' },
+            odp: { colorClass: 'infra-odp' },
+            nas: { colorClass: 'infra-nas' }
+        };
+
+        const meta = typesMeta[type] || typesMeta['odp'];
+        
+        const previewIcon = L.divIcon({
+            html: `
+                <div class="w-9 h-9 rounded-2xl ${meta.colorClass} text-white flex items-center justify-center shadow-lg border-2 border-white animate-bounce">
+                    <i class="fas ${iconClass} text-xs"></i>
+                </div>
+            `,
+            className: 'temp-infra-icon-wrapper',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+        });
+
+        addInfraState.tempMarker.setIcon(previewIcon);
+    }
+
+    function bindInfraTempMarkerEvents() {
+        if (!addInfraState.tempMarker) return;
+
+        addInfraState.tempMarker.on('drag', function(e) {
+            const pos = e.target.getLatLng();
+            addInfraState.lat = pos.lat;
+            addInfraState.lng = pos.lng;
+            updateInfraCoordDisplay(pos.lat, pos.lng);
+        });
+
+        addInfraState.tempMarker.on('dragend', function(e) {
+            const pos = e.target.getLatLng();
+            addInfraState.lat = pos.lat;
+            addInfraState.lng = pos.lng;
+            updateInfraCoordDisplay(pos.lat, pos.lng);
+        });
+    }
+
+    // Update live coordinate display
+    function updateInfraCoordDisplay(lat, lng) {
+        const display = document.getElementById('infraCoordDisplay');
+        if (display) {
+            display.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        }
+    }
+
+    // Handle manual coordinate / Google Maps link input for infrastructure
+    function handleInfraCoordInput() {
+        if (!addInfraState.active) return;
+        const text = document.getElementById('infraCoordsInput').value.trim();
+        if (!text) return;
+
+        const parsed = parseCoordinates(text);
+        if (parsed) {
+            addInfraState.lat = parsed.lat;
+            addInfraState.lng = parsed.lng;
+
+            if (addInfraState.tempMarker) {
+                addInfraState.tempMarker.setLatLng([parsed.lat, parsed.lng]);
+            }
+            map.flyTo([parsed.lat, parsed.lng], Math.max(map.getZoom(), 16), { duration: 1 });
+            updateInfraCoordDisplay(parsed.lat, parsed.lng);
+
+            // Visual feedback: hijau kalau berhasil
+            document.getElementById('infraCoordsInput').classList.add('border-emerald-500', 'bg-emerald-50');
+            document.getElementById('infraCoordsInput').classList.remove('border-red-400');
+        } else if (text.length > 5) {
+            // Tampilkan merah jika format tidak dikenali
+            document.getElementById('infraCoordsInput').classList.add('border-red-400');
+            document.getElementById('infraCoordsInput').classList.remove('border-emerald-500');
+        }
+    }
+
+    async function saveInfrastructure() {
+        if (!addInfraState.active || !addInfraState.lat || !addInfraState.lng) return;
+
+        const name = document.getElementById('infraNameInput').value.trim();
+        const type = document.getElementById('infraTypeInput').value;
+        const details = document.getElementById('infraDetailsInput').value.trim();
+        const icon = document.getElementById('infraIconInput').value || '';
+
+        if (!name) {
+            showNotification('Nama alat wajib diisi!', 'error');
+            document.getElementById('infraNameInput').focus();
+            return;
+        }
+
+        const payload = {
+            name: name,
+            type: type,
+            latitude: addInfraState.lat,
+            longitude: addInfraState.lng,
+            details: details,
+            icon: icon
+        };
+
+        try {
+            const res = await apiCall('/api/map/infrastructure/add', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            if (res.success) {
+                showNotification(res.message, 'success');
+                cancelAddInfrastructure();
+                loadMapData(); 
+            } else {
+                showNotification('Gagal menyimpan: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Error menyimpan infrastruktur', 'error');
+        }
+    }
+
+    function cancelAddInfrastructure() {
+        if (addInfraState.tempMarker) {
+            map.removeLayer(addInfraState.tempMarker);
+        }
+        document.getElementById('map').style.cursor = '';
+        document.getElementById('addInfraBanner').classList.add('hidden');
+        addInfraState = { active: false, tempMarker: null, lat: null, lng: null };
+    }
+
+    async function deleteInfrastructure(id, name) {
+        if (!confirm(`Hapus alat infrastruktur "${name}" dari peta?`)) return;
+
+        showNotification('Menghapus alat...', 'info');
+        try {
+            const res = await apiCall('/api/map/infrastructure/delete', {
+                method: 'POST',
+                body: JSON.stringify({ id: id })
+            });
+
+            if (res.success) {
+                showNotification(res.message, 'success');
+                loadMapData();
+            } else {
+                showNotification('Gagal menghapus: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Gagal menghapus alat', 'error');
+        }
+    }
+
+    async function saveDraggedInfraLocation(id, lat, lng) {
+        const payload = {
+            id: id,
+            latitude: lat,
+            longitude: lng
+        };
+
+        try {
+            const res = await apiCall('/api/map/infrastructure/update-coordinates', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            if (res.success) {
+                showNotification('Posisi infrastruktur diperbarui (Drag-Drop)', 'success');
+            } else {
+                showNotification('Gagal perbarui posisi: ' + res.error, 'error');
+            }
+        } catch (e) {
+            console.error('Drag update fail:', e);
+        }
+    }
+
+    // ----------------------------------------------------
+    // COORDINATE DELETION / RESET (BACK TO UNMAPPED STATUS)
+    // ----------------------------------------------------
+    async function deleteCustomerCoordinates(username) {
+        if (!confirm(`Hapus koordinat peta untuk pelanggan "${username}"?
+Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
+
+        showNotification('Menghapus lokasi pelanggan...', 'info');
+        try {
+            const res = await apiCall('/api/map/delete-coordinates', {
+                method: 'POST',
+                body: JSON.stringify({ username: username })
+            });
+
+            if (res.success) {
+                showNotification(res.message, 'success');
+                loadMapData(); 
+            } else {
+                showNotification('Gagal reset lokasi: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Error reset lokasi pelanggan', 'error');
+        }
+    }
+
+    async function deleteCoordinates(username, nasname) {
+        const target = username || nasname;
+        if (!confirm(`Hapus koordinat lokasi "${target}" dari peta?`)) return;
+
+        showNotification('Menghapus lokasi...', 'info');
+        try {
+            const payload = {};
+            if (username) payload.username = username;
+            if (nasname) payload.nasname = nasname;
+
+            const res = await apiCall('/api/map/delete-coordinates', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            if (res.success) {
+                showNotification(res.message, 'success');
+                loadMapData();
+            } else {
+                showNotification('Gagal hapus lokasi: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Gagal menghapus lokasi', 'error');
+        }
+    }
+
+    function onMapClick(e) {
+        if (setLocationState.active) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+
+            setLocationState.lat = lat;
+            setLocationState.lng = lng;
+
+            if (setLocationState.tempMarker) {
+                setLocationState.tempMarker.setLatLng(e.latlng);
+            } else {
+                const tempIcon = L.divIcon({
+                    html: '<i class="fas fa-map-marker-alt text-amber-500 text-4xl animate-bounce"></i>',
+                    className: 'temp-marker-icon',
+                    iconSize: [24, 36],
+                    iconAnchor: [12, 36]
+                });
+                setLocationState.tempMarker = L.marker(e.latlng, { icon: tempIcon, draggable: true }).addTo(map);
+                bindTempMarkerEvents();
+            }
+
+            document.getElementById('manualCoordsInput').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+            const saveBtn = document.getElementById('btnSaveLoc');
+            saveBtn.disabled = false;
+            saveBtn.className = "px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer";
+            saveBtn.onclick = saveCoordinates;
+        } 
+        else if (addInfraState.active) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+
+            addInfraState.lat = lat;
+            addInfraState.lng = lng;
+
+            if (addInfraState.tempMarker) {
+                addInfraState.tempMarker.setLatLng(e.latlng);
+            }
+
+            // Update live coordinate display & reset coord input field
+            updateInfraCoordDisplay(lat, lng);
+            const coordInput = document.getElementById('infraCoordsInput');
+            if (coordInput) {
+                coordInput.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                coordInput.classList.add('border-emerald-500');
+                coordInput.classList.remove('border-red-400');
+            }
+        }
+    }
+
+    async function saveCoordinates() {
+        if (!setLocationState.active || !setLocationState.lat || !setLocationState.lng) return;
+
+        const payload = {
+            latitude: setLocationState.lat,
+            longitude: setLocationState.lng
+        };
+        if (setLocationState.username) payload.username = setLocationState.username;
+        if (setLocationState.nasname) payload.nasname = setLocationState.nasname;
+
+        try {
+            const res = await apiCall('/api/map/update-coordinates', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            if (res.success) {
+                showNotification(res.message, 'success');
+                cancelSetLocation();
+                loadMapData(); 
+            } else {
+                showNotification('Gagal: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Gagal menyimpan koordinat', 'error');
+        }
+    }
+
+    async function saveDraggedLocation(username, nasname, lat, lng) {
+        const payload = { latitude: lat, longitude: lng };
+        if (username) payload.username = username;
+        if (nasname) payload.nasname = nasname;
+
+        try {
+            const res = await apiCall('/api/map/update-coordinates', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            if (res.success) {
+                showNotification(`Lokasi ${username || nasname} diperbarui (Drag-Drop)`, 'success');
+            } else {
+                showNotification('Gagal memperbarui lokasi drag: ' + res.error, 'error');
+            }
+        } catch (e) {
+            console.error('Drag update fail:', e);
+        }
+    }
+
+    function cancelSetLocation() {
+        if (setLocationState.tempMarker) {
+            map.removeLayer(setLocationState.tempMarker);
+        }
+        document.getElementById('map').style.cursor = '';
+        document.getElementById('setLocBanner').classList.add('hidden');
+        document.getElementById('manualCoordsInput').value = '';
+        setLocationState = { active: false, username: null, nasname: null, tempMarker: null, lat: null, lng: null };
+    }
+
+    async function rebootOnt(username) {
+        if (!confirm(`Kirim perintah reboot untuk ONT user: "${username}"?`)) return;
+        
+        showNotification('Mengirim perintah reboot ONT...', 'info');
+        try {
+            const res = await apiCall(`/api/acs/reboot/${encodeURIComponent(username)}`, { method: 'POST' });
+            if (res.success) {
+                showNotification(res.message || 'Perintah reboot sukses masuk antrean!', 'success');
+            } else {
+                showNotification('Gagal reboot: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Reboot ONT failed', 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initMap();
+        loadMapData();
+    });
+</script>
+{% endblock %}

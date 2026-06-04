@@ -1,0 +1,301 @@
+<script>
+let ipoePage = 1, ipoeTotalPages = 1, ipoeSearchTimer = null, ipoeFilterStatus = null;
+let _selectedDevices = new Set();
+let _allUsers = [], _leaseMap = {};
+
+function showToast(msg, type='success') {
+    const colors = {success:'bg-emerald-500', error:'bg-red-500'};
+    const t = document.createElement('div');
+    t.className = `fixed bottom-6 right-6 z-[9999] px-5 py-3 rounded-xl text-white text-sm font-bold shadow-xl ${colors[type]||colors.success}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+function formatMacInput(input) {
+    let v = input.value.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+    let out = '';
+    for (let i = 0; i < Math.min(v.length, 12); i++) {
+        if (i > 0 && i % 2 === 0) out += ':';
+        out += v[i];
+    }
+    input.value = out;
+}
+
+// ===== STATS =====
+async function loadStats() {
+    try {
+        const d = await (await fetch('/api/ipoe/stats')).json();
+        const total = d.total ?? 0, online = d.online ?? 0;
+        document.getElementById('statTotal').textContent = total || '—';
+        document.getElementById('statOnline').textContent = online || '—';
+        const pct = total > 0 ? Math.round(online/total*100) : 0;
+        document.getElementById('statOnlinePct').textContent = total > 0 ? `${pct}%` : '';
+        document.getElementById('statOnlineBar').style.width = pct + '%';
+    } catch(e) {}
+}
+
+// ===== FILTER STATUS =====
+function ipoeSetStatus(status) {
+    ipoeFilterStatus = status;
+    ipoePage = 1;
+    ['statusAll','statusOnline','statusOffline'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const active = (status === null && id === 'statusAll') || (status === 'online' && id === 'statusOnline') || (status === 'offline' && id === 'statusOffline');
+        btn.className = `px-3 py-2 rounded-lg text-xs font-bold transition-all ${active
+            ? (id==='statusOnline' ? 'bg-emerald-500 text-white' : id==='statusOffline' ? 'bg-gray-600 text-white' : 'bg-gray-800 text-white')
+            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`;
+    });
+    renderTable();
+}
+
+// ===== LOAD DATA =====
+async function loadIpoeUsers() {
+    document.getElementById('ipoeTableBody').innerHTML =
+        `<tr><td colspan="8" class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...</td></tr>`;
+    clearSelection();
+
+    // Fetch RADIUS users + DHCP leases paralel
+    const [radiusRes, leaseRes] = await Promise.all([
+        fetch(`/api/ipoe/users?page=1&limit=1000`).then(r => r.json()).catch(() => ({users:[]})),
+        fetch('/api/ipoe/dhcp-leases').then(r => r.json()).catch(() => ({leases:[]}))
+    ]);
+
+    _allUsers = radiusRes.users || [];
+
+    // Build lease map by MAC
+    _leaseMap = {};
+    for (const l of (leaseRes.leases || [])) {
+        _leaseMap[l.mac_address] = l;
+    }
+
+    // Merge lease data into users
+    for (const u of _allUsers) {
+        const lease = _leaseMap[u.mac_address];
+        if (lease) {
+            u.lease_ip = lease.address;
+            u.lease_status = lease.status;
+            u.lease_server = lease.server;
+            u.lease_expires = lease.expires_after;
+            u.lease_last_seen = lease.last_seen;
+            u.lease_hostname = lease.host_name;
+            u.lease_router = lease.router;
+            u.lease_flags = lease.flags;
+            u.lease_rate = lease.rate_limit;
+        }
+    }
+
+    renderTable();
+    loadStats();
+}
+
+function renderTable() {
+    const search = document.getElementById('ipoeSearch').value.toLowerCase();
+    let users = _allUsers.filter(u => {
+        if (search && !u.mac_address.includes(search) && !(u.lease_hostname||'').toLowerCase().includes(search) && !(u.lease_ip||'').includes(search)) return false;
+        if (ipoeFilterStatus === 'online') return u.active_sessions > 0 || u.lease_status === 'bound';
+        if (ipoeFilterStatus === 'offline') return u.active_sessions === 0 && u.lease_status !== 'bound';
+        return true;
+    });
+
+    const total = users.length;
+    ipoeTotalPages = Math.max(1, Math.ceil(total / 20));
+    if (ipoePage > ipoeTotalPages) ipoePage = 1;
+    const start = (ipoePage - 1) * 20;
+    const pageUsers = users.slice(start, start + 20);
+
+    const tbody = document.getElementById('ipoeTableBody');
+    if (!pageUsers.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-12">
+            <div class="flex flex-col items-center gap-2 text-gray-400">
+                <i class="fas fa-network-wired text-3xl opacity-30"></i>
+                <p class="text-sm font-medium">Tidak ada device ditemukan</p>
+            </div></td></tr>`;
+    } else {
+        tbody.innerHTML = pageUsers.map(u => {
+            const isBound = u.lease_status === 'bound';
+            const isOnline = u.active_sessions > 0 || isBound;
+
+            const statusBadge = isBound
+                ? `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white" style="background:#22c55e"><i class="fas fa-circle text-[8px] mr-1"></i>Bound</span>`
+                : (u.active_sessions > 0
+                    ? `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white" style="background:#22c55e"><i class="fas fa-circle text-[8px] mr-1"></i>Online</span>`
+                    : `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white" style="background:#ef4444"><i class="fas fa-circle text-[8px] mr-1"></i>Offline</span>`);
+
+            const flagsBadge = u.lease_flags
+                ? u.lease_flags.split('').map(f => {
+                    const fc = {R:'bg-purple-100 text-purple-700',D:'bg-blue-100 text-blue-700',B:'bg-red-100 text-red-700'};
+                    return `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${fc[f]||'bg-gray-100 text-gray-600'}">${f}</span>`;
+                  }).join('') : '';
+
+            const ipCell = u.lease_ip
+                ? `<div class="font-mono text-xs font-bold text-emerald-700">${u.lease_ip}</div>
+                   ${u.lease_hostname ? `<div class="text-[10px] text-gray-400">${u.lease_hostname}</div>` : ''}`
+                : (u.ip_address
+                    ? `<span class="font-mono text-xs text-blue-600">${u.ip_address}</span>`
+                    : `<span class="text-gray-400 text-xs">Dynamic</span>`);
+
+            const rateCell = u.lease_rate || u.rate_limit
+                ? `<span class="font-mono text-xs text-gray-700">${u.lease_rate || u.rate_limit}</span>`
+                : `<span class="text-gray-400 text-xs">—</span>`;
+
+            const leaseCell = u.lease_expires
+                ? `<div class="text-xs text-orange-600 font-mono">exp: ${u.lease_expires}</div>
+                   <div class="text-[10px] text-gray-400">seen: ${u.lease_last_seen||'—'}</div>`
+                : `<span class="text-gray-400 text-xs">—</span>`;
+
+            const serverCell = u.lease_server
+                ? `<div class="text-xs text-gray-700">${u.lease_server}</div>
+                   ${u.lease_router ? `<div class="text-[10px] text-gray-400">${u.lease_router}</div>` : ''}`
+                : `<span class="text-gray-400 text-xs">—</span>`;
+
+            const checked = _selectedDevices.has(u.mac_address) ? 'checked' : '';
+             return `<tr class="border-b border-gray-50 hover:bg-blue-50/20 transition-colors" data-mac="${u.mac_address}">
+                <td class="py-3 px-3">
+                    <input type="checkbox" ${checked} onchange="toggleRowSelect(this,'${u.mac_address}')"
+                           class="w-3.5 h-3.5 rounded accent-blue-500 cursor-pointer">
+                </td>
+                <td class="py-3 px-3">
+                    <div class="font-mono text-sm font-bold text-gray-800">${u.mac_address}</div>
+                    <div class="flex gap-1 mt-0.5">${flagsBadge}</div>
+                </td>
+                <td class="py-3 px-3">
+                    <div class="font-bold text-gray-800 text-xs">${u.name || '<span class="text-gray-400 font-normal">—</span>'}</div>
+                </td>
+                <td class="py-3 px-3">${ipCell}</td>
+                <td class="py-3 px-3">${serverCell}</td>
+                <td class="py-3 px-3">${rateCell}</td>
+                <td class="py-3 px-3">${leaseCell}</td>
+                <td class="py-3 px-3">${statusBadge}</td>
+                <td class="py-3 px-3 text-right">
+                    <div class="flex justify-end gap-1">
+                        <button onclick="openEditModal('${u.mac_address}','${(u.name||'').replace(/'/g, '\\\'')}','${u.ip_address||''}','${u.ip_pool||''}','${u.rate_limit||''}')"
+                                class="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-all" title="Edit">
+                            <i class="fas fa-edit text-xs"></i>
+                        </button>
+                        <button onclick="deleteDevice('${u.mac_address}')"
+                                class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-all" title="Hapus">
+                            <i class="fas fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    document.getElementById('ipoeStart').textContent = total ? start + 1 : 0;
+    document.getElementById('ipoeEnd').textContent = Math.min(start + 20, total);
+    document.getElementById('ipoeTotal').textContent = total;
+    document.getElementById('ipoePrev').disabled = ipoePage <= 1;
+    document.getElementById('ipoeNext').disabled = ipoePage >= ipoeTotalPages;
+
+    const pn = document.getElementById('ipoePageNums'); pn.innerHTML = '';
+    for (let i = Math.max(1, ipoePage-2); i <= Math.min(ipoeTotalPages, ipoePage+2); i++) {
+        const b = document.createElement('button');
+        b.textContent = i;
+        b.className = `w-8 h-8 rounded-lg text-xs font-bold transition-all ${i===ipoePage?'text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`;
+        if (i===ipoePage) b.style.background='linear-gradient(135deg,#3b82f6,#2563eb)';
+        b.onclick = () => { ipoePage = i; renderTable(); };
+        pn.appendChild(b);
+    }
+}
+
+function ipoeChangePage(p) { if (p<1||p>ipoeTotalPages) return; ipoePage=p; renderTable(); }
+document.getElementById('ipoeSearch').addEventListener('input', () => {
+    clearTimeout(ipoeSearchTimer);
+    ipoeSearchTimer = setTimeout(() => { ipoePage=1; renderTable(); }, 300);
+});
+
+// ===== ADD =====
+function openAddModal() { document.getElementById('addModal').classList.remove('hidden'); }
+function closeAddModal() { document.getElementById('addModal').classList.add('hidden'); document.getElementById('addForm').reset(); }
+
+async function submitAdd(e) {
+    e.preventDefault();
+    const form = e.target;
+    const body = {
+        mac_address: form.mac_address.value.trim(),
+        name: form.name.value.trim(),
+        ip_address: form.ip_address.value.trim(),
+        ip_pool: form.ip_pool.value.trim(),
+        rate_limit: form.rate_limit.value.trim()
+    };
+    const data = await (await fetch('/api/ipoe/users/add', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
+    if (data.success) { showToast(data.message); closeAddModal(); loadIpoeUsers(); }
+    else showToast(data.error, 'error');
+}
+
+// ===== EDIT =====
+function openEditModal(mac, name, ip, pool, rate) {
+    document.getElementById('editMac').value = mac;
+    document.getElementById('editMacLabel').textContent = mac;
+    document.getElementById('editName').value = name;
+    document.getElementById('editIpAddress').value = ip;
+    document.getElementById('editIpPool').value = pool;
+    document.getElementById('editRateLimit').value = rate;
+    document.getElementById('editModal').classList.remove('hidden');
+}
+function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+
+async function submitEdit(e) {
+    e.preventDefault();
+    const mac = document.getElementById('editMac').value;
+    const body = {
+        name: document.getElementById('editName').value.trim(),
+        ip_address: document.getElementById('editIpAddress').value.trim(),
+        ip_pool: document.getElementById('editIpPool').value.trim(),
+        rate_limit: document.getElementById('editRateLimit').value.trim()
+    };
+    const data = await (await fetch(`/api/ipoe/users/update/${encodeURIComponent(mac)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
+    if (data.success) { showToast(data.message); closeEditModal(); loadIpoeUsers(); }
+    else showToast(data.error, 'error');
+}
+
+// ===== DELETE =====
+async function deleteDevice(mac) {
+    if (!confirm(`Hapus device "${mac}"?`)) return;
+    const data = await (await fetch(`/api/ipoe/users/delete/${encodeURIComponent(mac)}`, {method:'DELETE'})).json();
+    if (data.success) { showToast(data.message); loadIpoeUsers(); }
+    else showToast(data.error, 'error');
+}
+
+// ===== BULK =====
+function toggleRowSelect(cb, mac) {
+    if (cb.checked) _selectedDevices.add(mac); else _selectedDevices.delete(mac);
+    updateBulkToolbar();
+}
+function toggleSelectAll(cb) {
+    document.querySelectorAll('#ipoeTableBody input[type=checkbox]').forEach(el => {
+        el.checked = cb.checked;
+        const m = el.closest('tr')?.dataset.mac;
+        if (m) { cb.checked ? _selectedDevices.add(m) : _selectedDevices.delete(m); }
+    });
+    updateBulkToolbar();
+}
+function updateBulkToolbar() {
+    const n = _selectedDevices.size;
+    document.getElementById('bulkToolbar').classList.toggle('hidden', n === 0);
+    document.getElementById('bulkCount').textContent = n;
+}
+function clearSelection() {
+    _selectedDevices.clear();
+    document.querySelectorAll('#ipoeTableBody input[type=checkbox]').forEach(el => el.checked = false);
+    const sa = document.getElementById('selectAll'); if (sa) sa.checked = false;
+    updateBulkToolbar();
+}
+async function bulkDelete() {
+    const devices = [..._selectedDevices];
+    if (!devices.length || !confirm(`Hapus ${devices.length} device terpilih?`)) return;
+    let ok = 0, fail = 0;
+    for (const m of devices) {
+        const r = await (await fetch(`/api/ipoe/users/delete/${encodeURIComponent(m)}`, {method:'DELETE'})).json();
+        r.success ? ok++ : fail++;
+    }
+    showToast(`${ok} device dihapus${fail ? `, ${fail} gagal` : ''}`, fail ? 'error' : 'success');
+    clearSelection(); loadIpoeUsers();
+}
+
+// Init
+loadIpoeUsers();
+setInterval(loadIpoeUsers, 30000);
+</script>

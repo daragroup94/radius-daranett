@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Kesehatan Optik ONT - RADIUS Manager{% endblock %}
+{% block page_title %}Kesehatan Optik ONT{% endblock %}
+{% block page_subtitle %}Pindai Redaman Laser (RxPower) ONT Masal via GenieACS NBI{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Font Styling */
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
+    }
+    
+    /* Stat Cards Hover & Shadows */
+    .stat-card-glow {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .stat-card-glow:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 30px rgba(0, 0, 0, 0.05);
+    }
+    .dark .stat-card-glow {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .dark .stat-card-glow:hover {
+        box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
+        border-color: rgba(59, 130, 246, 0.25);
+    }
+
+    /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
+    .icon-wrapper-noc {
+        width: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 1rem !important; /* 16px */
+        flex-shrink: 0 !important;
+    }
+    .icon-noc {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* Custom Gradients */
+    .icon-gradient-scan { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important; }
+    .icon-gradient-good { background: linear-gradient(135deg, #10b981 0%, #047857 100%) !important; }
+    .icon-gradient-warning { background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%) !important; }
+    .icon-gradient-critical { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important; }
+
+    /* Floating icon animation */
+    .floating-icon { 
+        animation: float 3.5s ease-in-out infinite;
+        will-change: transform;
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-scan mr-4 shadow-lg shadow-blue-500/15 floating-icon">
+                <i data-lucide="activity" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight text-white">GenieACS Optical Health Scan</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Pantau status redaman sinyal laser (RxPower) seluruh ONT pelanggan secara real-time.</p>
+            </div>
+        </div>
+        
+        <div class="z-10 flex gap-2.5 flex-wrap">
+            <button onclick="loadOpticalHealthIssues()" style="background-color: #ef4444 !important; color: #ffffff !important;" class="px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg transition-all hover:scale-[1.02] whitespace-nowrap">
+                <i class="fas fa-exclamation-triangle mr-1.5"></i>
+                <span>Daftar Gangguan (Latar Belakang)</span>
+            </button>
+            <button onclick="scanOpticalHealth()" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-750 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] whitespace-nowrap">
+                <i class="fas fa-sync mr-1.5"></i>
+                <span>Pindai Semua (Live)</span>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Stats Cards Row -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-5">
+        <!-- Total Scanned -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-scan shadow-md">
+                <i data-lucide="hard-drive" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Scanned</p>
+                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statTotal">—</p>
+            </div>
+        </div>
+        <!-- Good Signal -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-good shadow-md">
+                <i data-lucide="smile" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sinyal Baik</p>
+                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statGood">—</p>
+            </div>
+        </div>
+        <!-- Warning Signal -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-warning shadow-md">
+                <i data-lucide="meh" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sinyal Lemah</p>
+                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statWarning">—</p>
+            </div>
+        </div>
+        <!-- Critical Signal -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-critical shadow-md">
+                <i data-lucide="frown" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Critical / Loss</p>
+                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statCritical">—</p>
+            </div>
+        </div>
+        <!-- Unknown Status -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc bg-slate-400 dark:bg-slate-600 shadow-md">
+                <i data-lucide="help-circle" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tidak Diketahui</p>
+                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statUnknown">—</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Table Container -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+        
+        <!-- Controls Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-880 dark:text-white">Daftar Kesehatan Optik ONT</h3>
+                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">ONT dengan redaman di atas -25 dBm disarankan untuk dilakukan pemeriksaan fisik.</p>
+            </div>
+            
+            <div class="flex flex-wrap gap-2.5 w-full sm:w-auto">
+                <!-- Search Box -->
+                <div class="relative flex-1 sm:flex-initial min-w-[200px]">
+                    <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Cari username PPPoE..."
+                           class="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                </div>
+                <!-- Status Filter -->
+                <select id="statusFilter" onchange="applyFilters()"
+                        class="px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-semibold">
+                    <option value="">Semua Status Sinyal</option>
+                    <option value="good">🟢 Sinyal Baik (>= -15 dBm)</option>
+                    <option value="warning">🟡 Sinyal Lemah (-15 s/d -25 dBm)</option>
+                    <option value="critical">🔴 Critical / Loss (< -25 dBm)</option>
+                    <option value="unknown">⚪ Tidak Diketahui</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse table-light">
+                <thead>
+                    <tr class="border-b border-slate-100 dark:border-slate-750 text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-extrabold bg-slate-50/50 dark:bg-slate-900/50">
+                        <th class="py-4 px-4">Klien / PPPoE Username</th>
+                        <th class="py-4 px-4">Serial Number / Model</th>
+                        <th class="py-4 px-4 text-center">Laser Power (RxPower)</th>
+                        <th class="py-4 px-4 text-center">Temperatur</th>
+                        <th class="py-4 px-4 text-center">Mode PON</th>
+                        <th class="py-4 px-4">Cek Terakhir</th>
+                        <th class="py-4 px-4 text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="devicesTableBody">
+                    <tr>
+                        <td colspan="7" class="py-16 text-center text-slate-400 dark:text-slate-500">
+                            <i class="fas fa-search text-3xl mb-3 opacity-30"></i>
+                            <p class="font-semibold text-xs">Silakan lakukan pemindaian kesehatan optik terlebih dahulu.</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allDevices = [];
+
+    async function scanOpticalHealth() {
+        const body = document.getElementById('devicesTableBody');
+        body.innerHTML = `
+            <tr>
+                <td colspan="7" class="py-16 text-center">
+                    <div class="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+                    <p class="text-slate-400 dark:text-slate-500 font-bold text-xs">Sedang memindai seluruh ONT di GenieACS... Mohon tunggu.</p>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const res = await fetch('/api/acs/optical-health');
+            const data = await res.json();
+
+            if (!data.success) {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-16 text-center text-red-500">
+                            <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                            <p class="font-bold text-xs">Gagal melakukan pemindaian: ${data.error || 'Server error'}</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            allDevices = data.devices || [];
+            
+            // Render Stats
+            document.getElementById('statTotal').textContent = data.stats.total;
+            document.getElementById('statGood').textContent = data.stats.good;
+            document.getElementById('statWarning').textContent = data.stats.warning;
+            document.getElementById('statCritical').textContent = data.stats.critical;
+            document.getElementById('statUnknown').textContent = data.stats.unknown;
+
+            applyFilters();
+            showNotification('Pemindaian kesehatan optik selesai', 'success');
+        } catch (e) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="7" class="py-16 text-center text-red-500">
+                        <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                        <p class="font-bold text-xs">Error: ${e.message}</p>
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function applyFilters() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const status = document.getElementById('statusFilter').value;
+        const body = document.getElementById('devicesTableBody');
+
+        const filtered = allDevices.filter(d => {
+            const matchesSearch = d.username.toLowerCase().includes(search) || d.serial.toLowerCase().includes(search);
+            const matchesStatus = status ? d.rx_status === status : true;
+            return matchesSearch && matchesStatus;
+        });
+
+        if (filtered.length === 0) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="7" class="py-16 text-center text-slate-400 dark:text-slate-500">
+                        <i class="fas fa-file-alt text-3xl mb-3 opacity-30"></i>
+                        <p class="font-semibold text-xs">Tidak ada data ONT yang cocok.</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        body.innerHTML = filtered.map(d => {
+            let rxClass = 'text-gray-600 bg-gray-100 dark:text-gray-300 dark:bg-gray-700/50';
+            if (d.rx_status === 'good') rxClass = 'text-emerald-600 bg-emerald-500/10 dark:text-emerald-400 dark:bg-emerald-500/15';
+            else if (d.rx_status === 'warning') rxClass = 'text-amber-600 bg-amber-500/10 dark:text-amber-400 dark:bg-amber-500/15';
+            else if (d.rx_status === 'critical') rxClass = 'text-rose-600 bg-rose-500/10 dark:text-rose-400 dark:bg-rose-500/15';
+
+            const lastInform = d.last_inform !== 'N/A' ? new Date(d.last_inform).toLocaleString('id-ID') : 'N/A';
+
+            return `
+                <tr class="border-b border-slate-100 dark:border-slate-750 text-xs text-slate-700 dark:text-slate-350 hover:bg-slate-50/50 dark:hover:bg-slate-750/30 transition-colors">
+                    <td class="py-4 px-4 font-bold text-slate-900 dark:text-white">
+                        ${(d.username && d.username !== 'N/A' && !d.username.startsWith('unconfigured-')) ? d.username : '<span class="text-slate-400 font-normal">Belum Ada PPPoE</span>'}
+                    </td>
+
+                    <td class="py-4 px-4 font-mono">
+                        <div>${d.serial}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${d.manufacturer} ${d.model}</div>
+                    </td>
+                    <td class="py-4 px-4 text-center">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${rxClass}">
+                            ${d.rx_power !== 'N/A' ? d.rx_power + ' dBm' : 'Loss'}
+                        </span>
+                    </td>
+                    <td class="py-4 px-4 text-center font-bold">${d.temperature !== 'N/A' ? d.temperature + ' °C' : '—'}</td>
+                    <td class="py-4 px-4 text-center font-mono uppercase text-[10px]">${d.pon_mode || '—'}</td>
+                    <td class="py-4 px-4 text-slate-400 font-medium">${lastInform}</td>
+                    <td class="py-4 px-4 text-center">
+                        <button onclick="rebootOnt('${d.username}')" 
+                                style="background-color: #ef4444 !important; color: #ffffff !important;"
+                                class="px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-md transition-all active:scale-95 flex items-center gap-1.5 mx-auto">
+                            <i class="fas fa-power-off"></i>Reboot
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        lucide.createIcons();
+    }
+
+    async function rebootOnt(username) {
+        if (!username || username === 'N/A') {
+            alert('Tidak dapat me-reboot ONT: Username PPPoE tidak terdaftar pada ONT ini.');
+            return;
+        }
+        
+        if (!confirm(`Apakah Anda yakin ingin me-reboot ONT milik user "${username}"?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/acs/reboot/${encodeURIComponent(username)}`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                showNotification(data.message || 'Perintah reboot berhasil dikirim!', 'success');
+            } else {
+                showNotification(`Gagal: ${data.error || 'Server error'}`, 'error');
+            }
+        } catch (e) {
+            showNotification(`Error: ${e.message}`, 'error');
+        }
+    }
+
+    async function loadOpticalHealthIssues() {
+        const body = document.getElementById('devicesTableBody');
+        body.innerHTML = `
+            <tr>
+                <td colspan="7" class="py-16 text-center">
+                    <div class="w-12 h-12 border-4 border-rose-500/20 border-t-rose-500 rounded-full animate-spin mx-auto mb-4"></div>
+                    <p class="text-slate-400 dark:text-slate-500 font-bold text-xs">Sedang memuat daftar gangguan dari database lokal...</p>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const res = await fetch('/api/acs/optical-health/issues');
+            const data = await res.json();
+
+            if (!data.success) {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-16 text-center text-red-500">
+                            <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                            <p class="font-bold text-xs">Gagal memuat data: ${data.error || 'Server error'}</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            allDevices = data.devices || [];
+            
+            // Render Stats for the issues
+            document.getElementById('statTotal').textContent = allDevices.length;
+            document.getElementById('statGood').textContent = 0;
+            document.getElementById('statWarning').textContent = allDevices.filter(d => d.rx_status === 'warning').length;
+            document.getElementById('statCritical').textContent = allDevices.filter(d => d.rx_status === 'critical').length;
+            document.getElementById('statUnknown').textContent = allDevices.filter(d => d.rx_status === 'unknown').length;
+
+            applyFilters();
+            showNotification('Daftar gangguan optik berhasil dimuat', 'success');
+        } catch (e) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="7" class="py-16 text-center text-red-500">
+                        <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                        <p class="font-bold text-xs">Error: ${e.message}</p>
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    // Load issues on page start
+    document.addEventListener('DOMContentLoaded', loadOpticalHealthIssues);
+</script>
+{% endblock %}

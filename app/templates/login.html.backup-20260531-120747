@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login - RADIUS Manager</title>
+    <!-- Tailwind CSS (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+    <!-- Lucide Icons (Local) -->
+    <script src="{{ url_for('static', filename='js/lucide.min.js') }}"></script>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
+    <style>
+        body {
+            background-color: #111827;
+        }
+
+        /* High Contrast Input Fix */
+        .login-input {
+            background-color: #1f2937;
+            color: #ffffff;
+            border: 2px solid #374151;
+        }
+
+        .login-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+            outline: none;
+        }
+
+        /* Override autofill */
+        .login-input:-webkit-autofill,
+        .login-input:-webkit-autofill:hover,
+        .login-input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 30px #1f2937 inset !important;
+            -webkit-text-fill-color: white !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 sm:p-6 pb-20">
+
+    <!-- Container: Stacked di Mobile, Split di Laptop -->
+    <div class="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center mb-8">
+
+        <!-- Left Side: Branding (Hidden di mobile kecil, stacked di medium) -->
+        <div class="hidden lg:block text-left animate-fade-in">
+            <div class="inline-block mb-6">
+                <div class="w-32 h-32 bg-gray-800 rounded-3xl flex items-center justify-center shadow-2xl border-4 border-gray-700">
+                    <i data-lucide="shield-check" class="text-blue-500 w-16 h-16"></i>
+                </div>
+            </div>
+            <h1 class="text-5xl font-extrabold text-white mb-4 tracking-tight">
+                RADIUS Manager
+            </h1>
+            <p class="text-2xl text-gray-400 font-medium mb-6">
+                Network Control Center
+            </p>
+            <p class="text-gray-500 text-lg leading-relaxed max-w-lg">
+                Manage your PPPoE users, NAS connections, and network monitoring with ease and security.
+            </p>
+            <div class="flex gap-3 mt-8">
+                <div class="px-4 py-2 bg-gray-800 rounded-full text-gray-300 text-sm font-medium border border-gray-700 flex items-center">
+                    <i data-lucide="users" class="w-4 h-4 mr-2"></i>User Management
+                </div>
+                <div class="px-4 py-2 bg-gray-800 rounded-full text-gray-300 text-sm font-medium border border-gray-700 flex items-center">
+                    <i data-lucide="activity" class="w-4 h-4 mr-2"></i>Monitoring
+                </div>
+                <div class="px-4 py-2 bg-gray-800 rounded-full text-gray-300 text-sm font-medium border border-gray-700 flex items-center">
+                    <i data-lucide="shield" class="w-4 h-4 mr-2"></i>Secure
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Login Card (Full width di mobile) -->
+        <div class="w-full max-w-md mx-auto lg:mx-0 animate-fade-in">
+            <div class="bg-gray-900 border-2 border-gray-700 rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl">
+                
+                <!-- Header -->
+                <div class="text-center mb-6 sm:mb-8">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i data-lucide="log-in" class="text-white w-8 h-8"></i>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-2">Welcome Back!</h2>
+                    <p class="text-gray-400 text-base sm:text-lg">Sign in to your account</p>
+                </div>
+
+                <form method="POST" action="/login" id="loginForm" class="space-y-5 sm:space-y-6">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if mfa_required %}
+                    <input type="hidden" name="username" value="{{ username }}">
+                    <input type="hidden" name="password" value="{{ password }}">
+                    
+                    <!-- MFA Code -->
+                    <div>
+                        <label class="block text-blue-400 text-sm font-bold mb-2">
+                            Two-Factor Authentication
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="shield-check" class="text-blue-500 w-5 h-5"></i>
+                            </div>
+                            <input
+                                type="text"
+                                name="mfa_code"
+                                required
+                                autofocus
+                                autocomplete="one-time-code"
+                                class="login-input w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-xl font-bold text-center text-2xl tracking-widest"
+                                placeholder="000000"
+                                maxlength="6"
+                            >
+                        </div>
+                        <p class="text-gray-400 text-xs mt-2 text-center">Enter the 6-digit code from your authenticator app</p>
+                    </div>
+                    {% else %}
+                    <!-- Username -->
+                    <div>
+                        <label class="block text-gray-300 text-sm font-bold mb-2">
+                            Username
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="user" class="text-gray-500 w-5 h-5"></i>
+                            </div>
+                            <input
+                                type="text"
+                                name="username"
+                                required
+                                autocomplete="off"
+                                class="login-input w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-xl font-medium text-base sm:text-lg"
+                                placeholder="Enter username"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Password -->
+                    <div>
+                        <label class="block text-gray-300 text-sm font-bold mb-2">
+                            Password
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="lock" class="text-gray-500 w-5 h-5"></i>
+                            </div>
+                            <input
+                                type="password"
+                                name="password"
+                                id="password"
+                                required
+                                autocomplete="off"
+                                class="login-input w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-xl font-medium text-base sm:text-lg"
+                                placeholder="Enter password"
+                            >
+                            <button
+                                type="button"
+                                onclick="togglePassword()"
+                                class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-blue-400"
+                            >
+                                <i data-lucide="eye" id="toggleIcon" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Actions -->
+                    <div class="flex items-center justify-between text-sm">
+                        <label class="flex items-center text-gray-400 cursor-pointer hover:text-gray-300">
+                            <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-gray-800 focus:ring-blue-500">
+                            <span class="ml-2 font-medium">Remember me</span>
+                        </label>
+                        <a href="#" class="text-blue-400 hover:text-blue-300 font-semibold">Forgot password?</a>
+                    </div>
+
+                    <!-- Button -->
+                    <button
+                        type="submit"
+                        class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3.5 sm:py-4 rounded-xl font-bold text-lg sm:text-xl shadow-lg transition-all hover:-translate-y-0.5"
+                    >
+                        Sign In
+                    </button>
+                </form>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mt-6 space-y-2">
+                            {% for category, message in messages %}
+                                <div class="p-4 rounded-xl flex items-center space-x-3 {% if category == 'error' %}bg-red-500/90{% else %}bg-green-500/90{% endif %} text-white text-sm">
+                                    <i data-lucide="{% if category == 'error' %}alert-circle{% else %}check-circle{% endif %}" class="w-5 h-5"></i>
+                                    <span class="font-medium">{{ message }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Divider -->
+                <div class="flex items-center my-6">
+                    <div class="flex-1 border-t-2 border-gray-700"></div>
+                    <span class="px-4 text-gray-500 text-sm font-medium">or</span>
+                    <div class="flex-1 border-t-2 border-gray-700"></div>
+                </div>
+
+                <!-- Demo Card - FIXED LAYOUT -->
+                <div class="bg-gray-800 rounded-2xl p-5 border-2 border-gray-700">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="info" class="text-blue-400 w-5 h-5"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-white font-bold text-sm mb-3">Demo Credentials</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex items-center">
+                                    <span class="text-gray-400 w-20 flex-shrink-0">Username:</span>
+                                    <code class="text-blue-400 font-bold ml-2">admin</code>
+                                </div>
+                                <div class="flex items-center">
+                                    <span class="text-gray-400 w-20 flex-shrink-0">Password:</span>
+                                    <code class="text-blue-400 font-bold ml-2">admin123</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Login -->
+                <button
+                    onclick="quickLogin()"
+                    class="mt-4 w-full py-3 bg-gray-700/50 hover:bg-gray-700/70 text-gray-300 rounded-xl font-bold text-sm transition-all border-2 border-gray-600 hover:shadow-lg"
+                >
+                    Quick Login (Demo)
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="fixed bottom-0 left-0 right-0 py-4 text-center pointer-events-none z-10">
+        <p class="text-gray-500 text-xs sm:text-sm flex items-center justify-center">
+            <i data-lucide="shield-check" class="w-4 h-4 mr-2"></i>
+            <span class="hidden sm:inline">Secured by RADIUS Authentication • © 2025 RADIUS Manager</span>
+            <span class="sm:hidden">© 2025 RADIUS Manager</span>
+        </p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            lucide.createIcons();
+        });
+
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.getElementById('toggleIcon');
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.setAttribute('data-lucide', 'eye');
+            }
+
+            lucide.createIcons();
+        }
+
+        function quickLogin() {
+            document.querySelector('input[name="username"]').value = 'admin';
+            document.querySelector('input[name="password"]').value = 'admin123';
+        }
+    </script>
+</body>
+</html>

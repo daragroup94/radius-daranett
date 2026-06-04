@@ -535,9 +535,18 @@
         <!-- Logo -->
         <div class="flex items-center justify-between p-5 border-b border-slate-200">
             <div class="flex items-center space-x-3">
-                <div class="w-11 h-11 gradient-primary rounded-xl flex items-center justify-center shadow-lg glow-on-hover transform transition-transform hover:scale-105">
-                    <i data-lucide="radio-tower" class="lucide-lg text-white"></i>
-                </div>
+                <div class="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg glow-on-hover transform transition-transform hover:scale-105" style="background:linear-gradient(135deg,#06b6d4 0%,#3b82f6 50%,#6366f1 100%);box-shadow:0 4px 14px rgba(6,182,212,0.35);">
+    <svg width="26" height="26" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Shield body -->
+        <path d="M24 8 L36 13.5 L36 24 C36 33 24 38 24 38 C24 38 12 33 12 24 L12 13.5 Z" fill="white" opacity="0.95"/>
+        <!-- Checkmark -->
+        <polyline points="19,23.5 22.5,27 30,19" fill="none" stroke="#06b6d4" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Pulse arc 1 -->
+        <path d="M8 38 Q24 29 40 38" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round"/>
+        <!-- Pulse arc 2 -->
+        <path d="M4 43 Q24 32 44 43" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+</div>
                 <div class="logo-text transition-all duration-300">
                     <h1 class="text-lg font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent leading-tight tracking-tight">
                         RADIUS
@@ -585,39 +594,14 @@
                 <span class="tooltip">Integrations</span>
             </a>
 
-            <!-- Customer Users Dropdown -->
-            <div class="nav-dropdown-wrapper">
-                <button onclick="toggleCustomerMenu()" class="nav-item {% if request.path in ['/users', '/vpn-users', '/8021x-users', '/ipoe-users', '/hotspot-users'] %}active{% endif %} w-full flex items-center space-x-3 px-3 py-3 cursor-pointer group" id="customerMenuBtn">
-                    <div class="nav-icon-container">
-                        <i data-lucide="users" class="lucide nav-icon icon-emerald"></i>
-                    </div>
-                    <span class="nav-text flex-1 font-medium text-sm text-left">Customer Users</span>
-                    <i data-lucide="chevron-down" class="lucide nav-text w-4 h-4 transition-transform duration-200" id="customerMenuChevron"></i>
-                    <span class="tooltip">Customer Users</span>
-                </button>
-                <div id="customerSubmenu" class="nav-submenu {% if request.path in ['/users', '/vpn-users', '/8021x-users', '/ipoe-users', '/hotspot-users'] %}open{% endif %}">
-                    <a href="/users" class="nav-subitem {% if request.path == '/users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
-                        <i data-lucide="wifi" class="lucide w-4 h-4 nav-subicon"></i>
-                        <span class="nav-text text-sm">PPPoE</span>
-                    </a>
-                    <a href="/vpn-users" class="nav-subitem {% if request.path == '/vpn-users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
-                        <i data-lucide="shield" class="lucide w-4 h-4 nav-subicon"></i>
-                        <span class="nav-text text-sm">VPN Users</span>
-                    </a>
-                    <a href="/8021x-users" class="nav-subitem {% if request.path == '/8021x-users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
-                        <i data-lucide="lock" class="lucide w-4 h-4 nav-subicon"></i>
-                        <span class="nav-text text-sm">802.1X</span>
-                    </a>
-                    <a href="/ipoe-users" class="nav-subitem {% if request.path == '/ipoe-users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
-                        <i data-lucide="network" class="lucide w-4 h-4 nav-subicon"></i>
-                        <span class="nav-text text-sm">IPoE</span>
-                    </a>
-                    <a href="/hotspot-users" class="nav-subitem {% if request.path == '/hotspot-users' %}active{% endif %} flex items-center space-x-3 pl-10 pr-3 py-2.5 cursor-pointer group">
-                        <i data-lucide="ticket" class="lucide w-4 h-4 nav-subicon"></i>
-                        <span class="nav-text text-sm">Hotspot</span>
-                    </a>
+            <!-- Consolidated Customer Users Link -->
+            <a href="/users" class="nav-item {% if request.path in ['/users', '/vpn-users', '/8021x-users', '/ipoe-users', '/hotspot-users'] %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
+                <div class="nav-icon-container">
+                    <i data-lucide="users" class="lucide nav-icon icon-emerald"></i>
                 </div>
-            </div>
+                <span class="nav-text flex-1 font-medium text-sm">Customer Users</span>
+                <span class="tooltip">Customer Users</span>
+            </a>
 
             <a href="/sessions" class="nav-item {% if request.path == '/sessions' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
                 <div class="nav-icon-container">
@@ -635,6 +619,47 @@
                 <span class="nav-text flex-1 font-medium text-sm">Auth Logs</span>
                 <span class="tooltip">Authentication Logs</span>
             </a>
+
+            <!-- NOC Monitoring Section -->
+            <div class="section-divider">
+                <div class="px-3 py-2 mt-3">
+                    <div class="logo-text">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.15em]">NOC Monitoring</p>
+                    </div>
+                </div>
+            </div>
+
+            <a href="/network-map" class="nav-item {% if request.path == '/network-map' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
+                <div class="nav-icon-container">
+                    <i data-lucide="map" class="lucide nav-icon icon-indigo"></i>
+                </div>
+                <span class="nav-text flex-1 font-medium text-sm">Peta Jaringan</span>
+                <span class="tooltip">Live NOC Spatial Map</span>
+            </a>
+
+            <a href="/optical-health" class="nav-item {% if request.path == '/optical-health' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
+                <div class="nav-icon-container">
+                    <i data-lucide="activity" class="lucide nav-icon icon-rose"></i>
+                </div>
+                <span class="nav-text flex-1 font-medium text-sm">Kesehatan ONT</span>
+                <span class="tooltip">Kesehatan Optik ONT</span>
+            </a>
+            <a href="/ipam" class="nav-item {% if request.path == '/ipam' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
+                <div class="nav-icon-container">
+                    <i data-lucide="layout-grid" class="lucide nav-icon icon-emerald"></i>
+                </div>
+                <span class="nav-text flex-1 font-medium text-sm">Visual IPAM</span>
+                <span class="tooltip">Visual IPAM & IP Pool</span>
+            </a>
+
+            <a href="/diagnostics" class="nav-item {% if request.path == '/diagnostics' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
+                <div class="nav-icon-container">
+                    <i data-lucide="wrench" class="lucide nav-icon icon-indigo"></i>
+                </div>
+                <span class="nav-text flex-1 font-medium text-sm">Pusat Diagnostik</span>
+                <span class="tooltip">Diagnostik & Troubleshooting</span>
+            </a>
+
 
             <!-- Settings Section -->
             <div class="section-divider">
