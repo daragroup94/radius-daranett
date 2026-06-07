@@ -446,6 +446,11 @@ def api_ipam_pools():
 @diagnostics_bp.route('/api/topology/status')
 @login_required
 def api_topology_status():
+    # Capture application configuration in the main thread (has context)
+    db_host = current_app.config.get('DB_HOST', 'localhost')
+    db_port = current_app.config.get('DB_PORT', 5432)
+    redis_url = current_app.config.get('REDIS_URL', 'redis://localhost:6379/0')
+
     def check_latency(host, port=None):
         start = time.perf_counter()
         try:
@@ -484,10 +489,10 @@ def api_topology_status():
             'id': 'postgres',
             'name': 'Database Server',
             'type': 'database',
-            'ip': current_app.config['DB_HOST'],
+            'ip': db_host,
             'online': db_ok,
             'latency': db_lat,
-            'info': f"PostgreSQL Port {current_app.config['DB_PORT']}"
+            'info': f"PostgreSQL Port {db_port}"
         }
 
     def check_redis():
@@ -496,7 +501,7 @@ def api_topology_status():
         start = time.perf_counter()
         try:
             import redis
-            r_pool = redis.ConnectionPool.from_url(current_app.config['REDIS_URL'], socket_timeout=1)
+            r_pool = redis.ConnectionPool.from_url(redis_url, socket_timeout=1)
             r = redis.Redis(connection_pool=r_pool)
             if r.ping():
                 redis_ok = True
