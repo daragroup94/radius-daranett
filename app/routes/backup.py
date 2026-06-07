@@ -84,10 +84,7 @@ def api_create_backup():
             '--table=radusergroup',
             '--table=radgroupcheck',
             '--table=radgroupreply',
-            '--table=customer_coordinates',
-            '--table=nas_coordinates',
-            '--table=infrastructure_coordinates',
-            '--table=cable_connections',
+
             '--table=integrations',
             '--table=admin_users',
             '--table=hotspot_vouchers',
