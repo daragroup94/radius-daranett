@@ -27,6 +27,7 @@
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         cursor: pointer;
         position: relative;
+        z-index: 10;
     }
     .node-card:hover {
         transform: translateY(-4px);
@@ -79,6 +80,43 @@
         border-color: #f59e0b !important;
         background-color: rgba(245, 158, 11, 0.02) !important;
     }
+
+    /* SVG Map Connection Lines */
+    .connection-line {
+        fill: none;
+        stroke-width: 2.5;
+        transition: stroke 0.3s, stroke-width 0.3s, opacity 0.3s;
+        opacity: 0.12;
+    }
+    .dark .connection-line {
+        opacity: 0.22;
+    }
+    
+    .connection-active {
+        stroke-width: 4.5 !important;
+        opacity: 1 !important;
+    }
+
+    /* Glow animation along the line */
+    .connection-flow {
+        fill: none;
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        stroke-dasharray: 8 20;
+        animation: flow-dash 2s linear infinite;
+        opacity: 0.45;
+        transition: opacity 0.3s;
+    }
+    .connection-flow-highlighted {
+        stroke-width: 3.5;
+        opacity: 1;
+    }
+    
+    @keyframes flow-dash {
+        to {
+            stroke-dashoffset: -28;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -114,7 +152,9 @@
                 <i class="fas fa-project-diagram text-amber-500"></i> Diagram Arsitektur Jaringan
             </h3>
             
-            <div class="flex flex-col gap-10 items-center justify-center py-6 relative">
+            <div id="topology-container" class="flex flex-col gap-10 items-center justify-center py-6 relative">
+                <!-- SVG Canvas for visual connection maps -->
+                <svg id="topology-svg" class="absolute inset-0 pointer-events-none w-full h-full" style="z-index: 1; min-height: 500px;"></svg>
                 
                 <!-- TIER 1: Core Services -->
                 <div class="w-full">
@@ -354,7 +394,7 @@
                     const activeBorder = n.online ? 'border-emerald-200/40 dark:border-emerald-800/30' : 'border-red-200/40 dark:border-red-800/30';
                     
                     nasHtml += `
-                        <div onclick="inspectNode('${n.id}')" class="node-card p-2.5 rounded-xl border ${activeBorder} bg-white dark:bg-slate-900 flex items-center justify-between text-left shadow-sm">
+                        <div id="${n.id}" onclick="inspectNode('${n.id}')" class="node-card p-2.5 rounded-xl border ${activeBorder} bg-white dark:bg-slate-900 flex items-center justify-between text-left shadow-sm">
                             <div class="flex items-center gap-2 min-w-0">
                                 <div class="w-7 h-7 ${n.online ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'} rounded-lg flex items-center justify-center flex-shrink-0 text-xs">
                                     <i class="fas fa-hdd"></i>
@@ -387,6 +427,9 @@
             if (activeInspectId && nodesData[activeInspectId]) {
                 inspectNode(activeInspectId);
             }
+            
+            // Draw visual connections
+            setTimeout(drawConnections, 100);
         } catch (e) {
             showNotification('Gagal memuat status topologi: ' + e.message, 'error');
         }
@@ -514,12 +557,148 @@
             `;
         });
         document.getElementById('inspect-flow-list').innerHTML = flowsHtml;
+        
+        // Highlight active connections
+        drawConnections();
+    }
+
+    function getPath(x1, y1, x2, y2) {
+        const dx = Math.abs(x2 - x1);
+        const dy = Math.abs(y2 - y1);
+        
+        if (dy > dx) {
+            // S-curve vertical flow
+            const midY = (y1 + y2) / 2;
+            return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+        } else {
+            // S-curve horizontal flow
+            const midX = (x1 + x2) / 2;
+            return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+        }
+    }
+
+    function drawConnections() {
+        const container = document.getElementById('topology-container');
+        const svg = document.getElementById('topology-svg');
+        if (!container || !svg) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        
+        // Adjust SVG canvas size to match the container
+        svg.setAttribute('width', containerRect.width);
+        svg.setAttribute('height', containerRect.height);
+        
+        // Clear SVG and append gradients
+        svg.innerHTML = `
+            <defs>
+                <linearGradient id="flow-gradient-db" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.1"/>
+                    <stop offset="50%" stop-color="#3b82f6" stop-opacity="1"/>
+                    <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.1"/>
+                </linearGradient>
+                <linearGradient id="flow-gradient-control" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.1"/>
+                    <stop offset="50%" stop-color="#f59e0b" stop-opacity="1"/>
+                    <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.1"/>
+                </linearGradient>
+                <linearGradient id="flow-gradient-acs" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.1"/>
+                    <stop offset="50%" stop-color="#10b981" stop-opacity="1"/>
+                    <stop offset="100%" stop-color="#10b981" stop-opacity="0.1"/>
+                </linearGradient>
+                <linearGradient id="flow-gradient-client" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#a855f7" stop-opacity="0.1"/>
+                    <stop offset="50%" stop-color="#a855f7" stop-opacity="1"/>
+                    <stop offset="100%" stop-color="#a855f7" stop-opacity="0.1"/>
+                </linearGradient>
+            </defs>
+        `;
+        
+        // Core Connections List
+        const conns = [
+            { from: 'node-postgres', to: 'node-dashboard', color: '#3b82f6', grad: 'flow-gradient-db' },
+            { from: 'node-postgres', to: 'node-freeradius', color: '#3b82f6', grad: 'flow-gradient-db' },
+            { from: 'node-redis', to: 'node-dashboard', color: '#ef4444', grad: 'flow-gradient-control' },
+            { from: 'node-dashboard', to: 'node-freeradius', color: '#f59e0b', grad: 'flow-gradient-control' },
+            { from: 'node-dashboard', to: 'node-genieacs', color: '#10b981', grad: 'flow-gradient-acs' },
+            { from: 'node-genieacs', to: 'node-ont', color: '#10b981', grad: 'flow-gradient-acs' }
+        ];
+        
+        // Add dynamic connections for each NAS present in the DOM
+        const nasCards = document.querySelectorAll('#nas-container .node-card');
+        nasCards.forEach(nasCard => {
+            const nasId = nasCard.id;
+            if (!nasId) return;
+            // Dashboard to NAS (API control)
+            conns.push({ from: 'node-dashboard', to: nasId, color: '#f59e0b', grad: 'flow-gradient-control' });
+            // FreeRADIUS to NAS (RADIUS Auth/Acct)
+            conns.push({ from: 'node-freeradius', to: nasId, color: '#6366f1', grad: 'flow-gradient-control' });
+            // ONT to NAS (CPE client gateway route)
+            conns.push({ from: 'node-ont', to: nasId, color: '#a855f7', grad: 'flow-gradient-client' });
+        });
+        
+        conns.forEach(c => {
+            const fromEl = document.getElementById(c.from);
+            const toEl = document.getElementById(c.to);
+            
+            if (!fromEl || !toEl) return;
+            
+            const fromRect = fromEl.getBoundingClientRect();
+            const toRect = toEl.getBoundingClientRect();
+            
+            // Center coordinates relative to the svg container
+            const x1 = (fromRect.left + fromRect.width / 2) - containerRect.left;
+            const y1 = (fromRect.top + fromRect.height / 2) - containerRect.top;
+            const x2 = (toRect.left + toRect.width / 2) - containerRect.left;
+            const y2 = (toRect.top + toRect.height / 2) - containerRect.top;
+            
+            const pathD = getPath(x1, y1, x2, y2);
+            
+            let isHighlighted = false;
+            let isDimmed = false;
+            
+            if (activeInspectId) {
+                if (c.from === activeInspectId || c.to === activeInspectId) {
+                    isHighlighted = true;
+                } else {
+                    isDimmed = true;
+                }
+            }
+            
+            // Base static path line
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', pathD);
+            path.setAttribute('class', 'connection-line');
+            path.setAttribute('stroke', c.color);
+            if (isHighlighted) {
+                path.classList.add('connection-active');
+            }
+            if (isDimmed) {
+                path.style.opacity = '0.02';
+            }
+            svg.appendChild(path);
+            
+            // Overlay moving flow animation
+            if (!isDimmed) {
+                const flowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                flowPath.setAttribute('d', pathD);
+                flowPath.setAttribute('class', 'connection-flow');
+                flowPath.setAttribute('stroke', `url(#${c.grad})`);
+                if (isHighlighted) {
+                    flowPath.classList.add('connection-flow-highlighted');
+                }
+                svg.appendChild(flowPath);
+            }
+        });
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         loadTopology();
         // Refresh status every 30s
         setInterval(loadTopology, 30000);
+        
+        // Update connections layout when resizing window
+        window.addEventListener('resize', drawConnections);
     });
 </script>
 {% endblock %}
