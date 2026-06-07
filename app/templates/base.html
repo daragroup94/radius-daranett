@@ -648,6 +648,13 @@
                 <span class="nav-text flex-1 font-medium text-sm">Visual IPAM</span>
                 <span class="tooltip">Visual IPAM & IP Pool</span>
             </a>
+            <a href="/topology" class="nav-item {% if request.path == '/topology' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
+                <div class="nav-icon-container">
+                    <i data-lucide="network" class="lucide nav-icon icon-amber"></i>
+                </div>
+                <span class="nav-text flex-1 font-medium text-sm">Topologi Sistem</span>
+                <span class="tooltip">Topologi & Integrasi Sistem</span>
+            </a>
 
             <a href="/diagnostics" class="nav-item {% if request.path == '/diagnostics' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
                 <div class="nav-icon-container">

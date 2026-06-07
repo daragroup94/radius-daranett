@@ -235,6 +235,11 @@ def api_optical_health():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@diagnostics_bp.route('/topology')
+@login_required
+def topology_page():
+    return render_template('topology.html')
+
 @diagnostics_bp.route('/ipam')
 @login_required
 def ipam_page():
