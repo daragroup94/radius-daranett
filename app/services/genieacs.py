@@ -3,6 +3,31 @@ import requests
 import json as _json
 from flask import current_app
 
+def get_genieacs_config():
+    """
+    Mengambil konfigurasi GenieACS dari database integrations.
+    Jika tidak aktif/tidak ada, return fallback menggunakan environment variables.
+    """
+    try:
+        from database import execute_query
+        rows = execute_query("SELECT host, port, username, password FROM integrations WHERE type='genieacs' AND is_active=true ORDER BY id DESC LIMIT 1")
+        if rows:
+            host = rows[0]['host']
+            port = rows[0]['port']
+            username = rows[0]['username']
+            password = rows[0]['password']
+            if not host.startswith(('http://', 'https://')):
+                host = f"http://{host}"
+            url = f"{host}:{port}" if port else host
+            auth = (username, password) if username else None
+            return {'url': url, 'auth': auth}
+    except Exception as e:
+        print(f"Error querying GenieACS config: {e}")
+        
+    # Fallback to environment variables
+    url = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+    return {'url': url, 'auth': None}
+
 def get_genieacs_device_info(username):
     """
     Query GenieACS NBI untuk info device berdasarkan pppoeUsername dengan caching Redis (30 detik).
@@ -24,13 +49,21 @@ def get_genieacs_device_info(username):
             
     # 2. Jika tidak ada di cache, query GenieACS
     try:
-        GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
-        query = f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}'
-        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime'
+        config = get_genieacs_config()
+        GENIEACS_NBI = config['url']
+        auth = config['auth']
+        query = _json.dumps({
+            "$or": [
+                {"VirtualParameters.pppoeUsername._value": username},
+                {"VirtualParameters.pppoeUsername2._value": username}
+            ]
+        })
+        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime'
         
         resp = requests.get(
             f'{GENIEACS_NBI}/devices',
             params={'query': query, 'projection': projection},
+            auth=auth,
             timeout=3
         )
         
@@ -61,10 +94,10 @@ def get_genieacs_device_info(username):
         # Determine status
         try:
             rx_float = float(rx)
-            if -27.0 <= rx_float <= -8.0:
+            if rx_float >= -23.0:
                 rx_status = 'good'
                 rx_status_emoji = "🟢 Bagus (Optimum)"
-            elif -30.0 <= rx_float < -27.0 or rx_float > -8.0:
+            elif -27.0 <= rx_float < -23.0:
                 rx_status = 'warning'
                 rx_status_emoji = "🟡 Sedang (Warning)"
             else:

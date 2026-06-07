@@ -55,6 +55,52 @@
         </div>
     </div>
 
+    <!-- Real-Time VPN Tunnels Monitor -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 border-b border-slate-100 dark:border-slate-750 pb-4">
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <div class="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping opacity-40"></div>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-800 dark:text-white">VPN Tunnels Aktif</h3>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Monitoring real-time koneksi VPN — auto-refresh setiap 10 detik</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 mt-3 sm:mt-0">
+                <span id="tunnelCount" class="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-xl">0 tunnel</span>
+                <button onclick="loadVpnTunnels()" class="w-8 h-8 bg-slate-100 dark:bg-slate-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-slate-500 hover:text-emerald-600 rounded-lg transition-all flex items-center justify-center" title="Refresh">
+                    <i data-lucide="refresh-cw" class="lucide w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto min-w-full">
+            <table class="w-full text-left border-collapse align-middle" id="tunnelsTable">
+                <thead>
+                    <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
+                        <th class="pb-3 pt-1 px-4 font-extrabold">TYPE</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">USERNAME</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">PUBLIC IP</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">TUNNEL IP</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">TRAFFIC (RX / TX)</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">CONNECTED</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">CIPHER</th>
+                    </tr>
+                </thead>
+                <tbody id="tunnelsTableBody" class="divide-y divide-slate-50 dark:divide-slate-750">
+                    <tr><td colspan="7" class="text-center py-8 text-slate-400">
+                        <div class="flex flex-col items-center gap-2">
+                            <i data-lucide="loader" class="lucide w-5 h-5 animate-spin text-slate-300"></i>
+                            <span class="text-xs font-medium">Memuat data tunnel...</span>
+                        </div>
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Main List Card Container -->
     <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
         <!-- Sub-header dengan Search Bar saja -->

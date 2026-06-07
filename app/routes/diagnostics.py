@@ -29,10 +29,21 @@ def optical_health_page():
 @login_required
 def api_acs_reboot_user(username):
     try:
-        GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+        from services.genieacs import get_genieacs_config
+        config = get_genieacs_config()
+        GENIEACS_NBI = config['url']
+        auth = config['auth']
+        import json as _json
+        query = _json.dumps({
+            "$or": [
+                {"VirtualParameters.pppoeUsername._value": username},
+                {"VirtualParameters.pppoeUsername2._value": username}
+            ]
+        })
         resp_acs = requests.get(
             f'{GENIEACS_NBI}/devices',
-            params={'query': f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}', 'projection': '_id'},
+            params={'query': query, 'projection': '_id'},
+            auth=auth,
             timeout=3
         )
         devices = resp_acs.json()
@@ -47,7 +58,7 @@ def api_acs_reboot_user(username):
         reboot_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
         
         try:
-            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, timeout=10)
+            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, auth=auth, timeout=10)
             if resp_reboot.status_code in (200, 201, 202):
                 return jsonify({'success': True, 'message': 'Perintah reboot berhasil terkirim!'})
             else:
@@ -61,6 +72,19 @@ def api_acs_reboot_user(username):
 @login_required
 def api_optical_health_issues():
     try:
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.ont_health_issues (
+                username VARCHAR(100) PRIMARY KEY,
+                serial VARCHAR(100),
+                model VARCHAR(100),
+                manufacturer VARCHAR(100),
+                rx_power VARCHAR(20),
+                temperature VARCHAR(20),
+                last_inform VARCHAR(100),
+                detected_at TIMESTAMP DEFAULT NOW()
+            )
+        """, fetch=False)
+
         rows = execute_query("""
             SELECT username, serial, model, manufacturer, rx_power, temperature,
                    TO_CHAR(detected_at, 'YYYY-MM-DD HH24:MI:SS') as detected_at,
@@ -75,9 +99,9 @@ def api_optical_health_issues():
             try:
                 rx_clean = rx.replace('dBm', '').strip()
                 rx_float = float(rx_clean)
-                if -27.0 <= rx_float <= -8.0:
+                if rx_float >= -23.0:
                     rx_status = 'good'
-                elif -30.0 <= rx_float < -27.0 or rx_float > -8.0:
+                elif -27.0 <= rx_float < -23.0:
                     rx_status = 'warning'
                 else:
                     rx_status = 'critical'
@@ -99,18 +123,36 @@ def api_optical_health_issues():
 @login_required
 def api_optical_health():
     try:
-        GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
-        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeUsername,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber'
+        from services.genieacs import get_genieacs_config
+        config = get_genieacs_config()
+        GENIEACS_NBI = config['url']
+        auth = config['auth']
+        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber'
         
         resp = requests.get(
             f'{GENIEACS_NBI}/devices',
             params={'projection': projection},
+            auth=auth,
             timeout=8
         )
         devices = resp.json()
         if not isinstance(devices, list):
             return jsonify({'success': False, 'error': 'Respon tidak valid dari GenieACS'}), 500
             
+        # Load manual serial mappings from database
+        try:
+            execute_query("""
+                CREATE TABLE IF NOT EXISTS public.ont_serial_mapping (
+                    username VARCHAR(100) PRIMARY KEY,
+                    serial_number VARCHAR(100) UNIQUE NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """, fetch=False)
+            mappings = execute_query("SELECT username, serial_number FROM ont_serial_mapping") or []
+        except Exception:
+            mappings = []
+        serial_map = {m['serial_number'].strip(): m['username'].strip() for m in mappings if m['serial_number'] and m['username']}
+        
         results = []
         stats = {'total': 0, 'good': 0, 'warning': 0, 'critical': 0, 'unknown': 0}
         
@@ -124,7 +166,18 @@ def api_optical_health():
             di = d.get('DeviceInfo', {})
             dev_id = d.get('_deviceId', {})
             
+            serial = val(vp.get('getSerialNumber')) or dev_id.get('_SerialNumber', 'N/A')
+            serial_clean = serial.strip() if serial else 'N/A'
+            
             username = val(vp.get('pppoeUsername'))
+            if not username or username == 'N/A' or username == '':
+                username = val(vp.get('pppoeUsername2'))
+                
+            if not username or username == 'N/A' or username == '':
+                if serial_clean in serial_map:
+                    username = serial_map[serial_clean]
+                else:
+                    username = f"unconfigured-{serial_clean}"
             rx = val(vp.get('RXPower'))
             temp = val(vp.get('gettemp'))
             pon_mode = val(vp.get('getponmode'))
@@ -142,10 +195,10 @@ def api_optical_health():
                 try:
                     rx_clean = rx.replace('dBm', '').strip()
                     rx_float = float(rx_clean)
-                    if -27.0 <= rx_float <= -8.0:
+                    if rx_float >= -23.0:
                         rx_status = 'good'
                         stats['good'] += 1
-                    elif -30.0 <= rx_float < -27.0 or rx_float > -8.0:
+                    elif -27.0 <= rx_float < -23.0:
                         rx_status = 'warning'
                         stats['warning'] += 1
                     else:
@@ -477,10 +530,13 @@ def api_topology_status():
     def check_genieacs():
         acs_ok = False
         acs_lat = 999
-        acs_url = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+        from services.genieacs import get_genieacs_config
+        config = get_genieacs_config()
+        acs_url = config['url']
+        auth = config['auth']
         start = time.perf_counter()
         try:
-            resp = requests.get(f"{acs_url}/devices", params={'limit': 1}, timeout=1.5)
+            resp = requests.get(f"{acs_url}/devices", params={'limit': 1}, auth=auth, timeout=1.5)
             if resp.status_code == 200:
                 acs_ok = True
                 acs_lat = int((time.perf_counter() - start) * 1000)
@@ -490,7 +546,7 @@ def api_topology_status():
             'id': 'genieacs',
             'name': 'GenieACS Server (TR-069)',
             'type': 'acs',
-            'ip': acs_url.replace('http://', '').split(':')[0],
+            'ip': acs_url.replace('http://', '').replace('https://', '').split(':')[0],
             'online': acs_ok,
             'latency': acs_lat,
             'info': f"NBI Endpoint: {acs_url}"

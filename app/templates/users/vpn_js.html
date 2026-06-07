@@ -1,4 +1,25 @@
 <script>
+// Utility: escape HTML to prevent XSS
+if (typeof window.escapeHtml !== 'function') {
+    window.escapeHtml = function(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(String(str)));
+        return div.innerHTML;
+    };
+}
+
+// Utility: apiCall wrapper if not already defined
+if (typeof window.apiCall !== 'function') {
+    window.apiCall = async function(url, options = {}) {
+        const res = await fetch(url, {
+            headers: { 'Content-Type': 'application/json' },
+            ...options
+        });
+        return await res.json();
+    };
+}
+
 let vpnPage = 1;
 let vpnLimit = 20;
 let vpnTotal = 0;
@@ -18,8 +39,8 @@ async function loadVpnUsers() {
         // Update Stats
         document.getElementById('statTotal').textContent = vpnTotal;
         
-        // Count active sessions in this dataset (just for stats)
-        const onlineCount = data.users.reduce((acc, curr) => acc + (curr.active_sessions > 0 ? 1 : 0), 0);
+        // Use global online_count returned by API
+        const onlineCount = data.online_count !== undefined ? data.online_count : 0;
         document.getElementById('statOnline').textContent = onlineCount;
 
         if (data.users.length === 0) {
@@ -211,7 +232,110 @@ document.getElementById('vpnSearch').addEventListener('input', () => {
     }, 300);
 });
 
+// ============================================================
+// REAL-TIME VPN TUNNELS MONITORING
+// ============================================================
+let tunnelRefreshInterval = null;
+
+function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
+
+function formatRelativeTime(dateStr) {
+    if (!dateStr) return '—';
+    const now = new Date();
+    const then = new Date(dateStr.replace(' ', 'T') + (dateStr.includes('+') || dateStr.includes('Z') ? '' : 'Z'));
+    const diffSec = Math.floor((now - then) / 1000);
+    if (isNaN(diffSec) || diffSec < 0) return dateStr;
+    if (diffSec < 60) return 'Baru saja';
+    if (diffSec < 3600) return Math.floor(diffSec / 60) + ' menit lalu';
+    if (diffSec < 86400) return Math.floor(diffSec / 3600) + ' jam lalu';
+    return Math.floor(diffSec / 86400) + ' hari lalu';
+}
+
+async function loadVpnTunnels() {
+    const tbody = document.getElementById('tunnelsTableBody');
+    try {
+        const data = await apiCall('/api/vpn/tunnels');
+        const tunnels = data && data.tunnels ? data.tunnels : [];
+
+        // Update count badge
+        const countEl = document.getElementById('tunnelCount');
+        if (countEl) countEl.textContent = tunnels.length + ' tunnel';
+
+        // Keep statOnline card in sync in real-time
+        const statOnlineEl = document.getElementById('statOnline');
+        if (statOnlineEl) statOnlineEl.textContent = tunnels.length;
+
+        if (tunnels.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-400">
+                <div class="flex flex-col items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                        <i data-lucide="wifi-off" class="lucide w-6 h-6 text-slate-300 dark:text-slate-500"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-slate-500 dark:text-slate-400">Tidak ada tunnel aktif</p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Semua koneksi VPN sedang offline</p>
+                    </div>
+                </div>
+            </td></tr>`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            return;
+        }
+
+        tbody.innerHTML = tunnels.map(t => {
+            const isOvpn = t.type === 'openvpn';
+            const isIkev2 = t.type === 'ikev2';
+            const typeBadge = isOvpn
+                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800/50"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>OpenVPN</span>`
+                : isIkev2
+                ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800/50"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>IKEv2</span>`
+                : `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-cyan-50 text-cyan-700 border border-cyan-100 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-800/50"><span class="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>L2TP</span>`;
+
+            const rxFormatted = formatBytes(t.bytes_recv);
+            const txFormatted = formatBytes(t.bytes_sent);
+            const connTime = formatRelativeTime(t.connected_since);
+
+            return `
+                <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
+                    <td class="py-3 px-4">${typeBadge}</td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 ${isOvpn ? 'bg-gradient-to-tr from-purple-500 to-indigo-600' : 'bg-gradient-to-tr from-cyan-500 to-teal-600'}">
+                                <i class="fas fa-user text-white text-[10px]"></i>
+                            </div>
+                            <span class="font-bold text-slate-800 dark:text-slate-200 text-sm">${escapeHtml(t.username)}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4"><span class="text-xs font-mono text-slate-500 dark:text-slate-400">${escapeHtml(t.real_address || '—')}</span></td>
+                    <td class="py-3 px-4"><span class="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">${escapeHtml(t.virtual_address || '—')}</span></td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono text-blue-600 dark:text-blue-400"><i class="fas fa-arrow-down text-[9px] text-blue-400 mr-0.5"></i>${txFormatted}</span>
+                            <span class="text-slate-300 dark:text-slate-600">/</span>
+                            <span class="text-xs font-mono text-orange-600 dark:text-orange-400"><i class="fas fa-arrow-up text-[9px] text-orange-400 mr-0.5"></i>${rxFormatted}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4"><span class="text-xs text-slate-500 dark:text-slate-400 font-medium">${connTime}</span></td>
+                    <td class="py-3 px-4"><span class="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-600">${escapeHtml(t.cipher || '—')}</span></td>
+                </tr>
+            `;
+        }).join('');
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500 font-bold text-xs"><i class="fas fa-exclamation-triangle mr-2"></i>Error: ${e.message}</td></tr>`;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     loadVpnUsers();
+    loadVpnTunnels();
+    // Auto-refresh tunnels every 10 seconds
+    tunnelRefreshInterval = setInterval(loadVpnTunnels, 10000);
 });
 </script>

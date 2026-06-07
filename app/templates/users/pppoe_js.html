@@ -81,12 +81,11 @@
     // === FUNGSI UTAMA: editUser dan loadUsers ===
     async function editUser(username) {
         try {
-            const response = await fetch(`/api/users?search=${encodeURIComponent(username)}&limit=1`);
+            const response = await fetch(`/api/users/get/${encodeURIComponent(username)}`);
             if (!response.ok) throw new Error('Failed to fetch user');
-            const result = await response.json();
-            const user = (result.users || []).find(u => u.username === username);
+            const user = await response.json();
             
-            if (!user) {
+            if (!user || user.error) {
                 showNotification('User not found!', 'error');
                 return;
             }

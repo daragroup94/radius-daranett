@@ -15,6 +15,12 @@ def dashboard_page():
 @login_required
 def api_stats():
     try:
+        try:
+            from services.session_tasks import sync_active_sessions_with_routers
+            sync_active_sessions_with_routers()
+        except Exception as sync_err:
+            print(f"Failed to sync sessions in dashboard api_stats: {sync_err}")
+
         # PPPoE Stats (Users not in ipoe, vpn, 8021x, or hotspot groups)
         pppoe_users = execute_query("""
             SELECT COUNT(*) as count FROM radcheck c 
@@ -31,26 +37,70 @@ def api_stats():
             WHERE a.acctstoptime IS NULL 
             AND NOT EXISTS (
                 SELECT 1 FROM radusergroup g 
-                WHERE LOWER(g.username) = LOWER(a.username) 
+                WHERE (LOWER(g.username) = LOWER(a.username) OR REGEXP_REPLACE(LOWER(g.username), '[^a-z0-9]', '', 'g') = REGEXP_REPLACE(LOWER(a.username), '[^a-z0-9]', '', 'g'))
                 AND g.groupname IN ('ipoe', 'vpn', '8021x')
             ) 
             AND NOT EXISTS (
                 SELECT 1 FROM hotspot_vouchers h 
-                WHERE LOWER(h.username) = LOWER(a.username)
+                WHERE (LOWER(h.username) = LOWER(a.username) OR REGEXP_REPLACE(LOWER(h.username), '[^a-z0-9]', '', 'g') = REGEXP_REPLACE(LOWER(a.username), '[^a-z0-9]', '', 'g'))
             )
         """)[0]['count']
         
         # IPoE Stats
         ipoe_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'ipoe'")[0]['count']
-        ipoe_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'ipoe' WHERE a.acctstoptime IS NULL")[0]['count']
+        ipoe_sessions = execute_query("""
+            SELECT COUNT(*) as count FROM radacct a 
+            INNER JOIN radusergroup g ON (LOWER(g.username) = LOWER(a.username) OR REGEXP_REPLACE(LOWER(g.username), '[^a-z0-9]', '', 'g') = REGEXP_REPLACE(LOWER(a.username), '[^a-z0-9]', '', 'g')) AND g.groupname = 'ipoe' 
+            WHERE a.acctstoptime IS NULL
+        """)[0]['count']
 
         # Hotspot Stats
         hotspot_users = execute_query("SELECT COUNT(*) as count FROM hotspot_vouchers WHERE deleted_at IS NULL")[0]['count']
-        hotspot_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a WHERE a.acctstoptime IS NULL AND EXISTS (SELECT 1 FROM hotspot_vouchers h WHERE LOWER(h.username) = LOWER(a.username))")[0]['count']
+        hotspot_sessions = execute_query("""
+            SELECT COUNT(*) as count FROM radacct a 
+            WHERE a.acctstoptime IS NULL 
+            AND EXISTS (
+                SELECT 1 FROM hotspot_vouchers h 
+                WHERE (LOWER(h.username) = LOWER(a.username) OR REGEXP_REPLACE(LOWER(h.username), '[^a-z0-9]', '', 'g') = REGEXP_REPLACE(LOWER(a.username), '[^a-z0-9]', '', 'g'))
+            )
+        """)[0]['count']
 
         # VPN Stats
         vpn_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'vpn'")[0]['count']
-        vpn_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'vpn' WHERE a.acctstoptime IS NULL")[0]['count']
+        vpn_sessions = execute_query("""
+            SELECT COUNT(*) as count FROM radacct a 
+            INNER JOIN radusergroup g ON (LOWER(g.username) = LOWER(a.username) OR REGEXP_REPLACE(LOWER(g.username), '[^a-z0-9]', '', 'g') = REGEXP_REPLACE(LOWER(a.username), '[^a-z0-9]', '', 'g')) AND g.groupname = 'vpn' 
+            WHERE a.acctstoptime IS NULL
+        """)[0]['count']
+
+        # Add OpenVPN sessions from status log since OpenVPN doesn't use radacct
+        openvpn_online_count = 0
+        status_file = '/tmp/openvpn-status.log'
+        import os
+        if os.path.exists(status_file):
+            try:
+                openvpn_usernames = set()
+                with open(status_file, 'r') as f:
+                    in_client_list = False
+                    for line in f:
+                        line = line.strip()
+                        if not line or line == 'END': continue
+                        parts = line.split(',')
+                        if len(parts) >= 2 and parts[0] == 'HEADER' and parts[1] == 'CLIENT_LIST':
+                            in_client_list = True
+                            continue
+                        if parts[0] == 'HEADER':
+                            in_client_list = False
+                            continue
+                        if in_client_list and parts[0] == 'CLIENT_LIST' and len(parts) >= 8:
+                            username = parts[9] if len(parts) > 9 and parts[9] and parts[9] != 'UNDEF' else parts[1]
+                            if username and username != 'UNDEF':
+                                openvpn_usernames.add(username.lower())
+                openvpn_online_count = len(openvpn_usernames)
+            except Exception:
+                pass
+        
+        vpn_sessions += openvpn_online_count
 
         # 802.1X Stats
         x8021x_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = '8021x'")[0]['count']
@@ -59,6 +109,7 @@ def api_stats():
         total_users = pppoe_users + ipoe_users + hotspot_users + vpn_users + x8021x_users
         active_sessions = pppoe_sessions + ipoe_sessions + hotspot_sessions + vpn_sessions + x8021x_sessions
         online_users = execute_query("SELECT COUNT(DISTINCT username) as count FROM radacct WHERE acctstoptime IS NULL")[0]['count']
+        online_users += openvpn_online_count
         today_auth = execute_query("SELECT COUNT(*) as count FROM radpostauth WHERE DATE(authdate AT TIME ZONE 'Asia/Jakarta') = CURRENT_DATE")[0]['count']
 
         try:

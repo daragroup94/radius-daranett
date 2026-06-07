@@ -352,7 +352,8 @@ async function loadSessions() {
     if (data.error) { showError('sessionsList', data.error); return; }
     allSessions = data;
     duplicateUsernames = new Set((dupes||[]).map(d => d.username));
-    document.getElementById('disconnectDupBtn').classList.toggle('hidden', duplicateUsernames.size === 0);
+    const hasPppoeDupes = (dupes||[]).some(d => (d.pppoe_count || 0) > 1);
+    document.getElementById('disconnectDupBtn').classList.toggle('hidden', !hasPppoeDupes);
     updateStats(data, dupes||[]);
     filterSessions();
   } catch(e) { showError('sessionsList', e.message); }
@@ -367,8 +368,8 @@ function updateStats(sessions, dupes) {
   sessions.forEach(s => { dl+=parseInt(s.acctinputoctets||0); ul+=parseInt(s.acctoutputoctets||0); dur+=parseInt(s.acctsessiontime||0); });
   document.getElementById('totalSessions').textContent = sessions.length;
   document.getElementById('totalDuplicates').textContent = dupes.length;
-  document.getElementById('totalDownload').textContent = fmtBytes(dl);
-  document.getElementById('totalUpload').textContent = fmtBytes(ul);
+  document.getElementById('totalDownload').textContent = fmtBytes(ul); // Swap: totalDownload is ul (acctoutputoctets)
+  document.getElementById('totalUpload').textContent = fmtBytes(dl); // Swap: totalUpload is dl (acctinputoctets)
   document.getElementById('avgDuration').textContent = sessions.length ? fmtDur(Math.floor(dur/sessions.length)) : '0s';
 }
 
@@ -377,7 +378,7 @@ function filterSessions() {
   const nas = document.getElementById('filterNas').value;
   const dup = document.getElementById('filterDuplicate').value;
   let list = allSessions.filter(s =>
-    s.username.toLowerCase().includes(q) &&
+    (s.username||'').toLowerCase().includes(q) &&
     (!nas || s.nasipaddress === nas) &&
     (!dup || (dup==='duplicate' && duplicateUsernames.has(s.username)))
   );
@@ -423,7 +424,7 @@ function renderSessions(sessions) {
     const isDup = duplicateUsernames.has(s.username);
     const dl = parseInt(s.acctinputoctets||0), ul = parseInt(s.acctoutputoctets||0);
     const total = dl + ul;
-    const dlPct = total ? Math.round(dl/total*100) : 50;
+    const dlPct = total ? Math.round(ul/total*100) : 50; // Swap: dlPct represents download ratio (ul / total)
     
     const dupBadge = isDup 
       ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100">GANDA</span>'
@@ -455,14 +456,14 @@ function renderSessions(sessions) {
         <td class="py-3 px-4">
           <span class="text-xs font-mono font-bold text-indigo-650 bg-indigo-50/50 px-2 py-0.5 rounded border border-indigo-100/50">
             <i class="fas fa-clock text-indigo-400 mr-1.5"></i>
-            <span class="session-timer font-bold" data-start="${s.acctstarttime}">${fmtDur(s.acctsessiontime||0)}</span>
+            <span class="session-timer font-bold" data-secs="${s.acctsessiontime||0}">${fmtDur(s.acctsessiontime||0)}</span>
           </span>
         </td>
         <td class="py-3 px-4">
           <div class="flex flex-col w-48 gap-1">
             <div class="flex justify-between text-[10px] font-bold">
-              <span class="text-emerald-600">↓ ${fmtBytes(dl)}</span>
-              <span class="text-blue-600">↑ ${fmtBytes(ul)}</span>
+              <span class="text-emerald-600">↓ ${fmtBytes(ul)}</span>
+              <span class="text-blue-600">↑ ${fmtBytes(dl)}</span>
             </div>
             <div class="w-full speed-bar-wrap bg-slate-100 h-1.5 overflow-hidden rounded-full">
               <div class="speed-bar-fill h-full rounded-full" style="width:${dlPct}%;background:linear-gradient(90deg,#10b981,#3b82f6)"></div>
@@ -826,9 +827,10 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSessions();
   loadNasFilter();
   setInterval(() => {
-    document.querySelectorAll('.session-timer[data-start]').forEach(el => {
-      const secs = Math.floor((Date.now() - new Date(el.dataset.start).getTime()) / 1000);
-      el.textContent = fmtDur(Math.max(0, secs));
+    document.querySelectorAll('.session-timer[data-secs]').forEach(el => {
+      const secs = parseInt(el.dataset.secs) + 1;
+      el.dataset.secs = secs;
+      el.textContent = fmtDur(secs);
     });
   }, 1000);
 });

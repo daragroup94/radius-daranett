@@ -31,6 +31,9 @@ authorize {
     mschap
     digest
     suffix
+    eap {
+        ok = return
+    }
     files
     sql
     pap
@@ -48,6 +51,7 @@ authenticate {
     }
     mschap
     digest
+    eap
 }
 
 preacct {
@@ -68,6 +72,31 @@ session {
 
 post-auth {
     sql
+
+    # If these attributes are not set in the reply, fetch them from PostgreSQL.
+    # This ensures that EAP clients (where authorize sql is skipped in the final round)
+    # get their assigned attributes.
+    if (!reply:Framed-IP-Address) {
+        if ("%{sql:SELECT value FROM radreply WHERE username = '%{User-Name}' AND attribute = 'Framed-IP-Address' LIMIT 1}" != "") {
+            update reply {
+                Framed-IP-Address := "%{sql:SELECT value FROM radreply WHERE username = '%{User-Name}' AND attribute = 'Framed-IP-Address' LIMIT 1}"
+            }
+        }
+    }
+    if (!reply:Framed-Pool) {
+        if ("%{sql:SELECT value FROM radreply WHERE username = '%{User-Name}' AND attribute = 'Framed-Pool' LIMIT 1}" != "") {
+            update reply {
+                Framed-Pool := "%{sql:SELECT value FROM radreply WHERE username = '%{User-Name}' AND attribute = 'Framed-Pool' LIMIT 1}"
+            }
+        }
+    }
+    if (!reply:Mikrotik-Rate-Limit) {
+        if ("%{sql:SELECT value FROM radreply WHERE username = '%{User-Name}' AND attribute = 'Mikrotik-Rate-Limit' LIMIT 1}" != "") {
+            update reply {
+                Mikrotik-Rate-Limit := "%{sql:SELECT value FROM radreply WHERE username = '%{User-Name}' AND attribute = 'Mikrotik-Rate-Limit' LIMIT 1}"
+            }
+        }
+    }
 
     Post-Auth-Type REJECT {
         sql

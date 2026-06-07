@@ -17,13 +17,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.radius.entrypoints=web"
-      - "traefik.http.routers.radius.rule=Host(`radius.access.daragroup.cloud`)"
+      - "traefik.http.routers.radius.rule=Host(`radius.go.daragroup.cloud`) || Host(`radius.access.daragroup.cloud`)"
       - "traefik.http.routers.radius.middlewares=radius-https-redirect"
       - "traefik.http.middlewares.radius-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.radius-https-redirect.redirectscheme.permanent=true"
       # IPoE Domain Router (Bypass HTTPS Redirect for /api/ipoe/ paths)
       - "traefik.http.routers.radius-ipoe.entrypoints=web"
-      - "traefik.http.routers.radius-ipoe.rule=Host(`radius.access.daragroup.cloud`) && PathPrefix(`/api/ipoe/`)"
+      - "traefik.http.routers.radius-ipoe.rule=(Host(`radius.go.daragroup.cloud`) || Host(`radius.access.daragroup.cloud`)) && PathPrefix(`/api/ipoe/`)"
       - "traefik.http.routers.radius-ipoe.service=radius-service"
       # IPoE Raw IP Router (For RouterOS v6 compatibility where URL overrides host header)
       - "traefik.http.routers.radius-ipoe-ip.entrypoints=web"
@@ -31,7 +31,7 @@ services:
       - "traefik.http.routers.radius-ipoe-ip.service=radius-service"
       # HTTPS (Secure)
       - "traefik.http.routers.radius-secure.entrypoints=websecure"
-      - "traefik.http.routers.radius-secure.rule=Host(`radius.access.daragroup.cloud`)"
+      - "traefik.http.routers.radius-secure.rule=Host(`radius.go.daragroup.cloud`) || Host(`radius.access.daragroup.cloud`)"
       - "traefik.http.routers.radius-secure.tls=true"
       - "traefik.http.routers.radius-secure.tls.certresolver=cloudflare"
       - "traefik.http.routers.radius-secure.service=radius-service"
@@ -60,7 +60,10 @@ services:
       - ./logs:/app/logs
       - ./backups:/app/backups
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log/openvpn-status.log:/tmp/openvpn-status.log:ro
+      - /etc/openvpn/ccd:/etc/openvpn/ccd
       - /usr/bin/docker:/usr/bin/docker:ro
+      - /usr/bin/radclient:/usr/bin/radclient:ro
     # Allow adding routes to reach NAS subnets
     cap_add:
       - NET_ADMIN
@@ -70,7 +73,7 @@ services:
     # Network
     networks:
       my-net:
-        ipv4_address: 10.204.0.51
+        ipv4_address: 100.204.0.51
     # Dependencies
     depends_on:
       postgres:
@@ -110,7 +113,7 @@ services:
     # Network
     networks:
       my-net:
-        ipv4_address: 10.204.0.52
+        ipv4_address: 100.204.0.52
     # Health Check
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U radius -d radius"]
@@ -136,7 +139,7 @@ services:
     # Network
     networks:
       my-net:
-        ipv4_address: 10.204.0.53
+        ipv4_address: 100.204.0.53
     # Command
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru --replicaof no one
     # Health Check
@@ -190,8 +193,11 @@ services:
     # Network
     networks:
       my-net:
-        ipv4_address: 10.204.0.54
-    # Command (Debug mode - remove -X for production)
+        ipv4_address: 100.204.0.54
+    # Allow adding routes to VPN subnets via host gateway
+    cap_add:
+      - NET_ADMIN
+    # Command (Production mode)
     command: freeradius -f -l stdout
     # Dependencies
     depends_on:
@@ -210,13 +216,13 @@ services:
       - "traefik.enable=true"
       # HTTP (Redirect to HTTPS)
       - "traefik.http.routers.pgadmin.entrypoints=web"
-      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.access.daragroup.cloud`)"
+      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.go.daragroup.cloud`) || Host(`pgadmin.access.daragroup.cloud`)"
       - "traefik.http.routers.pgadmin.middlewares=pgadmin-https-redirect"
       - "traefik.http.middlewares.pgadmin-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.pgadmin-https-redirect.redirectscheme.permanent=true"
       # HTTPS (Secure)
       - "traefik.http.routers.pgadmin-secure.entrypoints=websecure"
-      - "traefik.http.routers.pgadmin-secure.rule=Host(`pgadmin.access.daragroup.cloud`)"
+      - "traefik.http.routers.pgadmin-secure.rule=Host(`pgadmin.go.daragroup.cloud`) || Host(`pgadmin.access.daragroup.cloud`)"
       - "traefik.http.routers.pgadmin-secure.tls=true"
       - "traefik.http.routers.pgadmin-secure.tls.certresolver=cloudflare"
       - "traefik.http.routers.pgadmin-secure.service=pgadmin-service"
@@ -235,11 +241,42 @@ services:
     # Network
     networks:
       my-net:
-        ipv4_address: 10.204.0.55
+        ipv4_address: 100.204.0.55
     # Dependencies
     depends_on:
       postgres:
         condition: service_healthy
+
+  # ==========================================
+  # IKEv2 VPN SERVER (StrongSwan)
+  # ==========================================
+  ikev2-vpn:
+    build:
+      context: ./ikev2-config
+      dockerfile: Dockerfile
+    container_name: ikev2-vpn
+    restart: unless-stopped
+    # Privileged is required for IPsec kernel modules and routing
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+    environment:
+      # Opsional: Jika kosong, script akan otomatis mendeteksi IP Public
+      - VPN_DOMAIN_OR_IP=
+    ports:
+      - "500:500/udp"
+      - "4500:4500/udp"
+    volumes:
+      - ./uploads:/app-certs
+      - /lib/modules:/lib/modules:ro
+      - ikev2_certs:/etc/ipsec.d
+    networks:
+      my-net:
+        ipv4_address: 100.204.0.56
+    depends_on:
+      freeradius:
+        condition: service_started
 
 # ==========================================
 # NETWORKS
@@ -259,6 +296,9 @@ volumes:
   redis_data:
     driver: local
     name: freeradius_redis_data
+  ikev2_certs:
+    external: true
+    name: ikev2_certs
   pgadmin_data:
     driver: local
     name: freeradius_pgadmin_data

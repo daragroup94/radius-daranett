@@ -131,9 +131,12 @@ function renderTable() {
             const ipCell = u.lease_ip
                 ? `<div class="font-mono text-xs font-bold text-emerald-700">${u.lease_ip}</div>
                    ${u.lease_hostname ? `<div class="text-[10px] text-gray-400">${u.lease_hostname}</div>` : ''}`
-                : (u.ip_address
-                    ? `<span class="font-mono text-xs text-blue-600">${u.ip_address}</span>`
-                    : `<span class="text-gray-400 text-xs">Dynamic</span>`);
+                : (u.active_ip
+                    ? `<div class="font-mono text-xs font-bold text-blue-600">${u.active_ip}</div>
+                       <div class="text-[9px] text-blue-400 font-semibold">(Sesi Aktif)</div>`
+                    : (u.ip_address
+                        ? `<span class="font-mono text-xs text-blue-600">${u.ip_address}</span>`
+                        : `<span class="text-gray-400 text-xs">Dynamic</span>`));
 
             const rateCell = u.lease_rate || u.rate_limit
                 ? `<span class="font-mono text-xs text-gray-700">${u.lease_rate || u.rate_limit}</span>`
@@ -169,7 +172,7 @@ function renderTable() {
                 <td class="py-3 px-3">${statusBadge}</td>
                 <td class="py-3 px-3 text-right">
                     <div class="flex justify-end gap-1">
-                        <button onclick="openEditModal('${u.mac_address}','${(u.name||'').replace(/'/g, '\\\'')}','${u.ip_address||''}','${u.ip_pool||''}','${u.rate_limit||''}')"
+                        <button onclick="openEditModal('${u.mac_address}','${(u.name||'').replace(/'/g, '\\\'')}','${u.ip_address||''}','${u.framed_pool||''}','${u.rate_limit||''}')"
                                 class="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-all" title="Edit">
                             <i class="fas fa-edit text-xs"></i>
                         </button>

@@ -53,5 +53,9 @@ echo "Starting FreeRADIUS in debug mode..."
 echo "==================================================="
 echo ""
 
+# Add routes to NAS subnets via host (VPN gateway)
+echo "Adding routes to NAS subnets..."
+ip route add 10.0.0.0/8 via 100.204.0.1 2>/dev/null && echo "✓ Route 10.0.0.0/8 added" || echo "⚠ Route 10.0.0.0/8 already exists"
+
 # Start FreeRADIUS
 exec "$@"

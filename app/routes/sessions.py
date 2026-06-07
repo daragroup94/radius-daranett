@@ -16,18 +16,139 @@ def sessions_page():
 @login_required
 def api_sessions():
     try:
+        # Sync active sessions with MikroTik live status in real-time
+        try:
+            from services.session_tasks import sync_active_sessions_with_routers
+            sync_active_sessions_with_routers()
+        except Exception as sync_err:
+            print(f"Failed to sync sessions in API endpoint: {sync_err}")
+
         sessions = execute_query("""
-            SELECT DISTINCT ON (username, acctsessionid)
-                   radacctid, acctsessionid, acctuniqueid, username,
+            SELECT radacctid, acctsessionid, acctuniqueid, username,
                    nasipaddress, nasportid, nasporttype, acctstarttime,
                    acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets,
                    calledstationid, callingstationid, framedipaddress,
                    framedprotocol, servicetype, connectinfo_start,
-                   CASE WHEN acctstoptime IS NULL THEN 'active' ELSE 'inactive' END as status
+                   'active' as status
             FROM radacct
             WHERE acctstoptime IS NULL
-            ORDER BY username, acctsessionid, acctstarttime DESC
+            ORDER BY acctstarttime DESC
         """)
+
+        # Fetch live data from MikroTik routers to merge real-time bytes & uptime
+        try:
+            routers = execute_query("SELECT id, name, host, username, password, port FROM integrations WHERE type='mikrotik' AND is_active=true")
+            if routers and sessions:
+                import librouteros
+                import re
+
+                def parse_uptime(ut_str):
+                    if not ut_str: return 0
+                    secs = 0
+                    m = re.search(r'(\d+)w', ut_str)
+                    if m: secs += int(m.group(1)) * 604800
+                    m = re.search(r'(\d+)d', ut_str)
+                    if m: secs += int(m.group(1)) * 86400
+                    m = re.search(r'(\d+):(\d+):(\d+)', ut_str)
+                    if m:
+                        secs += int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+                    else:
+                        m = re.search(r'(\d+)h', ut_str)
+                        if m: secs += int(m.group(1)) * 3600
+                        m = re.search(r'(\d+)m', ut_str)
+                        if m: secs += int(m.group(1)) * 60
+                        m = re.search(r'(\d+)s', ut_str)
+                        if m: secs += int(m.group(1))
+                    return secs
+
+                live_ppp_data = {}
+                live_leases = {}
+
+                for r in routers:
+                    nas_ip = r['host']
+                    try:
+                        api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=1.5)
+                        
+                        # PPP active users
+                        try:
+                            active_ppp = list(api('/ppp/active/print'))
+                        except Exception:
+                            active_ppp = []
+
+                        # PPPoE interface bytes
+                        try:
+                            ifaces = list(api('/interface/print'))
+                            iface_map = {}
+                            for iface in ifaces:
+                                if iface.get('type') in ('pppoe-in', 'sstp-in', 'l2tp-in', 'ovpn-in'):
+                                    iname = iface.get('name', '').strip('<>')
+                                    uname = iname[6:] if iname.startswith('pppoe-') else iname
+                                    iface_map[uname.lower()] = {
+                                        'rx_byte': int(iface.get('rx-byte', 0)),
+                                        'tx_byte': int(iface.get('tx-byte', 0))
+                                    }
+                        except Exception:
+                            iface_map = {}
+
+                        for s in active_ppp:
+                            name = s.get('name', '').lower()
+                            live_ppp_data[(nas_ip, name)] = {
+                                'address': s.get('address', ''),
+                                'uptime_secs': parse_uptime(s.get('uptime', '')),
+                                'rx_byte': iface_map.get(name, {}).get('rx_byte', 0),
+                                'tx_byte': iface_map.get(name, {}).get('tx_byte', 0)
+                            }
+
+                        # DHCP active leases
+                        try:
+                            leases = list(api('/ip/dhcp-server/lease/print'))
+                            for l in leases:
+                                mac = l.get('mac-address', '').lower()
+                                if mac:
+                                    live_leases[(nas_ip, mac)] = {
+                                        'address': l.get('active-address') or l.get('address', ''),
+                                        'status': l.get('status', '')
+                                    }
+                        except Exception:
+                            pass
+
+                        api.close()
+                    except Exception as conn_err:
+                        print(f"Failed to fetch live stats in API from router {r['name']}: {conn_err}")
+
+                # Merge live data into session structures
+                for s in (sessions or []):
+                    nas_ip = s['nasipaddress']
+                    uname = s['username'].lower()
+                    called = (s['calledstationid'] or '').lower()
+                    
+                    is_ppp = 'pppoe' in called or 'l2tp' in called or 'sstp' in called or 'pptp' in called or not called
+                    
+                    if is_ppp:
+                        live_key = (nas_ip, uname)
+                        if live_key in live_ppp_data:
+                            ldata = live_ppp_data[live_key]
+                            s['acctsessiontime'] = ldata['uptime_secs']
+                            s['framedipaddress'] = ldata['address']
+                            if ldata['rx_byte'] > 0:
+                                s['acctinputoctets'] = ldata['rx_byte']
+                            if ldata['tx_byte'] > 0:
+                                s['acctoutputoctets'] = ldata['tx_byte']
+                    else:
+                        # IPoE / DHCP
+                        clean_mac = uname.replace(':', '').replace('-', '').replace('_', '')
+                        for (lip, lmac), ldata in live_leases.items():
+                            if lip == nas_ip and clean_mac == lmac.replace(':', '').replace('-', '').replace('_', ''):
+                                s['framedipaddress'] = ldata['address']
+                                break
+        except Exception as merge_err:
+            print(f"Error merging live session data: {merge_err}")
+
+        # Serialize datetime fields to ISO string for reliable JS parsing
+        for s in (sessions or []):
+            for field in ('acctstarttime', 'acctupdatetime'):
+                if s.get(field) and hasattr(s[field], 'strftime'):
+                    s[field] = s[field].strftime('%Y-%m-%dT%H:%M:%S')
         return jsonify(sessions)
     except Exception as e:
         print(f"Error in api_sessions: {str(e)}")
@@ -37,15 +158,19 @@ def api_sessions():
 @login_required
 def api_cleanup_sessions():
     try:
-        deleted = execute_query("""
-            DELETE FROM radacct 
-            WHERE acctstoptime IS NULL 
+        # UPDATE (bukan DELETE) agar histori sesi tetap tersimpan di database.
+        # Hanya menarget PPPoE (pppoe/PPPoE) - L2TP/IPoE/Hotspot tidak boleh dimatikan paksa.
+        updated = execute_query("""
+            UPDATE radacct
+            SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
+            WHERE acctstoptime IS NULL
+            AND POSITION('pppoe' IN LOWER(calledstationid)) > 0
             AND acctupdatetime < NOW() - INTERVAL '30 minutes'
             RETURNING radacctid
         """)
         
-        count = len(deleted) if deleted else 0
-        return jsonify({'success': True, 'message': f'{count} stale sessions cleaned up (no update for 30+ minutes)'})
+        count = len(updated) if updated else 0
+        return jsonify({'success': True, 'message': f'{count} stale PPPoE sessions marked as disconnected (no update for 30+ minutes)'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -59,12 +184,13 @@ def api_fix_stale_sessions():
             UPDATE radacct 
             SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
             WHERE acctstoptime IS NULL 
+            AND POSITION('pppoe' IN LOWER(calledstationid)) > 0
             AND acctupdatetime < NOW() - (INTERVAL '1 minute' * %s)
             RETURNING radacctid, username
         """, (threshold,))
         
         count = len(updated) if updated else 0
-        return jsonify({'success': True, 'message': f'{count} stale sessions marked as disconnected', 'count': count})
+        return jsonify({'success': True, 'message': f'{count} stale PPPoE sessions marked as disconnected', 'count': count})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -135,9 +261,10 @@ def api_sessions_duplicates():
         dupes = execute_query("""
             SELECT username, COUNT(*) as session_count,
                    array_agg(acctsessionid ORDER BY acctstarttime DESC) as session_ids,
-                   array_agg(nasipaddress ORDER BY acctstarttime DESC) as nas_ips,
-                   array_agg(framedipaddress ORDER BY acctstarttime DESC) as framed_ips,
-                   array_agg(acctstarttime ORDER BY acctstarttime DESC) as start_times
+                   array_agg(HOST(nasipaddress) ORDER BY acctstarttime DESC) as nas_ips,
+                   array_agg(HOST(framedipaddress) ORDER BY acctstarttime DESC) as framed_ips,
+                   array_agg(TO_CHAR(acctstarttime AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') ORDER BY acctstarttime DESC) as start_times,
+                   COUNT(*) FILTER (WHERE LOWER(calledstationid) LIKE '%pppoe%') as pppoe_count
             FROM radacct
             WHERE acctstoptime IS NULL
             GROUP BY username
@@ -187,16 +314,20 @@ def api_disconnect_expired():
 @login_required
 def api_disconnect_duplicates():
     try:
+        # Hanya duplikasi PPPoE yang perlu di-disconnect.
+        # L2TP/IPoE boleh punya sesi lama di DB tanpa harus dimatikan.
         dupes = execute_query("""
             WITH ranked AS (
                 SELECT acctsessionid, nasipaddress, username,
                        ROW_NUMBER() OVER (PARTITION BY username ORDER BY acctstarttime DESC) AS rn
-                FROM radacct WHERE acctstoptime IS NULL
+                FROM radacct 
+                WHERE acctstoptime IS NULL 
+                  AND POSITION('pppoe' IN LOWER(calledstationid)) > 0
             )
             SELECT acctsessionid, nasipaddress, username FROM ranked WHERE rn > 1
         """)
         if not dupes:
-            return jsonify({'success': True, 'message': 'Tidak ada session duplikat', 'count': 0})
+            return jsonify({'success': True, 'message': 'Tidak ada session PPPoE duplikat', 'count': 0})
 
         coa_success = 0
         for s in dupes:
@@ -211,7 +342,7 @@ def api_disconnect_duplicates():
 
         return jsonify({
             'success': True,
-            'message': f'{len(dupes)} session duplikat di-disconnect ({coa_success} CoA sent)',
+            'message': f'{len(dupes)} session PPPoE duplikat di-disconnect ({coa_success} CoA sent)',
             'count': len(dupes)
         })
     except Exception as e:

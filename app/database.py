@@ -30,6 +30,7 @@ def execute_query(query, params=None, fetch=True):
             result = cur.fetchall()
             columns = [desc[0] for desc in cur.description]
             cur.close()
+            conn.commit()
             return [dict(zip(columns, row)) for row in result]
         else:
             conn.commit()

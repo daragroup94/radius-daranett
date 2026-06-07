@@ -1,15 +1,35 @@
+import redis
 from extensions import socketio
 from database import execute_query
 from helpers import ping_nas
 from services.telegram import send_telegram_notification
 from datetime import datetime
+import os
 
-# Local state to track previous NAS health states to avoid spamming Telegram
-_nas_health_state = {}
+# Use Redis for persistent state with in-memory fallback
+redis_client = redis.Redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
+_nas_health_state_local = {}
+
+def get_nas_status_from_cache(ip):
+    """Get NAS status from Redis cache with in-memory fallback"""
+    try:
+        status = redis_client.get(f"nas_status:{ip}")
+        if status is not None:
+            return status.decode()
+    except Exception as e:
+        print(f"[nas-monitor] Redis error getting status: {e}")
+    return _nas_health_state_local.get(ip)
+
+def set_nas_status_to_cache(ip, status):
+    """Set NAS status to Redis cache and local memory"""
+    _nas_health_state_local[ip] = status
+    try:
+        redis_client.set(f"nas_status:{ip}", status, ex=300)  # 5 min TTL
+    except Exception as e:
+        print(f"[nas-monitor] Redis error setting status: {e}")
 
 def background_nas_monitor():
     """Memantau status ping ke setiap IP NAS setiap 1 menit dan mengirim notifikasi Telegram jika berubah."""
-    global _nas_health_state
     print("[nas-monitor] Thread initialized, sleeping 15s for startup...")
     socketio.sleep(15)
     print("[nas-monitor] Starting NAS health monitor loop...")
@@ -25,16 +45,17 @@ def background_nas_monitor():
                     
                     # Test ping
                     status = ping_nas(ip)
-                    prev_status = _nas_health_state.get(ip)
+                    prev_status = get_nas_status_from_cache(ip)
+                    
+                    # Update cache
+                    set_nas_status_to_cache(ip, status)
                     
                     # Initial state tracking
                     if prev_status is None:
-                        _nas_health_state[ip] = status
                         continue
                         
                     # State changed!
                     if status != prev_status:
-                        _nas_health_state[ip] = status
                         time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         
                         if status == 'offline':

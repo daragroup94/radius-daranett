@@ -77,6 +77,69 @@
         color: #ffffff !important;
     }
 
+    /* Customer House Icon */
+    .customer-house-icon {
+        background: transparent !important;
+        border: none !important;
+    }
+    .house-marker {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .house-marker svg {
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+        transition: transform 0.2s ease;
+    }
+    .house-marker:hover svg {
+        transform: scale(1.15);
+    }
+    .house-label {
+        position: absolute;
+        top: -16px;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-size: 8px;
+        font-weight: 800;
+        font-family: 'Outfit', sans-serif;
+        padding: 1px 4px;
+        border-radius: 4px;
+        pointer-events: none;
+        background: rgba(15,23,42,0.85);
+        color: #f1f5f9;
+        border: 1px solid rgba(255,255,255,0.12);
+        backdrop-filter: blur(4px);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        letter-spacing: 0.02em;
+    }
+
+    /* Infra marker with outside label */
+    .infra-labeled-marker {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: transparent !important;
+        border: none !important;
+    }
+    .infra-labeled-marker .marker-label {
+        margin-top: 2px;
+        white-space: nowrap;
+        font-size: 8px;
+        font-weight: 800;
+        font-family: 'Outfit', sans-serif;
+        padding: 1px 5px;
+        border-radius: 5px;
+        background: rgba(15,23,42,0.85);
+        color: #f1f5f9;
+        border: 1px solid rgba(255,255,255,0.12);
+        backdrop-filter: blur(4px);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        letter-spacing: 0.02em;
+        pointer-events: none;
+    }
+
     /* Pulsing Glowing Custom Marker Dots */
     .glow-marker {
         width: 14px;
@@ -139,6 +202,10 @@
         background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%) !important;
         box-shadow: 0 0 14px rgba(6, 182, 212, 0.5) !important;
     }
+    .infra-oit {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+        box-shadow: 0 0 14px rgba(245, 158, 11, 0.5) !important;
+    }
     .infra-odp {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
         box-shadow: 0 0 14px rgba(16, 185, 129, 0.5) !important;
@@ -147,24 +214,101 @@
         background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
         box-shadow: 0 0 14px rgba(59, 130, 246, 0.5) !important;
     }
-</style>
 
-    /* Modern Fiber Optic Cable Line with Glow */
-    .cable-line-glow {
-        filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
-    }
-    
-    path.cable-line-glow {
+    /* Premium High-Tech Fiber Optic Cable Styles */
+    .feeder-cable {
+        stroke: #c084fc !important;
         stroke-linecap: round;
-        stroke-dasharray: 10, 5;
-        animation: cableDash 1s linear infinite;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.75)) drop-shadow(0 0 2px rgba(168, 85, 247, 0.4));
+        stroke-dasharray: 16, 12;
+        animation: flowFast 1s linear infinite;
+        transition: stroke-width 0.2s, filter 0.2s;
     }
-    
-    @keyframes cableDash {
+    .feeder-cable:hover {
+        stroke-width: 6.5px !important;
+        stroke: #d8b4fe !important;
+        filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.95)) drop-shadow(0 0 4px rgba(168, 85, 247, 0.6));
+        cursor: pointer;
+    }
+
+    .dist-cable {
+        stroke: #22d3ee !important;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 0 5px rgba(6, 182, 212, 0.7)) drop-shadow(0 0 2px rgba(6, 182, 212, 0.35));
+        stroke-dasharray: 12, 9;
+        animation: flowMedium 1.4s linear infinite;
+        transition: stroke-width 0.2s, filter 0.2s;
+    }
+    .dist-cable:hover {
+        stroke-width: 5.5px !important;
+        stroke: #67e8f9 !important;
+        filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.9)) drop-shadow(0 0 3px rgba(6, 182, 212, 0.5));
+        cursor: pointer;
+    }
+
+    .drop-cable {
+        stroke: #34d399 !important;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.65)) drop-shadow(0 0 1.5px rgba(16, 185, 129, 0.3));
+        stroke-dasharray: 8, 6;
+        animation: flowSlow 1.8s linear infinite;
+        transition: stroke-width 0.2s, filter 0.2s;
+    }
+    .tap-cable {
+        stroke: #fbbf24 !important;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.7)) drop-shadow(0 0 2px rgba(245, 158, 11, 0.35));
+        stroke-dasharray: 6, 6;
+        animation: flowMedium 1.4s linear infinite;
+        transition: stroke-width 0.2s, filter 0.2s;
+    }
+    .tap-cable:hover {
+        stroke-width: 5.5px !important;
+        stroke: #fcd34d !important;
+        filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.9)) drop-shadow(0 0 3px rgba(245, 158, 11, 0.5));
+        cursor: pointer;
+    }
+    .drop-cable:hover {
+        stroke-width: 4.5px !important;
+        stroke: #6ee7b7 !important;
+        filter: drop-shadow(0 0 7px rgba(16, 185, 129, 0.85)) drop-shadow(0 0 2.5px rgba(16, 185, 129, 0.45));
+        cursor: pointer;
+    }
+
+    /* Active drawing line style */
+    .active-draw-cable {
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-dasharray: 6, 6;
+        animation: flowActive 0.8s linear infinite;
+        filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.6));
+    }
+
+    @keyframes flowFast {
         to {
-            stroke-dashoffset: -15;
+            stroke-dashoffset: -28;
         }
     }
+    @keyframes flowMedium {
+        to {
+            stroke-dashoffset: -21;
+        }
+    }
+    @keyframes flowSlow {
+        to {
+            stroke-dashoffset: -14;
+        }
+    }
+    @keyframes flowActive {
+        to {
+            stroke-dashoffset: -12;
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -185,13 +329,9 @@
         </div>
         
         <div class="z-10 flex gap-2 flex-wrap">
-            <a href="/nas" class="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 shadow-md hover:scale-[1.02] text-xs cursor-pointer decoration-none">
-                <i class="fas fa-server"></i>
-                <span>Tambah NAS</span>
-            </a>
             <button onclick="startAddInfrastructure()" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 shadow-md hover:scale-[1.02] text-xs cursor-pointer">
                 <i class="fas fa-plus"></i>
-                <span>Tambah OLT/ODC/ODP</span>
+                <span>Tambah OLT/ODC/ODP/OIT</span>
             </button>
             <button onclick="loadMapData()" class="bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 border border-white/10 hover:scale-[1.02] text-xs cursor-pointer">
                 <i class="fas fa-sync-alt" id="refreshMapIcon"></i>
@@ -230,9 +370,9 @@
     </div>
 
     <!-- Add Infrastructure Banner (Appears when adding OLT/ODC/ODP) -->
-    <div id="addInfraBanner" class="hidden map-banner-info p-4 rounded-3xl shadow-lg flex flex-col gap-3 transition-all duration-300 border border-slate-200 dark:border-slate-700/80">
+    <div id="addInfraBanner" class="hidden map-banner-info p-5 rounded-3xl shadow-xl flex flex-col gap-4 transition-all duration-300 border border-slate-200 dark:border-slate-700/80">
         <!-- Row 1: Header + Tipe + Ikon -->
-        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-700/50">
             <div class="flex items-center gap-3 flex-shrink-0">
                 <div class="w-10 h-10 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shadow-md flex-shrink-0">
                     <i class="fas fa-plus-circle text-lg"></i>
@@ -242,50 +382,70 @@
                     <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Paste koordinat / link Maps, klik peta, atau geser PIN</p>
                 </div>
             </div>
-            <div class="flex flex-wrap gap-2 flex-1">
-                <select id="infraTypeInput" onchange="onInfraTypeChange()"
-                        class="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
-                    <option value="olt">OLT Pusat (Pusat Transmisi)</option>
-                    <option value="odc">ODC (Cabinet)</option>
-                    <option value="odp">ODP (Splitter Box)</option>
-                    <option value="nas">NAS Router (Custom)</option>
-                </select>
-                <!-- Icon Choice Dropdown -->
-                <select id="infraIconInput" onchange="updateInfraTempIcon()"
-                        class="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
-                    <option value="fa-network-wired">💻 Network Wired (Default OLT)</option>
-                    <option value="fa-broadcast-tower">📡 Broadcast Tower</option>
-                    <option value="fa-server">🖥️ Server (Central)</option>
-                    <option value="fa-ethernet">🔌 Ethernet Port</option>
-                    <option value="fa-route">🛣️ Router / Route</option>
-                    <option value="fa-box">📦 Box / Cabinet (Default ODC)</option>
-                    <option value="fa-hdd">💾 HDD Rack</option>
-                    <option value="fa-toolbox">🧰 Toolbox / Cabinet</option>
-                    <option value="fa-cubes">🧱 Nodes / Cubes</option>
-                    <option value="fa-sitemap">🌿 Sitemap (Default ODP)</option>
-                    <option value="fa-share-alt">🔀 Share Node / Splitter</option>
-                    <option value="fa-code-branch">🌿 Branching Node</option>
-                    <option value="fa-plug">🔌 Plug / Connect</option>
-                    <option value="fa-wifi">📶 WiFi Signal</option>
-                    <option value="fa-map-pin">📍 Map Pin</option>
-                </select>
+            <div class="flex flex-wrap gap-2">
+                <div>
+                    <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Tipe Alat</label>
+                    <select id="infraTypeInput" onchange="onInfraTypeChange()"
+                            class="px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="olt">OLT Pusat (Pusat Transmisi)</option>
+                        <option value="odc">ODC (Cabinet)</option>
+                        <option value="oit">OIT (Optical Inline Tap)</option>
+                        <option value="odp">ODP (Splitter Box)</option>
+                        <option value="nas">NAS Router (Custom)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Ikon Peta</label>
+                    <select id="infraIconInput" onchange="updateInfraTempIcon()"
+                            class="px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="fa-network-wired">💻 Network Wired (Default OLT)</option>
+                        <option value="fa-broadcast-tower">📡 Broadcast Tower</option>
+                        <option value="fa-server">🖥️ Server (Central)</option>
+                        <option value="fa-ethernet">🔌 Ethernet Port</option>
+                        <option value="fa-route">🛣️ Router / Route</option>
+                        <option value="fa-box">📦 Box / Cabinet (Default ODC)</option>
+                        <option value="fa-hdd">💾 HDD Rack</option>
+                        <option value="fa-toolbox">🧰 Toolbox / Cabinet</option>
+                        <option value="fa-cubes">🧱 Nodes / Cubes</option>
+                        <option value="fa-sitemap">🌿 Sitemap (Default ODP)</option>
+                        <option value="fa-share-alt">🔀 Share Node / Splitter</option>
+                        <option value="fa-code-branch">🌿 Branching Node</option>
+                        <option value="fa-plug">🔌 Plug / Connect</option>
+                        <option value="fa-wifi">📶 WiFi Signal</option>
+                        <option value="fa-map-pin">📍 Map Pin</option>
+                    </select>
+                </div>
             </div>
         </div>
 
         <!-- Row 2: Nama + Keterangan + Koordinat -->
-        <div class="flex flex-col sm:flex-row gap-2">
-            <input type="text" id="infraNameInput" placeholder="Nama Alat (cth: ODP-PATI-01)" 
-                   class="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none flex-1">
-            <input type="text" id="infraDetailsInput" placeholder="Keterangan / Notes (Opsional)" 
-                   class="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none flex-1">
-            <!-- Koordinat Input -->
-            <div class="relative flex-1 min-w-[220px]">
-                <input type="text" id="infraCoordsInput"
-                       placeholder="Paste koordinat / link Google Maps..."
-                       oninput="handleInfraCoordInput()"
-                       class="w-full pl-8 pr-3.5 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700/60 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                <i class="fas fa-map-marker-alt absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 text-[10px]"></i>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">Nama Alat *</label>
+                <input type="text" id="infraNameInput" placeholder="Nama Alat (cth: ODP-PATI-01)" 
+                       class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none">
             </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">Keterangan / Notes (Opsional)</label>
+                <input type="text" id="infraDetailsInput" placeholder="Keterangan / Notes (Opsional)" 
+                       class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none">
+            </div>
+            <!-- Koordinat Input -->
+            <div class="min-w-[220px]">
+                <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1">Input Koordinat / Link Maps</label>
+                <div class="relative">
+                    <input type="text" id="infraCoordsInput"
+                           placeholder="Paste koordinat / link Google Maps..."
+                           oninput="handleInfraCoordInput()"
+                           class="w-full pl-8 pr-3.5 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700/60 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    <i class="fas fa-map-marker-alt absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 text-[10px]"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2.5: Dynamic Form Fields for Modern & Professional FTTH -->
+        <div id="infraFormFields" class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3 border-t border-slate-100 dark:border-slate-700/60 pt-3">
+            <!-- Dynamically populated via javascript depending on selection -->
         </div>
 
         <!-- Row 3: Live koordinat display + tombol aksi -->
@@ -300,6 +460,26 @@
                 <button onclick="cancelAddInfrastructure()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-750 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer">Batal</button>
                 <button id="btnSaveInfra" onclick="saveInfrastructure()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">Simpan Alat</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Draw Cable Banner (Appears when drawing a cable route) -->
+    <div id="drawCableBanner" class="hidden map-banner-info p-4 rounded-3xl shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 border border-emerald-300 dark:border-emerald-800/80">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md flex-shrink-0">
+                <i class="fas fa-plug text-lg animate-pulse"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs font-bold text-slate-800 dark:text-white">Menggambar Rute Kabel Fiber</p>
+                <p id="drawCableMsg" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5"></p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="undoDrawCablePoint()" class="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-750 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border border-slate-200 dark:border-slate-700/80">
+                <i class="fas fa-undo text-[10px]"></i><span>Undo</span>
+            </button>
+            <button onclick="cancelDrawCable()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-750 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer">Batal</button>
+            <button id="btnSaveCable" onclick="saveCablePath()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">Simpan Rute</button>
         </div>
     </div>
 
@@ -343,6 +523,10 @@
                         <label class="flex items-center space-x-3 cursor-pointer">
                             <input type="checkbox" id="chkShowOdc" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-cyan-500 border-slate-300 rounded focus:ring-cyan-400">
                             <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-box text-cyan-500 text-[10px]"></i>ODC Cabinet</span>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="chkShowOit" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-amber-500 border-slate-300 rounded focus:ring-amber-400">
+                            <span class="text-xs font-bold text-slate-655 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-code-branch text-amber-500 text-[10px]"></i>OIT Inline Tap</span>
                         </label>
                         <label class="flex items-center space-x-3 cursor-pointer">
                             <input type="checkbox" id="chkShowOdp" checked onchange="updateFilters()" class="w-4.5 h-4.5 text-emerald-500 border-slate-300 rounded focus:ring-emerald-400">
@@ -444,6 +628,17 @@
         lng: null
     };
 
+    let drawCableState = {
+        active: false, type: 'customer',
+        username: null, odpId: null,
+        srcId: null, dstId: null,
+        srcName: null, dstName: null,
+        srcLat: null, srcLng: null,
+        dstLat: null, dstLng: null,
+        customerLat: null, customerLng: null,
+        points: [], polyline: null, tempMarkers: []
+    };
+
     let currentSidebarTab = 'unmapped';
     let isMapCentered = false;
 
@@ -471,11 +666,11 @@
             maxZoom: 20
         });
 
-        // Center of map near Pati, ID. Default is Google Roadmap to avoid dark maps!
+        // Center of map near Kudus, ID. Default is Google Roadmap to avoid dark maps!
         map = L.map('map', {
             zoomControl: false,
             layers: [googleRoadmap] 
-        }).setView([-6.75, 111.03], 13);
+        }).setView([-6.789041146195261, 110.85068039664176], 15);
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -497,6 +692,16 @@
 
         // Listen to map click for coordinate selection
         map.on('click', onMapClick);
+
+        // Listen to mousemove to draw active cable line following cursor
+        map.on('mousemove', onMapMouseMove);
+
+        // Close any popups if draw mode is active to prevent disruption
+        map.on('popupopen', function(e) {
+            if (drawCableState.active) {
+                map.closePopup();
+            }
+        });
     }
 
     // Nominatim Geocoding Search (Search village/street)
@@ -703,7 +908,15 @@
                 mapData.cables = cablesRes.cables;
                 renderCables();
             }
-            
+
+            // Load infrastructure connections
+            const infraConnRes = await apiCall('/api/map/infra-connections');
+            if (infraConnRes.success) {
+                mapData.infraConnections = infraConnRes.connections;
+            } else {
+                mapData.infraConnections = [];
+            }
+
             if (devicesRes.success && infraRes.success) {
                 mapData.nas = devicesRes.nas;
                 mapData.clients = devicesRes.clients;
@@ -745,13 +958,14 @@
         mapData.nas.forEach(nas => {
             if (nas.latitude && nas.longitude) {
                 const nasIcon = L.divIcon({
-                    className: 'custom-nas-marker',
+                    className: 'infra-labeled-marker',
                     html: `
                         <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg border-2 border-white shadow-blue-500/20 hover:scale-110 transition-transform">
                             <i class="fas fa-server text-xs"></i>
                         </div>
+                        <div class="marker-label">${nas.shortname}</div>
                     `,
-                    iconSize: [32, 32],
+                    iconSize: [32, 48],
                     iconAnchor: [16, 16]
                 });
 
@@ -791,34 +1005,86 @@
                     saveDraggedLocation(null, nas.nasname, newLatLng.lat, newLatLng.lng);
                 });
 
+                marker.on('click', function(e) {
+                    if (drawCableState.active) {
+                        if (e.originalEvent) { e.originalEvent.stopPropagation(); }
+                        addDrawCablePoint(nas.latitude, nas.longitude);
+                    }
+                });
+
                 nasLayer.addLayer(marker);
             }
         });
         mapData.clients.forEach(client => {
             if (!client.latitude || !client.longitude) return;
 
-            const rxColors = {
-                good: '16, 185, 129',     
-                warning: '245, 158, 11',  
-                bad: '239, 68, 68',       
-            };
-            const col = client.is_online ? (rxColors[client.rx_status] || '16, 185, 129') : '148, 163, 184';
-            
+            // House color based on ONT signal quality (integrated with GenieACS)
+            let houseColor, houseStroke, houseGlow, pulseCss;
+            if (!client.is_online) {
+                houseColor = '#94a3b8'; houseStroke = '#64748b'; houseGlow = 'none'; pulseCss = '';
+            } else if (client.rx_status === 'good') {
+                houseColor = '#10b981'; houseStroke = '#059669'; houseGlow = 'drop-shadow(0 0 5px rgba(16,185,129,0.8))';
+                pulseCss = 'animation: houseGoodPulse 2s infinite;';
+            } else if (client.rx_status === 'warning') {
+                houseColor = '#f59e0b'; houseStroke = '#d97706'; houseGlow = 'drop-shadow(0 0 5px rgba(245,158,11,0.8))';
+                pulseCss = 'animation: houseWarnPulse 1.5s infinite;';
+            } else {
+                houseColor = '#ef4444'; houseStroke = '#dc2626'; houseGlow = 'drop-shadow(0 0 6px rgba(239,68,68,0.9))';
+                pulseCss = 'animation: houseBadPulse 1s infinite;';
+            }
+
+            const signalDotColor = !client.is_online ? '#94a3b8' : client.rx_status === 'good' ? '#10b981' : client.rx_status === 'warning' ? '#f59e0b' : '#ef4444';
             const clientIcon = L.divIcon({
-                className: 'custom-client-marker',
+                className: 'customer-house-icon',
                 html: `
-                    <div class="glow-marker" style="background: rgba(${col}, 0.2); border-color: rgba(${col}, 0.8)">
-                        <div class="glow-marker-inner" style="background: rgb(${col}); --pulse-color: ${col}"></div>
+                    <div class="house-marker">
+                        <div class="house-label">${client.username}</div>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 46" width="36" height="42" style="filter:${houseGlow}; ${pulseCss}">
+                            <!-- Chimney -->
+                            <rect x="26" y="4" width="5" height="9" fill="${houseStroke}" rx="1"/>
+                            <rect x="25" y="3" width="7" height="2.5" fill="${houseColor}" rx="0.8"/>
+                            <!-- Roof -->
+                            <polygon points="20,3 38,18 2,18" fill="${houseStroke}" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
+                            <!-- Roof highlight -->
+                            <polygon points="20,6 35,18 5,18" fill="${houseColor}" opacity="0.6"/>
+                            <!-- House body -->
+                            <rect x="4" y="17" width="32" height="26" fill="${houseColor}" stroke="white" stroke-width="1.2" rx="1"/>
+                            <!-- Door -->
+                            <rect x="16" y="30" width="8" height="13" fill="white" opacity="0.95" rx="1.5"/>
+                            <circle cx="22.5" cy="37" r="0.8" fill="${houseStroke}"/>
+                            <!-- Left window -->
+                            <rect x="6" y="21" width="8" height="7" fill="white" opacity="0.85" rx="1"/>
+                            <line x1="10" y1="21" x2="10" y2="28" stroke="${houseStroke}" stroke-width="0.6" opacity="0.4"/>
+                            <line x1="6" y1="24.5" x2="14" y2="24.5" stroke="${houseStroke}" stroke-width="0.6" opacity="0.4"/>
+                            <!-- Right window -->
+                            <rect x="26" y="21" width="8" height="7" fill="white" opacity="0.85" rx="1"/>
+                            <line x1="30" y1="21" x2="30" y2="28" stroke="${houseStroke}" stroke-width="0.6" opacity="0.4"/>
+                            <line x1="26" y1="24.5" x2="34" y2="24.5" stroke="${houseStroke}" stroke-width="0.6" opacity="0.4"/>
+                            <!-- ONT Status dot (signal indicator) -->
+                            <circle cx="34" cy="10" r="4" fill="${signalDotColor}" stroke="white" stroke-width="1.2"/>
+                        </svg>
                     </div>
                 `,
-                iconSize: [14, 14],
-                iconAnchor: [7, 7]
+                iconSize: [36, 54],
+                iconAnchor: [18, 43]
             });
+
 
             const rxColorClass = client.rx_status === 'good' ? 'text-emerald-400' : client.rx_status === 'warning' ? 'text-amber-400' : 'text-rose-500';
             const statusBadge = client.is_online ? 
                 `<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[9px] font-bold rounded-full">Online</span>` :
                 `<span class="px-2 py-0.5 bg-slate-500/10 text-slate-400 text-[9px] font-bold rounded-full">Offline</span>`;
+
+            const clientCable = mapData.cables ? mapData.cables.find(c => c.customer_username === client.username) : null;
+            const cableBtnHtml = clientCable ? `
+                <button onclick="deleteCable(${clientCable.id})" class="w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-red-500/30 cursor-pointer">
+                    <i class="fas fa-unlink mr-1"></i>Putus Kabel dari ODP
+                </button>
+            ` : `
+                <button onclick="openCableModal('${client.username}')" class="w-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-emerald-500/30 cursor-pointer">
+                    <i class="fas fa-plug mr-1"></i>Tarik Kabel dari ODP
+                </button>
+            `;
 
             const popupHtml = `
                 <div class="p-3 w-64 text-slate-200">
@@ -850,9 +1116,7 @@
                                 <i class="fas fa-sync-alt mr-1"></i>Reboot ONT
                             </button>
                         </div>
-                        <button onclick="openCableModal('${client.username}')" class="w-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-emerald-500/30 cursor-pointer">
-                            <i class="fas fa-plug mr-1"></i>Tarik Kabel dari ODP
-                        </button>
+                        ${cableBtnHtml}
                         <button onclick="deleteCustomerCoordinates('${client.username}')"
                                 class="w-full bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-700 cursor-pointer">
                             <i class="fas fa-trash-alt mr-1"></i>Hapus Lokasi dari Peta
@@ -863,6 +1127,18 @@
 
             const marker = L.marker([client.latitude, client.longitude], { icon: clientIcon, draggable: true })
                 .bindPopup(popupHtml);
+
+            marker.on('click', function(e) {
+                if (drawCableState.active) {
+                    if (e.originalEvent) { e.originalEvent.stopPropagation(); }
+                    if (drawCableState.type === 'customer' && client.username === drawCableState.username) {
+                        addDrawCablePoint(client.latitude, client.longitude);
+                        saveCablePath();
+                    } else {
+                        addDrawCablePoint(client.latitude, client.longitude);
+                    }
+                }
+            });
 
             marker.on('dragend', function(e) {
                 const newLatLng = e.target.getLatLng();
@@ -885,12 +1161,14 @@
             const defaultIcons = {
                 olt: 'fa-network-wired',
                 odc: 'fa-box',
+                oit: 'fa-code-branch',
                 odp: 'fa-sitemap',
                 nas: 'fa-server'
             };
             const typesMeta = {
                 olt: { label: 'OLT Pusat', colorClass: 'infra-olt' },
                 odc: { label: 'ODC Cabinet', colorClass: 'infra-odc' },
+                oit: { label: 'OIT Inline Tap', colorClass: 'infra-oit' },
                 odp: { label: 'ODP Splitter Box', colorClass: 'infra-odp' },
                 nas: { label: 'NAS Router (Custom)', colorClass: 'infra-nas' }
             };
@@ -899,42 +1177,261 @@
             const iconClass = device.icon || defaultIcons[device.type] || 'fa-map-pin';
 
             const infraIcon = L.divIcon({
-                className: 'infra-marker-icon-wrapper',
+                className: 'infra-labeled-marker',
                 html: `
                     <div class="w-9 h-9 rounded-2xl ${meta.colorClass} text-white flex items-center justify-center shadow-lg border-2 border-white hover:scale-110 transition-transform">
                         <i class="fas ${iconClass} text-xs"></i>
                     </div>
+                    <div class="marker-label">${device.name}</div>
                 `,
-                iconSize: [36, 36],
+                iconSize: [36, 56],
                 iconAnchor: [18, 18]
             });
 
+            // Parse structured JSON details if present
+            let notes = '-';
+            let totalPorts = 8;
+            let detailsHtml = '';
+
+            if (device.type === 'olt') totalPorts = 16;
+            if (device.type === 'odc') totalPorts = 24;
+
+            if (device.details) {
+                try {
+                    const parsed = JSON.parse(device.details);
+                    if (parsed && typeof parsed === 'object') {
+                        notes = parsed.description || parsed.notes || '-';
+                        if (parsed.total_ports) {
+                            totalPorts = parseInt(parsed.total_ports);
+                        }
+                        
+                        if (device.type === 'olt') {
+                            const brand = parsed.brand || 'Huawei';
+                            const ip = parsed.ip_address || '-';
+                            const ponType = parsed.pon_type || 'GPON';
+                            const uplink = parsed.uplink_cap || '10G';
+                            const vlan = parsed.vlan_mgmt || '-';
+                            detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Merk OLT:</span><span class="text-white font-semibold">${brand}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">IP Management:</span><span class="font-mono text-indigo-400 font-bold">${ip}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Teknologi PON:</span><span class="text-white font-semibold">${ponType}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Uplink:</span><span class="text-white font-semibold">${uplink}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">VLAN Mgmt:</span><span class="text-white font-semibold">${vlan}</span></div>
+                            `;
+                        } else if (device.type === 'odc') {
+                            const brand = parsed.brand || 'Generic';
+                            const feeder = parsed.feeder_source || '-';
+                            const install = parsed.install_type || 'Outdoor';
+                            detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Merk Cabinet:</span><span class="text-white font-semibold">${brand}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Feeder Source:</span><span class="text-white font-semibold truncate max-w-[120px]">${feeder}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Pemasangan:</span><span class="text-white font-semibold">${install}</span></div>
+                            `;
+                        } else if (device.type === 'oit') {
+                            const feederId = parsed.feeder_source || '';
+                            const feederObj = mapData.infra.find(d => d.id == feederId);
+                            const feederName = feederObj ? feederObj.name : '-';
+                            const tapRatio = parsed.tap_ratio || '-';
+                            const inAtten = parsed.attenuation_in ? parsed.attenuation_in + ' dBm' : '-';
+                            const tapAtten = parsed.attenuation_tap ? parsed.attenuation_tap + ' dBm' : '-';
+                            const passAtten = parsed.attenuation_pass ? parsed.attenuation_pass + ' dBm' : '-';
+                            const connectedOdpId = parsed.connected_odp || '';
+                            const connectedOdpObj = mapData.infra.find(d => d.id == connectedOdpId);
+                            const odpName = connectedOdpObj ? connectedOdpObj.name : '-';
+                            const status = parsed.status || 'Aktif';
+                            
+                            detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Status OIT:</span><span class="text-white font-semibold">${status === 'Aktif' ? '🟢 Aktif' : status === 'Instalasi' ? '🟡 Instalasi' : '🔴 Gangguan'}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Sumber Feeder:</span><span class="font-bold text-amber-400">${feederName}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Rasio Tap:</span><span class="text-white font-semibold">${tapRatio}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Redaman In:</span><span class="text-emerald-400 font-mono font-bold">${inAtten}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Redaman Tap/Pass:</span><span class="text-white font-mono">${tapAtten} / ${passAtten}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">ODP Terhubung:</span><span class="text-white font-semibold">${odpName}</span></div>
+                            `;
+                        } else if (device.type === 'odp') {
+                            const brand = parsed.brand || 'Generic';
+                            const boxType = parsed.odp_type || 'Pole';
+                            const ports = parsed.total_ports || 8;
+                            const source = parsed.odc_source || '-';
+                            const color = parsed.core_color || '-';
+                            detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Merk ODP:</span><span class="text-white font-semibold">${brand}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Tipe ODP:</span><span class="text-white font-semibold">${boxType}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Kapasitas Port:</span><span class="text-white font-semibold">1:${ports} (${ports} Port)</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Distribusi ODC:</span><span class="text-white font-semibold truncate max-w-[120px]">${source}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Warna Tube/Core:</span><span class="text-white font-semibold">${color}</span></div>
+                            `;
+                        } else if (device.type === 'nas') {
+                            const ip = parsed.ip_address || '-';
+                            detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">IP Management:</span><span class="font-mono text-indigo-400 font-bold">${ip}</span></div>
+                            `;
+                        }
+                    }
+                } catch(e) {
+                    notes = device.details;
+                }
+            }
+
+            if (!detailsHtml) {
+                detailsHtml = `<div class="flex justify-between"><span class="text-slate-400">Deskripsi:</span><span class="text-white font-semibold truncate max-w-[130px]">${notes}</span></div>`;
+            }
+
+            // Calculate dynamic port utilization
+            let usedPorts = 0;
+            if (device.type === 'odp') {
+                usedPorts = mapData.cables ? mapData.cables.filter(c => c.odp_id == device.id).length : 0;
+            } else {
+                usedPorts = mapData.infraConnections ? mapData.infraConnections.filter(c => !c.is_disconnected && (c.src_id == device.id || c.dst_id == device.id)).length : 0;
+            }
+
+            const portPercent = Math.min(Math.round((usedPorts / totalPorts) * 100), 100);
+            let progressBarColor = 'bg-emerald-500';
+            if (portPercent >= 90) progressBarColor = 'bg-rose-500';
+            else if (portPercent >= 75) progressBarColor = 'bg-amber-500';
+
+            let statusBadge = '';
+            if (device.type === 'olt') {
+                statusBadge = device.status === 'offline' 
+                    ? `<span class="px-1.5 py-0.5 bg-rose-500/15 text-rose-400 text-[8px] font-extrabold rounded-md uppercase">Offline</span>`
+                    : `<span class="px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 text-[8px] font-extrabold rounded-md uppercase">Online</span>`;
+            } else {
+                statusBadge = `<span class="px-1.5 py-0.5 bg-slate-500/15 text-slate-400 text-[8px] font-extrabold rounded-md uppercase">${meta.label}</span>`;
+            }
+
+            // Build port list for ODP cards (show port names from details + connected cables)
+            let odpPortsHtml = '';
+            if (device.type === 'odp') {
+                const connectedCables = mapData.cables ? mapData.cables.filter(c => c.odp_id == device.id) : [];
+                // Parse port_names from details if present
+                let portNamesObj = {};
+                try {
+                    const pd = device.details ? JSON.parse(device.details) : {};
+                    portNamesObj = pd.port_names || {};
+                } catch(e) { portNamesObj = {}; }
+                const portRows = [];
+                for (let p = 1; p <= totalPorts; p++) {
+                    const cable = connectedCables.find(c => c.port_number == p) || null;
+                    const isUsed = cable !== null;
+                    // Prefer cable username, then saved port name, then empty
+                    const portLabel = isUsed ? cable.customer_username : (portNamesObj[p] || '');
+                    portRows.push(`
+                        <div class="flex items-center justify-between py-0.5 border-b border-slate-800/50">
+                            <span class="text-[9px] font-bold text-slate-400">Port ${p}</span>
+                            ${isUsed
+                                ? `<div class="flex items-center gap-1">
+                                     <span class="text-[9px] text-emerald-400 font-semibold truncate max-w-[80px]">${cable.customer_username}</span>
+                                     <button onclick="deleteCable(${cable.id})" class="p-0.5 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded text-[8px] font-bold transition-all border border-red-500/30 cursor-pointer" title="Putus kabel">
+                                         <i class="fas fa-unlink"></i>
+                                     </button>
+                                   </div>`
+                                : portLabel
+                                    ? `<span class="text-[9px] text-sky-400 font-semibold truncate max-w-[90px]">${portLabel}</span>`
+                                    : `<span class="text-[9px] text-slate-600 italic">— kosong —</span>`
+                            }
+                        </div>
+                    `);
+                }
+                odpPortsHtml = `
+                    <div class="mt-2 border-t border-slate-700/50 pt-2">
+                        <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Daftar Port Pelanggan</p>
+                        <div class="max-h-28 overflow-y-auto pr-0.5" style="scrollbar-width:thin">
+                            ${portRows.join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Build delete cables button for ODC card (list connected cables)
+            let odcCablesHtml = '';
+            if (device.type === 'odc') {
+                const odcConns = mapData.infraConnections ? mapData.infraConnections.filter(c => !c.is_disconnected && (c.src_id == device.id || c.dst_id == device.id)) : [];
+                if (odcConns.length > 0) {
+                    odcCablesHtml = `
+                        <div class="mt-2 border-t border-slate-700/50 pt-2">
+                            <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Koneksi Kabel</p>
+                            <div class="space-y-0.5">
+                                ${odcConns.map(c => `
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[9px] text-white truncate max-w-[130px]">${c.src_name} ↔ ${c.dst_name}</span>
+                                        <button onclick="deleteInfraConnection(${c.id})" class="p-0.5 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded text-[8px] font-bold transition-all border border-red-500/30 cursor-pointer" title="Putus kabel">
+                                            <i class="fas fa-unlink"></i>
+                                        </button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
             const popupHtml = `
-                <div class="p-3 w-64 text-slate-200">
-                    <div class="flex items-center gap-2 mb-2">
-                        <div class="w-7 h-7 rounded-lg ${meta.colorClass} text-white flex items-center justify-center">
-                            <i class="fas ${iconClass} text-xs"></i>
+                <div class="p-3.5 w-72 text-slate-200 font-outfit">
+                    <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-700/50">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg ${meta.colorClass} text-white flex items-center justify-center shadow-md">
+                                <i class="fas ${iconClass} text-xs"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-white leading-none">${device.name}</p>
+                                <p class="text-[8px] text-slate-400 font-extrabold uppercase mt-0.5">${device.type.toUpperCase()}</p>
+                            </div>
                         </div>
-                        <div>
-                            <p class="text-xs font-bold text-white leading-none">${device.name}</p>
-                            <p class="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider mt-0.5">${meta.label}</p>
+                        ${statusBadge}
+                    </div>
+                    
+                    <div class="text-[10px] space-y-1.5 mb-3">
+                        ${detailsHtml}
+                        <div class="flex justify-between"><span class="text-slate-400">Deskripsi:</span><span class="text-white font-semibold truncate max-w-[140px]">${notes}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Koordinat:</span><span class="font-mono text-white">${device.latitude.toFixed(5)}, ${device.longitude.toFixed(5)}</span></div>
+                        
+                        <div class="pt-1.5">
+                            <div class="flex justify-between text-[9px] font-bold mb-1">
+                                <span class="text-slate-400">${device.type === 'olt' ? 'PON Ports' : device.type === 'odc' ? 'ODP Terhubung' : 'Port Pelanggan'}</span>
+                                <span class="text-white">${usedPorts} / ${totalPorts} Port</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="h-full ${progressBarColor} transition-all duration-300" style="width: ${portPercent}%"></div>
+                            </div>
                         </div>
+                        ${odpPortsHtml}
+                        ${odcCablesHtml}
                     </div>
-                    <div class="border-t border-slate-700/60 pt-2 text-[10px] space-y-1">
-                        <div class="flex justify-between"><span class="text-slate-400">Keterangan:</span><span class="text-white font-semibold">${device.details || '-'}</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">Koordinat:</span><span class="font-mono text-white">${device.latitude.toFixed(6)}, ${device.longitude.toFixed(6)}</span></div>
+                    
+                    <div class="space-y-1.5">
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button onclick="openInfraCableModal(${device.id})"
+                                    class="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all shadow-md cursor-pointer">
+                                <i class="fas fa-plug mr-1"></i>Tarik Kabel
+                            </button>
+                            <button onclick="openEditInfraModal(${device.id})"
+                                    class="bg-slate-750 hover:bg-slate-700 text-slate-200 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-600 cursor-pointer">
+                                <i class="fas fa-edit mr-1"></i>Edit Detail
+                            </button>
+                        </div>
+                        <button onclick="deleteInfrastructure(${device.id}, '${device.name}')"
+                                class="w-full bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-700 cursor-pointer">
+                            <i class="fas fa-trash-alt mr-1"></i>Hapus Alat
+                        </button>
                     </div>
-                    <button onclick="deleteInfrastructure(${device.id}, '${device.name}')"
-                            class="mt-3 w-full bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-650 hover:to-rose-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all shadow-md cursor-pointer">
-                        <i class="fas fa-trash-alt mr-1"></i>Hapus Alat ini
-                    </button>
                 </div>
             `;
 
             const marker = L.marker([device.latitude, device.longitude], { icon: infraIcon, draggable: true })
                 .bindPopup(popupHtml);
 
-            // Drag and drop positional update for OLT/ODC/ODP
+            marker.on('click', function(e) {
+                if (drawCableState.active) {
+                    if (e.originalEvent) { e.originalEvent.stopPropagation(); }
+                    if (drawCableState.type === 'infra' && device.id == drawCableState.dstId) {
+                        addDrawCablePoint(device.latitude, device.longitude);
+                        saveCablePath();
+                    } else {
+                        addDrawCablePoint(device.latitude, device.longitude);
+                    }
+                }
+            });
+
             marker.on('dragend', function(e) {
                 const newLatLng = e.target.getLatLng();
                 saveDraggedInfraLocation(device.id, newLatLng.lat, newLatLng.lng);
@@ -952,19 +1449,17 @@
         cableLayer.clearLayers();
         
         mapData.cables.forEach(cable => {
-            const startLatLng = [cable.odp_lat, cable.odp_lng];
-            const endLatLng = [cable.customer_lat, cable.customer_lng];
+            // Skip cables without manual coordinates
+            if (!cable.coordinates || !Array.isArray(cable.coordinates) || cable.coordinates.length === 0) return;
             
-            // Modern fiber optic cable style with glow effect
-            const cableLine = L.polyline([startLatLng, endLatLng], {
+            const cableLine = L.polyline(cable.coordinates, {
                 color: '#10b981',
                 weight: 3,
                 opacity: 0.8,
                 smoothFactor: 1,
-                className: 'cable-line-glow'
+                className: 'drop-cable'
             });
             
-            // Add popup to cable
             cableLine.bindPopup(`
                 <div class="p-3 w-56 text-slate-200">
                     <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700/50">
@@ -1189,6 +1684,7 @@
         const showOlt = document.getElementById('chkShowOlt').checked;
         const showOdc = document.getElementById('chkShowOdc').checked;
         const showOdp = document.getElementById('chkShowOdp').checked;
+        const showOit = document.getElementById('chkShowOit') ? document.getElementById('chkShowOit').checked : true;
 
         // Apply NAS Layer visibility
         if (showNas) {
@@ -1203,6 +1699,7 @@
             if (device.type === 'olt' && !showOlt) return;
             if (device.type === 'odc' && !showOdc) return;
             if (device.type === 'odp' && !showOdp) return;
+            if (device.type === 'oit' && !showOit) return;
             if (device.type === 'nas' && !showNas) return;
 
             const marker = infraMarkers[device.id];
@@ -1279,66 +1776,54 @@
         const showBad = document.getElementById('chkShowBad').checked;
         const showOffline = document.getElementById('chkShowOffline').checked;
 
-        // 1. Draw ONT (Clients) to nearest ODP lines
-        mapData.clients.forEach(client => {
-            if (!client.latitude || !client.longitude) return;
-            if (client.is_simulated) return;
+        // 1. Draw ONT (Clients) to ODP is handled via manual cables in renderCables()
 
-            // Skip if the client is filtered out
-            if (!client.is_online) {
-                if (!showOffline) return;
-            } else {
-                if (client.rx_status === 'good' && !showGood) return;
-                if (client.rx_status === 'warning' && !showWarning) return;
-                if (client.rx_status === 'bad' && !showBad) return;
-            }
-
-            const nearestOdp = findNearestDevice(client.latitude, client.longitude, 'odp');
-            if (nearestOdp) {
-                const color = client.is_online ? '#10b981' : '#94a3b8';
-                const line = L.polyline([[client.latitude, client.longitude], [nearestOdp.latitude, nearestOdp.longitude]], {
-                    color: color,
-                    weight: 1.5,
-                    dashArray: '4, 4',
-                    opacity: 0.55
-                }).bindTooltip(`Drop Fiber: ${client.username} &rarr; ${nearestOdp.name} (${client.rx_power} dBm)`, { sticky: true });
+        // 2. Draw actual infrastructure connections from database
+        if (mapData.infraConnections) {
+            mapData.infraConnections.forEach(conn => {
+                if (conn.is_disconnected) return;
+                let pathPoints;
+                if (conn.coordinates && Array.isArray(conn.coordinates) && conn.coordinates.length > 0) {
+                    pathPoints = conn.coordinates;
+                } else {
+                    pathPoints = [[conn.src_lat, conn.src_lng], [conn.dst_lat, conn.dst_lng]];
+                }
+                let color = '#06b6d4', weight = 3.0;
+                let label = `Distribusi: ${conn.src_name} &rarr; ${conn.dst_name}`;
+                let className = 'dist-cable';
+                if (conn.src_type === 'olt' || conn.dst_type === 'olt' || (conn.src_type === 'oit' && conn.dst_type === 'oit') || (conn.src_type === 'olt' && conn.dst_type === 'oit') || (conn.src_type === 'oit' && conn.dst_type === 'olt')) {
+                    color = '#a855f7'; weight = 4.5;
+                    label = `Feeder Utama: ${conn.src_name} &rarr; ${conn.dst_name}`;
+                    className = 'feeder-cable';
+                } else if ((conn.src_type === 'oit' && conn.dst_type === 'odp') || (conn.src_type === 'odp' && conn.dst_type === 'oit')) {
+                    color = '#fbbf24'; weight = 3.0;
+                    label = `Kabel Tap: ${conn.src_name} &rarr; ${conn.dst_name}`;
+                    className = 'tap-cable';
+                }
+                const line = L.polyline(pathPoints, { color, weight, opacity: 0.8, className }).bindTooltip(label, { sticky: true });
+                line.bindPopup(`
+                    <div class="p-3 w-56 text-slate-200">
+                        <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700/50">
+                            <i class="fas fa-network-wired text-cyan-400 text-sm"></i>
+                            <span class="text-xs font-bold text-white">Koneksi Infrastruktur</span>
+                        </div>
+                        <div class="text-[10px] space-y-1.5">
+                            <div class="flex justify-between"><span class="text-slate-400">Dari:</span><span class="font-bold text-white">${conn.src_name} (${conn.src_type.toUpperCase()})</span></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Ke:</span><span class="font-bold text-white">${conn.dst_name} (${conn.dst_type.toUpperCase()})</span></div>
+                        </div>
+                        <button onclick="deleteInfraConnection(${conn.id})" class="mt-3 w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-red-500/30 cursor-pointer">
+                            <i class="fas fa-unlink mr-1"></i>Putus Koneksi
+                        </button>
+                    </div>
+                `);
                 topologyLayer.addLayer(line);
-            }
-        });
-
-        // 2. Draw ODP to nearest ODC lines
-        mapData.infra.forEach(odp => {
-            if (odp.type !== 'odp' || !odp.latitude || !odp.longitude) return;
-
-            const nearestOdc = findNearestDevice(odp.latitude, odp.longitude, 'odc');
-            if (nearestOdc) {
-                const line = L.polyline([[odp.latitude, odp.longitude], [nearestOdc.latitude, nearestOdc.longitude]], {
-                    color: '#06b6d4', // cyan
-                    weight: 3.0,
-                    opacity: 0.7
-                }).bindTooltip(`Distribusi: ${odp.name} &rarr; ${nearestOdc.name}`, { sticky: true });
-                topologyLayer.addLayer(line);
-            }
-        });
-
-        // 3. Draw ODC to nearest OLT lines
-        mapData.infra.forEach(odc => {
-            if (odc.type !== 'odc' || !odc.latitude || !odc.longitude) return;
-
-            const nearestOlt = findNearestDevice(odc.latitude, odc.longitude, 'olt');
-            if (nearestOlt) {
-                const line = L.polyline([[odc.latitude, odc.longitude], [nearestOlt.latitude, nearestOlt.longitude]], {
-                    color: '#a855f7', // purple/indigo
-                    weight: 4.5,
-                    opacity: 0.8
-                }).bindTooltip(`Feeder Utama: ${odc.name} &rarr; ${nearestOlt.name}`, { sticky: true });
-                topologyLayer.addLayer(line);
-            }
-        });
+            });
+        }
     }
 
     // Start Interactive Location Placement Mode
     function startSetLocation(username, nasname, displayName) {
+        if (drawCableState.active) cancelDrawCable();
         if (setLocationState.tempMarker) {
             map.removeLayer(setLocationState.tempMarker);
         }
@@ -1420,6 +1905,7 @@
     // ADD INFRASTRUCTURE (OLT / ODC / ODP) INTERACTIVE MODE
     // ----------------------------------------------------
     function startAddInfrastructure() {
+        if (drawCableState.active) cancelDrawCable();
         cancelSetLocation(); 
         if (addInfraState.tempMarker) {
             map.removeLayer(addInfraState.tempMarker);
@@ -1439,6 +1925,9 @@
         document.getElementById('infraTypeInput').value = 'olt';
         document.getElementById('infraIconInput').value = 'fa-network-wired';
         document.getElementById('infraCoordDisplay').textContent = 'Klik di peta atau paste koordinat untuk menempatkan PIN';
+
+        // Initialize professional fields
+        renderAddInfraFormFields('olt');
 
         const banner = document.getElementById('addInfraBanner');
         banner.classList.remove('hidden');
@@ -1470,16 +1959,280 @@
         showNotification('Mode tambah infrastruktur aktif! Paste koordinat/link Maps, klik peta, atau geser PIN.', 'info');
     }
 
+    function renderAddInfraFormFields(type) {
+        const container = document.getElementById('infraFormFields');
+        if (!container) return;
+
+        let html = '';
+
+        if (type === 'olt') {
+            html = `
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Brand / Merk OLT *</label>
+                    <select id="oltBrand" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="Huawei">Huawei</option>
+                        <option value="ZTE">ZTE</option>
+                        <option value="Fiberhome">Fiberhome</option>
+                        <option value="Nokia">Nokia</option>
+                        <option value="Cisco">Cisco</option>
+                        <option value="Other">Lainnya</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Management IP Address</label>
+                    <input type="text" id="oltIpAddress" placeholder="cth: 10.100.0.2" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Teknologi PON *</label>
+                    <select id="oltPonType" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="GPON">GPON (Default)</option>
+                        <option value="EPON">EPON</option>
+                        <option value="XG-PON">XG-PON</option>
+                        <option value="XGS-PON">XGS-PON</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">PON Ports *</label>
+                    <select id="oltTotalPorts" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="1">PON 1</option>
+                        <option value="2">PON 2</option>
+                        <option value="4">4 Port</option>
+                        <option value="8">8 Port</option>
+                        <option value="16" selected>16 Port</option>
+                        <option value="32">32 Port</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Uplink Capacity *</label>
+                    <select id="oltUplinkCap" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="1G">1 Gbps</option>
+                        <option value="10G" selected>10 Gbps</option>
+                        <option value="40G">40 Gbps</option>
+                        <option value="100G">100 Gbps</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">VLAN Management</label>
+                    <input type="number" id="oltVlanMgmt" placeholder="cth: 100" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none">
+                </div>
+            `;
+        } else if (type === 'odc') {
+            const oltOptions = mapData.infra.filter(i => i.type === 'olt' || i.type === 'oit').map(item => `<option value="${item.name}">${item.name} (${item.type.toUpperCase()})</option>`).join('') || '<option value="">- Tidak ada OLT/OIT -</option>';
+            html = `
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Brand / Merk Cabinet *</label>
+                    <select id="odcBrand" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="Generic">Generic / Metal Box</option>
+                        <option value="Huawei">Huawei</option>
+                        <option value="ZTE">ZTE</option>
+                        <option value="CC">CC</option>
+                        <option value="Fibront">Fibront</option>
+                        <option value="Other">Lainnya</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Kapasitas Total Port ODC *</label>
+                    <select id="odcTotalPorts" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="2">2 Port</option>
+                        <option value="4">4 Port</option>
+                        <option value="8" selected>8 Port</option>
+                        <option value="16">16 Port</option>
+                        <option value="24">24 Port</option>
+                        <option value="32">32 Port</option>
+                        <option value="48">48 Port</option>
+                        <option value="96">96 Port</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Sumber Feeder (OLT) *</label>
+                    <select id="odcFeederSource" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        ${oltOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Tipe Pemasangan *</label>
+                    <select id="odcInstallType" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="Outdoor Cabinet" selected>Outdoor Cabinet (Ground Mount)</option>
+                        <option value="Pole Mount">Pole Mount (Tiang)</option>
+                        <option value="Wall/Indoor">Wall Mount / Indoor Rack</option>
+                    </select>
+                </div>
+            `;
+        } else if (type === 'oit') {
+            html = `
+                <div>
+                    <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Sumber Feeder *</label>
+                    <select id="oitFeederSource" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="">-- Pilih Upstream --</option>
+                        ${mapData.infra.filter(d => d.type === 'olt' || d.type === 'oit').map(d => '<option value="' + d.id + '">' + d.name + ' (' + d.type.toUpperCase() + ')</option>').join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Pjg Kabel (m) & Redaman Masuk</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="oitCableIn" placeholder="Mtr" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <input type="text" id="oitAttenIn" placeholder="dBm" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Rasio Tap * & Merk</label>
+                    <div class="flex gap-2">
+                        <select id="oitTapRatio" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                            <option value="10:90">10:90</option>
+                            <option value="15:85" selected>15:85</option>
+                            <option value="20:80">20:80</option>
+                            <option value="25:75">25:75</option>
+                            <option value="30:70">30:70</option>
+                            <option value="50:50">50:50</option>
+                        </select>
+                        <input type="text" id="oitSplitterBrand" placeholder="Merk" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Redaman Tap & Pass (dBm)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="oitAttenTap" placeholder="Tap (ke ODP)" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <input type="text" id="oitAttenPass" placeholder="Pass (lanjut)" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                    </div>
+                </div>
+                <div class="col-span-1 sm:col-span-2 border-t border-slate-100 dark:border-slate-700/60 pt-2 mt-1">
+                    <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Port Tap ke ODP</label>
+                    <div class="flex gap-2">
+                        <select id="oitConnectedOdp" class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                            <option value="">-- Pilih ODP --</option>
+                            ${mapData.infra.filter(d => d.type === 'odp').map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('')}
+                        </select>
+                        <select id="oitOdpRatio" class="w-24 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                            <option value="1:2">1:2</option>
+                            <option value="1:4">1:4</option>
+                            <option value="1:8" selected>1:8</option>
+                            <option value="1:16">1:16</option>
+                        </select>
+                        <input type="number" id="oitCableToOdp" placeholder="Pjg (m)" class="w-24 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                    </div>
+                </div>
+                <div class="col-span-1 sm:col-span-2 border-t border-slate-100 dark:border-slate-700/60 pt-2 mt-1">
+                    <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Port Pass Lanjutan</label>
+                    <div class="flex gap-2 items-center">
+                        <select id="oitNextOit" class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                            <option value="">-- Pilih OIT Berikutnya --</option>
+                            ${mapData.infra.filter(d => d.type === 'oit').map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('')}
+                        </select>
+                        <input type="number" id="oitCablePass" placeholder="Pjg (m)" class="w-24 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <label class="flex items-center gap-1.5 text-[10px] text-slate-500 shrink-0">
+                            <input type="checkbox" id="oitIsEnd" class="rounded"> Ujung Jalur
+                        </label>
+                    </div>
+                </div>
+                <div class="col-span-1 sm:col-span-4 mt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Status Operasional</label>
+                        <select id="oitStatus" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                            <option value="Aktif" selected>🟢 Aktif</option>
+                            <option value="Instalasi">🟡 Instalasi</option>
+                            <option value="Gangguan">🔴 Gangguan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Tanggal Pasang</label>
+                        <input type="date" id="oitDate" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Catatan Teknisi</label>
+                        <input type="text" id="oitTechNotes" placeholder="Catatan tambahan..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                    </div>
+                </div>
+            `;
+        } else if (type === 'odp') {
+            const odcOptions = mapData.infra.filter(i => i.type === 'odc' || i.type === 'olt' || i.type === 'oit').map(item => `<option value="${item.name}">${item.name} (${item.type.toUpperCase()})</option>`).join('') || '<option value="">- Tidak ada ODC/OLT/OIT -</option>';
+            html = `
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Brand / Merk ODP *</label>
+                    <select id="odpBrand" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="Fibront">Fibront</option>
+                        <option value="Huawei">Huawei</option>
+                        <option value="ZTE">ZTE</option>
+                        <option value="CC">CC</option>
+                        <option value="Generic" selected>Generic / No Brand</option>
+                        <option value="Other">Lainnya</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Tipe Kotak ODP *</label>
+                    <select id="odpBoxType" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="Pole" selected>ODP Tiang (Pole Mount)</option>
+                        <option value="Wall">ODP Dinding (Wall Mount)</option>
+                        <option value="Pedestal">ODP Pedestal (Closure / Underground)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Jumlah Port Pelanggan *</label>
+                    <select id="odpTotalPorts" onchange="renderOdpPortList()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="4">4 Port (1:4 Splitter)</option>
+                        <option value="8" selected>8 Port (1:8 Splitter)</option>
+                        <option value="16">16 Port (1:16 Splitter)</option>
+                        <option value="32">32 Port (1:32 Splitter)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Sumber Feeder (ODC/OLT) *</label>
+                    <select id="odpSource" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        ${odcOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Warna Tube / Core Feeder</label>
+                    <select id="odpCoreColor" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                        <option value="Biru" selected>1 - Biru</option>
+                        <option value="Oranye">2 - Oranye</option>
+                        <option value="Hijau">3 - Hijau</option>
+                        <option value="Cokelat">4 - Cokelat</option>
+                        <option value="Abu-abu">5 - Abu-abu</option>
+                        <option value="Putih">6 - Putih</option>
+                        <option value="Merah">7 - Merah</option>
+                        <option value="Hitam">8 - Hitam</option>
+                        <option value="Kuning">9 - Kuning</option>
+                        <option value="Ungu">10 - Ungu</option>
+                        <option value="Pink">11 - Pink</option>
+                        <option value="Toska">12 - Toska</option>
+                    </select>
+                </div>
+                <div class="sm:col-span-3 md:col-span-4">
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">📋 Nama Pelanggan per Port <span class="text-slate-400 font-normal">(opsional — isi jika sudah ada pelanggan)</span></label>
+                    <div id="odpPortNamesList" class="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl">
+                        <!-- will be rendered by renderOdpPortList() -->
+                    </div>
+                </div>
+            `;
+        } else {
+            // Custom nas or other router
+            html = `
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-700 dark:text-slate-350 mb-1">Management IP Address</label>
+                    <input type="text" id="nasIpAddress" placeholder="cth: 10.10.0.1" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/85 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+        // Auto-render ODP port names list if odp form was just rendered
+        if (type === 'odp') {
+            renderOdpPortList();
+        }
+    }
+
     function onInfraTypeChange() {
         const type = document.getElementById('infraTypeInput').value;
         const iconInput = document.getElementById('infraIconInput');
         
         if (type === 'olt') iconInput.value = 'fa-network-wired';
         else if (type === 'odc') iconInput.value = 'fa-box';
+        else if (type === 'oit') iconInput.value = 'fa-code-branch';
         else if (type === 'odp') iconInput.value = 'fa-sitemap';
         else if (type === 'nas') iconInput.value = 'fa-server';
         
         updateInfraTempIcon();
+        renderAddInfraFormFields(type);
     }
 
     function updateInfraTempIcon() {
@@ -1589,12 +2342,61 @@
             return;
         }
 
+        // Build structured JSON details depending on device type
+        let detailsObj = { description: details };
+        if (type === 'olt') {
+            detailsObj.brand = document.getElementById('oltBrand').value;
+            detailsObj.ip_address = document.getElementById('oltIpAddress').value.trim();
+            detailsObj.pon_type = document.getElementById('oltPonType').value;
+            detailsObj.total_ports = parseInt(document.getElementById('oltTotalPorts').value);
+            detailsObj.uplink_cap = document.getElementById('oltUplinkCap').value;
+            detailsObj.vlan_mgmt = document.getElementById('oltVlanMgmt').value.trim();
+        } else if (type === 'odc') {
+            detailsObj.brand = document.getElementById('odcBrand').value;
+            detailsObj.total_ports = parseInt(document.getElementById('odcTotalPorts').value);
+            detailsObj.feeder_source = document.getElementById('odcFeederSource').value;
+            detailsObj.install_type = document.getElementById('odcInstallType').value;
+        } else if (type === 'oit') {
+            detailsObj.feeder_source = document.getElementById('oitFeederSource') ? document.getElementById('oitFeederSource').value : '';
+            detailsObj.cable_in_m = document.getElementById('oitCableIn') ? document.getElementById('oitCableIn').value : '';
+            detailsObj.attenuation_in = document.getElementById('oitAttenIn') ? document.getElementById('oitAttenIn').value.trim() : '';
+            detailsObj.tap_ratio = document.getElementById('oitTapRatio') ? document.getElementById('oitTapRatio').value : '';
+            detailsObj.splitter_brand = document.getElementById('oitSplitterBrand') ? document.getElementById('oitSplitterBrand').value.trim() : '';
+            detailsObj.attenuation_tap = document.getElementById('oitAttenTap') ? document.getElementById('oitAttenTap').value.trim() : '';
+            detailsObj.attenuation_pass = document.getElementById('oitAttenPass') ? document.getElementById('oitAttenPass').value.trim() : '';
+            detailsObj.connected_odp = document.getElementById('oitConnectedOdp') ? document.getElementById('oitConnectedOdp').value : '';
+            detailsObj.odp_ratio = document.getElementById('oitOdpRatio') ? document.getElementById('oitOdpRatio').value : '';
+            detailsObj.cable_to_odp_m = document.getElementById('oitCableToOdp') ? document.getElementById('oitCableToOdp').value : '';
+            detailsObj.next_oit = document.getElementById('oitNextOit') ? document.getElementById('oitNextOit').value : '';
+            detailsObj.cable_pass_m = document.getElementById('oitCablePass') ? document.getElementById('oitCablePass').value : '';
+            detailsObj.is_end = document.getElementById('oitIsEnd') ? document.getElementById('oitIsEnd').checked : false;
+            detailsObj.status = document.getElementById('oitStatus') ? document.getElementById('oitStatus').value : '';
+            detailsObj.install_date = document.getElementById('oitDate') ? document.getElementById('oitDate').value : '';
+            detailsObj.tech_notes = document.getElementById('oitTechNotes') ? document.getElementById('oitTechNotes').value.trim() : '';
+        } else if (type === 'odp') {
+            detailsObj.brand = document.getElementById('odpBrand').value;
+            detailsObj.odp_type = document.getElementById('odpBoxType').value;
+            const odpPorts = parseInt(document.getElementById('odpTotalPorts').value);
+            detailsObj.total_ports = odpPorts;
+            detailsObj.odc_source = document.getElementById('odpSource').value;
+            detailsObj.core_color = document.getElementById('odpCoreColor').value;
+            // Collect port names from input fields
+            const portNamesObj = {};
+            for (let p = 1; p <= odpPorts; p++) {
+                const inp = document.getElementById(`odpPortName_${p}`);
+                if (inp && inp.value.trim()) portNamesObj[p] = inp.value.trim();
+            }
+            if (Object.keys(portNamesObj).length > 0) detailsObj.port_names = portNamesObj;
+        } else if (type === 'nas') {
+            detailsObj.ip_address = document.getElementById('nasIpAddress').value.trim();
+        }
+
         const payload = {
             name: name,
             type: type,
             latitude: addInfraState.lat,
             longitude: addInfraState.lng,
-            details: details,
+            details: JSON.stringify(detailsObj),
             icon: icon
         };
 
@@ -1665,6 +2467,400 @@
             }
         } catch (e) {
             console.error('Drag update fail:', e);
+        }
+    }
+
+    const buildEditFieldsOnly = (type, details) => {
+        let typeSpecificHtml = '';
+        if (type === 'olt') {
+            const brand = details.brand || 'Huawei';
+            const ip = details.ip_address || '';
+            const ponType = details.pon_type || 'GPON';
+            const totalPorts = details.total_ports || 16;
+            const uplink = details.uplink_cap || '10G';
+            const vlan = details.vlan_mgmt || '';
+
+            typeSpecificHtml = `
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Brand / Merk OLT *</label>
+                        <select id="editOltBrand" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="Huawei" ${brand === 'Huawei' ? 'selected' : ''}>Huawei</option>
+                            <option value="ZTE" ${brand === 'ZTE' ? 'selected' : ''}>ZTE</option>
+                            <option value="Fiberhome" ${brand === 'Fiberhome' ? 'selected' : ''}>Fiberhome</option>
+                            <option value="Nokia" ${brand === 'Nokia' ? 'selected' : ''}>Nokia</option>
+                            <option value="Cisco" ${brand === 'Cisco' ? 'selected' : ''}>Cisco</option>
+                            <option value="Other" ${brand === 'Other' ? 'selected' : ''}>Lainnya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Management IP Address</label>
+                        <input id="editOltIp" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" value="${ip}" placeholder="cth: 10.100.0.2">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Teknologi PON *</label>
+                        <select id="editOltPonType" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="GPON" ${ponType === 'GPON' ? 'selected' : ''}>GPON</option>
+                            <option value="EPON" ${ponType === 'EPON' ? 'selected' : ''}>EPON</option>
+                            <option value="XG-PON" ${ponType === 'XG-PON' ? 'selected' : ''}>XG-PON</option>
+                            <option value="XGS-PON" ${ponType === 'XGS-PON' ? 'selected' : ''}>XGS-PON</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">PON Ports *</label>
+                        <select id="editOltTotalPorts" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="1" ${totalPorts == 1 ? 'selected' : ''}>PON 1</option>
+                            <option value="2" ${totalPorts == 2 ? 'selected' : ''}>PON 2</option>
+                            <option value="4" ${totalPorts == 4 ? 'selected' : ''}>4 Port</option>
+                            <option value="8" ${totalPorts == 8 ? 'selected' : ''}>8 Port</option>
+                            <option value="16" ${totalPorts == 16 ? 'selected' : ''}>16 Port</option>
+                            <option value="32" ${totalPorts == 32 ? 'selected' : ''}>32 Port</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Uplink Capacity *</label>
+                        <select id="editOltUplink" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="1G" ${uplink === '1G' ? 'selected' : ''}>1 Gbps</option>
+                            <option value="10G" ${uplink === '10G' ? 'selected' : ''}>10 Gbps</option>
+                            <option value="40G" ${uplink === '40G' ? 'selected' : ''}>40 Gbps</option>
+                            <option value="100G" ${uplink === '100G' ? 'selected' : ''}>100 Gbps</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">VLAN Management</label>
+                        <input id="editOltVlan" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" value="${vlan}" placeholder="cth: 100">
+                    </div>
+                </div>
+            `;
+        } else if (type === 'odc') {
+            const brand = details.brand || 'Generic';
+            const totalPorts = details.total_ports || 16;
+            const feeder = details.feeder_source || '';
+            const install = details.install_type || 'Outdoor Cabinet';
+
+            const oltOptions = mapData.infra.filter(i => i.type === 'olt' || i.type === 'oit').map(item => `<option value="${item.name}" ${feeder === item.name ? 'selected' : ''}>${item.name} (${item.type.toUpperCase()})</option>`).join('') || '<option value="">- Tidak ada OLT/OIT -</option>';
+
+            typeSpecificHtml = `
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Brand / Merk Cabinet *</label>
+                        <select id="editOdcBrand" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="Generic" ${brand === 'Generic' ? 'selected' : ''}>Generic</option>
+                            <option value="Huawei" ${brand === 'Huawei' ? 'selected' : ''}>Huawei</option>
+                            <option value="ZTE" ${brand === 'ZTE' ? 'selected' : ''}>ZTE</option>
+                            <option value="CC" ${brand === 'CC' ? 'selected' : ''}>CC</option>
+                            <option value="Fibront" ${brand === 'Fibront' ? 'selected' : ''}>Fibront</option>
+                            <option value="Other" ${brand === 'Other' ? 'selected' : ''}>Lainnya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Kapasitas Total Port *</label>
+                        <select id="editOdcTotalPorts" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="2" ${totalPorts == 2 ? 'selected' : ''}>2 Port</option>
+                            <option value="4" ${totalPorts == 4 ? 'selected' : ''}>4 Port</option>
+                            <option value="8" ${totalPorts == 8 ? 'selected' : ''}>8 Port</option>
+                            <option value="16" ${totalPorts == 16 ? 'selected' : ''}>16 Port</option>
+                            <option value="24" ${totalPorts == 24 ? 'selected' : ''}>24 Port</option>
+                            <option value="32" ${totalPorts == 32 ? 'selected' : ''}>32 Port</option>
+                            <option value="48" ${totalPorts == 48 ? 'selected' : ''}>48 Port</option>
+                            <option value="96" ${totalPorts == 96 ? 'selected' : ''}>96 Port</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Sumber Feeder (OLT) *</label>
+                        <select id="editOdcFeeder" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            ${oltOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Tipe Pemasangan *</label>
+                        <select id="editOdcInstall" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="Outdoor Cabinet" ${install === 'Outdoor Cabinet' ? 'selected' : ''}>Outdoor Cabinet</option>
+                            <option value="Pole Mount" ${install === 'Pole Mount' ? 'selected' : ''}>Pole Mount</option>
+                            <option value="Wall/Indoor" ${install === 'Wall/Indoor' ? 'selected' : ''}>Wall / Indoor Rack</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+        } else if (type === 'oit') {
+            const feeder = details.feeder_source || '';
+            const tapRatio = details.tap_ratio || '15:85';
+            const attenIn = details.attenuation_in || '';
+            const attenTap = details.attenuation_tap || '';
+            const attenPass = details.attenuation_pass || '';
+            const status = details.status || 'Aktif';
+            const notes = details.tech_notes || '';
+
+            const feederOptions = mapData.infra.filter(i => i.type === 'olt' || i.type === 'oit').map(item => '<option value="' + item.id + '" ' + (feeder == item.id ? 'selected' : '') + '>' + item.name + ' (' + item.type.toUpperCase() + ')</option>').join('') || '<option value="">- Tidak ada Upstream -</option>';
+
+            typeSpecificHtml = `
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Sumber Feeder *</label>
+                        <select id="editOitFeeder" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="">-- Pilih Upstream --</option>
+                            ${feederOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Rasio Tap *</label>
+                        <select id="editOitTapRatio" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="10:90" ${tapRatio === '10:90' ? 'selected' : ''}>10:90</option>
+                            <option value="15:85" ${tapRatio === '15:85' ? 'selected' : ''}>15:85</option>
+                            <option value="20:80" ${tapRatio === '20:80' ? 'selected' : ''}>20:80</option>
+                            <option value="25:75" ${tapRatio === '25:75' ? 'selected' : ''}>25:75</option>
+                            <option value="30:70" ${tapRatio === '30:70' ? 'selected' : ''}>30:70</option>
+                            <option value="50:50" ${tapRatio === '50:50' ? 'selected' : ''}>50:50</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Redaman Masuk (dBm)</label>
+                        <input id="editOitAttenIn" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" value="${attenIn}" placeholder="-18.00">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Redaman Tap & Pass</label>
+                        <div class="flex gap-2">
+                            <input id="editOitAttenTap" class="w-1/2 px-3 py-2 border border-slate-300 rounded-lg text-xs" value="${attenTap}" placeholder="Tap">
+                            <input id="editOitAttenPass" class="w-1/2 px-3 py-2 border border-slate-300 rounded-lg text-xs" value="${attenPass}" placeholder="Pass">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Status Operasional</label>
+                        <select id="editOitStatus" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="Aktif" ${status === 'Aktif' ? 'selected' : ''}>🟢 Aktif</option>
+                            <option value="Instalasi" ${status === 'Instalasi' ? 'selected' : ''}>🟡 Instalasi</option>
+                            <option value="Gangguan" ${status === 'Gangguan' ? 'selected' : ''}>🔴 Gangguan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Catatan Teknisi</label>
+                        <input id="editOitNotes" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" value="${notes}" placeholder="Notes...">
+                    </div>
+                </div>
+            `;
+        } else if (type === 'odp') {
+            const brand = details.brand || 'Generic';
+            const boxType = details.odp_type || 'Pole';
+            const ports = details.total_ports || 8;
+            const source = details.odc_source || '';
+            const color = details.core_color || 'Biru';
+            const portNames = details.port_names || {};
+
+            const odcOptions = mapData.infra.filter(i => i.type === 'odc' || i.type === 'olt' || i.type === 'oit').map(item => `<option value="${item.name}" ${source === item.name ? 'selected' : ''}>${item.name} (${item.type.toUpperCase()})</option>`).join('') || '<option value="">- Tidak ada ODC/OLT/OIT -</option>';
+
+            // Build port name input rows
+            let portNameInputs = '';
+            for (let p = 1; p <= ports; p++) {
+                const val = portNames[p] || '';
+                portNameInputs += `<div class="flex items-center gap-1.5">
+                    <span class="text-[10px] font-bold text-slate-500 w-12 flex-shrink-0">Port ${p}:</span>
+                    <input id="editOdpPortName_${p}" type="text" value="${val}" placeholder="Nama pelanggan..." class="flex-1 px-2 py-1 border border-slate-200 rounded text-[10px] focus:outline-none">
+                </div>`;
+            }
+
+            typeSpecificHtml = `
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Brand / Merk ODP *</label>
+                        <select id="editOdpBrand" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="Fibront" ${brand === 'Fibront' ? 'selected' : ''}>Fibront</option>
+                            <option value="Huawei" ${brand === 'Huawei' ? 'selected' : ''}>Huawei</option>
+                            <option value="ZTE" ${brand === 'ZTE' ? 'selected' : ''}>ZTE</option>
+                            <option value="CC" ${brand === 'CC' ? 'selected' : ''}>CC</option>
+                            <option value="Generic" ${brand === 'Generic' ? 'selected' : ''}>Generic</option>
+                            <option value="Other" ${brand === 'Other' ? 'selected' : ''}>Lainnya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Tipe Kotak ODP *</label>
+                        <select id="editOdpBoxType" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="Pole" ${boxType === 'Pole' ? 'selected' : ''}>ODP Tiang</option>
+                            <option value="Wall" ${boxType === 'Wall' ? 'selected' : ''}>ODP Dinding</option>
+                            <option value="Pedestal" ${boxType === 'Pedestal' ? 'selected' : ''}>ODP Pedestal</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Jumlah Port Pelanggan *</label>
+                        <select id="editOdpPorts" onchange="renderEditOdpPortNames(this.value, {})" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="4" ${ports == 4 ? 'selected' : ''}>4 Port (1:4 Splitter)</option>
+                            <option value="8" ${ports == 8 ? 'selected' : ''}>8 Port (1:8 Splitter)</option>
+                            <option value="16" ${ports == 16 ? 'selected' : ''}>16 Port (1:16 Splitter)</option>
+                            <option value="32" ${ports == 32 ? 'selected' : ''}>32 Port (1:32 Splitter)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Sumber Distribusi *</label>
+                        <select id="editOdpSource" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            ${odcOptions}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Warna Tube/Core Feeder</label>
+                        <select id="editOdpColor" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs">
+                            <option value="Biru" ${color === 'Biru' ? 'selected' : ''}>1 - Biru</option>
+                            <option value="Oranye" ${color === 'Oranye' ? 'selected' : ''}>2 - Oranye</option>
+                            <option value="Hijau" ${color === 'Hijau' ? 'selected' : ''}>3 - Hijau</option>
+                            <option value="Cokelat" ${color === 'Cokelat' ? 'selected' : ''}>4 - Cokelat</option>
+                            <option value="Abu-abu" ${color === 'Abu-abu' ? 'selected' : ''}>5 - Abu-abu</option>
+                            <option value="Putih" ${color === 'Putih' ? 'selected' : ''}>6 - Putih</option>
+                            <option value="Merah" ${color === 'Merah' ? 'selected' : ''}>7 - Merah</option>
+                            <option value="Hitam" ${color === 'Hitam' ? 'selected' : ''}>8 - Hitam</option>
+                            <option value="Kuning" ${color === 'Kuning' ? 'selected' : ''}>9 - Kuning</option>
+                            <option value="Ungu" ${color === 'Ungu' ? 'selected' : ''}>10 - Ungu</option>
+                            <option value="Pink" ${color === 'Pink' ? 'selected' : ''}>11 - Pink</option>
+                            <option value="Toska" ${color === 'Toska' ? 'selected' : ''}>12 - Toska</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">📋 Nama Pelanggan per Port <span class="text-slate-400 font-normal text-[10px]">(opsional)</span></label>
+                        <div id="editOdpPortNamesList" class="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                            ${portNameInputs}
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            const ip = details.ip_address || '';
+            typeSpecificHtml = `
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Management IP Address</label>
+                    <input id="editNasIp" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs" value="${ip}" placeholder="cth: 10.10.0.1">
+                </div>
+            `;
+        }
+        return typeSpecificHtml;
+    };
+
+    async function openEditInfraModal(id) {
+        const device = mapData.infra.find(i => i.id == id);
+        if (!device) return;
+
+        let detailsObj = {};
+        if (device.details) {
+            try {
+                detailsObj = JSON.parse(device.details);
+            } catch(e) {
+                detailsObj = { description: device.details };
+            }
+        }
+        const description = detailsObj.description || detailsObj.notes || '';
+
+        const { value: formValues } = await Swal.fire({
+            title: 'Edit Detail Alat',
+            html: `
+                <div class="text-left space-y-3 font-outfit">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nama Alat *</label>
+                        <input id="editName" class="w-full px-3 py-2 border border-slate-350 rounded-lg text-xs" value="${device.name}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Tipe Alat *</label>
+                        <select id="editType" class="w-full px-3 py-2 border border-slate-350 rounded-lg text-xs">
+                            <option value="olt" ${device.type === 'olt' ? 'selected' : ''}>OLT Pusat</option>
+                            <option value="odc" ${device.type === 'odc' ? 'selected' : ''}>ODC Cabinet</option>
+                            <option value="odp" ${device.type === 'odp' ? 'selected' : ''}>ODP Splitter Box</option>
+                            <option value="nas" ${device.type === 'nas' ? 'selected' : ''}>NAS Router (Custom)</option>
+                        </select>
+                    </div>
+                    <div id="dynamicEditFields" class="border-t border-slate-100 pt-3 mt-3">
+                        ${buildEditFieldsOnly(device.type, detailsObj)}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Keterangan / Notes</label>
+                        <input id="editDesc" class="w-full px-3 py-2 border border-slate-350 rounded-lg text-xs" value="${description}">
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Simpan Perubahan',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#4f46e5',
+            didOpen: () => {
+                const typeSelect = document.getElementById('editType');
+                typeSelect.addEventListener('change', function() {
+                    const fieldsContainer = document.getElementById('dynamicEditFields');
+                    fieldsContainer.innerHTML = buildEditFieldsOnly(this.value, detailsObj);
+                });
+            },
+            preConfirm: () => {
+                const name = document.getElementById('editName').value.trim();
+                const type = document.getElementById('editType').value;
+                const desc = document.getElementById('editDesc').value.trim();
+
+                if (!name) {
+                    Swal.showValidationMessage('Nama alat wajib diisi');
+                    return false;
+                }
+
+                let detailsVal = { description: desc };
+                if (type === 'olt') {
+                    detailsVal.brand = document.getElementById('editOltBrand').value;
+                    detailsVal.ip_address = document.getElementById('editOltIp').value.trim();
+                    detailsVal.pon_type = document.getElementById('editOltPonType').value;
+                    detailsVal.total_ports = parseInt(document.getElementById('editOltTotalPorts').value);
+                    detailsVal.uplink_cap = document.getElementById('editOltUplink').value;
+                    detailsVal.vlan_mgmt = document.getElementById('editOltVlan').value.trim();
+                } else if (type === 'odc') {
+                    detailsVal.brand = document.getElementById('editOdcBrand').value;
+                    detailsVal.total_ports = parseInt(document.getElementById('editOdcTotalPorts').value);
+                    detailsVal.feeder_source = document.getElementById('editOdcFeeder').value;
+                    detailsVal.install_type = document.getElementById('editOdcInstall').value;
+                } else if (type === 'oit') {
+                    detailsVal.feeder_source = document.getElementById('editOitFeeder').value;
+                    detailsVal.tap_ratio = document.getElementById('editOitTapRatio').value;
+                    detailsVal.attenuation_in = document.getElementById('editOitAttenIn').value.trim();
+                    detailsVal.attenuation_tap = document.getElementById('editOitAttenTap').value.trim();
+                    detailsVal.attenuation_pass = document.getElementById('editOitAttenPass').value.trim();
+                    detailsVal.status = document.getElementById('editOitStatus').value;
+                    detailsVal.tech_notes = document.getElementById('editOitNotes').value.trim();
+                } else if (type === 'odp') {
+                    detailsVal.brand = document.getElementById('editOdpBrand').value;
+                    detailsVal.odp_type = document.getElementById('editOdpBoxType').value;
+                    const editOdpPorts = parseInt(document.getElementById('editOdpPorts').value);
+                    detailsVal.total_ports = editOdpPorts;
+                    detailsVal.odc_source = document.getElementById('editOdpSource').value;
+                    detailsVal.core_color = document.getElementById('editOdpColor').value;
+                    // Collect port names
+                    const editPortNames = {};
+                    for (let p = 1; p <= editOdpPorts; p++) {
+                        const inp = document.getElementById(`editOdpPortName_${p}`);
+                        if (inp && inp.value.trim()) editPortNames[p] = inp.value.trim();
+                    }
+                    if (Object.keys(editPortNames).length > 0) detailsVal.port_names = editPortNames;
+                } else if (type === 'nas') {
+                    detailsVal.ip_address = document.getElementById('editNasIp').value.trim();
+                }
+
+                return { name, type, details: JSON.stringify(detailsVal) };
+            }
+        });
+
+        if (formValues) {
+            const payload = {
+                id: device.id,
+                name: formValues.name,
+                type: formValues.type,
+                latitude: device.latitude,
+                longitude: device.longitude,
+                details: formValues.details,
+                icon: device.icon || ''
+            };
+
+            showNotification('Menyimpan perubahan...', 'info');
+            try {
+                const res = await apiCall('/api/map/infrastructure/edit', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                if (res.success) {
+                    showNotification(res.message, 'success');
+                    await loadMapData();
+                } else {
+                    showNotification('Gagal menyimpan: ' + res.error, 'error');
+                }
+            } catch (e) {
+                showNotification('Error menyimpan perubahan', 'error');
+            }
         }
     }
 
@@ -1767,6 +2963,15 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                 coordInput.classList.remove('border-red-400');
             }
         }
+        else if (drawCableState.active) {
+            addDrawCablePoint(e.latlng.lat, e.latlng.lng);
+        }
+    }
+
+    function onMapMouseMove(e) {
+        if (!drawCableState.active || !drawCableState.polyline) return;
+        const tempPoints = [...drawCableState.points, [e.latlng.lat, e.latlng.lng]];
+        drawCableState.polyline.setLatLngs(tempPoints);
     }
 
     async function saveCoordinates() {
@@ -1893,58 +3098,201 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                 return odpId;
             }
         });
-        
+
         if (result.isConfirmed) {
-            await connectCable(result.value, username);
+            startDrawCable(username, result.value);
         }
     }
-    
-    async function connectCable(odpId, username) {
-        try {
-            const res = await apiCall('/api/map/cables/add', {
-                method: 'POST',
-                body: JSON.stringify({ odp_id: parseInt(odpId), customer_username: username })
-            });
-            
-            if (res.success) {
-                showNotification('Kabel berhasil ditarik!', 'success');
-                await loadMapData(); // Reload to show cable
-            } else {
-                showNotification(res.error || 'Gagal menarik kabel', 'error');
-            }
-        } catch (e) {
-            showNotification('Error: ' + e.message, 'error');
-        }
+
+    function startDrawCable(username, odpId) {
+        map.closePopup();
+        cancelSetLocation(); cancelAddInfrastructure();
+        if (drawCableState.active) cancelDrawCable();
+        const odp = mapData.infra.find(i => i.id == odpId);
+        const client = mapData.clients.find(c => c.username === username);
+        if (!odp) { showNotification('ODP tidak ditemukan!', 'error'); return; }
+        if (!client) { showNotification('Customer tidak ditemukan!', 'error'); return; }
+        drawCableState = {
+            active: true, type: 'customer', username, odpId,
+            odpLat: odp.latitude, odpLng: odp.longitude,
+            customerLat: client.latitude, customerLng: client.longitude,
+            points: [[odp.latitude, odp.longitude]], polyline: null, tempMarkers: []
+        };
+        drawCableState.polyline = L.polyline(drawCableState.points, { color: '#10b981', weight: 3, opacity: 0.8, className: 'active-draw-cable', interactive: false }).addTo(map);
+        const si = L.divIcon({ html: '<div class="w-3 h-3 rounded-full bg-emerald-500 border border-white shadow-md"></div>', className: 'draw-node-icon', iconSize: [12,12], iconAnchor: [6,6] });
+        drawCableState.tempMarkers.push(L.marker([odp.latitude, odp.longitude], { icon: si, interactive: false }).addTo(map));
+        document.getElementById('drawCableMsg').innerHTML = `Klik di peta untuk menggambar jalur kabel dari <strong>${odp.name}</strong> ke pelanggan <strong>${username}</strong>. Klik PIN pelanggan untuk snap & simpan.`;
+        document.getElementById('drawCableBanner').classList.remove('hidden');
+        showNotification('Mode tarik kabel aktif. Klik beberapa titik di jalan, lalu klik PIN pelanggan.', 'info');
     }
-    
-    async function deleteCable(cableId) {
+
+    async function openInfraCableModal(srcId) {
+        const srcDevice = mapData.infra.find(i => i.id == srcId);
+        if (!srcDevice) return;
+        const otherDevices = mapData.infra.filter(i => i.id != srcId);
+        if (otherDevices.length === 0) { showNotification('Belum ada alat infrastruktur lain', 'warning'); return; }
+        let options = otherDevices.map(d => `<option value="${d.id}">${d.name} (${d.type.toUpperCase()})</option>`).join('');
         const result = await Swal.fire({
-            title: 'Putus Koneksi Kabel?',
-            text: 'Kabel fiber akan diputus dari ODP',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Ya, Putus',
-            cancelButtonText: 'Batal',
-            confirmButtonColor: '#ef4444'
+            title: 'Hubungkan Kabel Infrastruktur',
+            html: `<div class="text-left space-y-3"><p class="text-sm text-slate-600">Dari: <strong>${srcDevice.name}</strong></p><label class="block text-sm font-bold text-slate-700">Pilih Tujuan:</label><select id="dstDeviceSelect" class="w-full px-3 py-2 border border-slate-300 rounded-lg"><option value="">-- Pilih --</option>${options}</select></div>`,
+            showCancelButton: true, confirmButtonText: 'Tarik Kabel', cancelButtonText: 'Batal', confirmButtonColor: '#10b981',
+            preConfirm: () => { const v = document.getElementById('dstDeviceSelect').value; if (!v) { Swal.showValidationMessage('Pilih tujuan'); return false; } return v; }
         });
-        
+        if (result.isConfirmed) startDrawInfraCable(srcId, result.value);
+    }
+
+    function startDrawInfraCable(srcId, dstId) {
+        map.closePopup();
+        cancelSetLocation(); cancelAddInfrastructure();
+        if (drawCableState.active) cancelDrawCable();
+        const srcDev = mapData.infra.find(i => i.id == srcId);
+        const dstDev = mapData.infra.find(i => i.id == dstId);
+        if (!srcDev || !dstDev) { showNotification('Alat tidak ditemukan!', 'error'); return; }
+        drawCableState = {
+            active: true, type: 'infra', srcId, dstId,
+            srcName: srcDev.name, dstName: dstDev.name,
+            srcLat: srcDev.latitude, srcLng: srcDev.longitude,
+            dstLat: dstDev.latitude, dstLng: dstDev.longitude,
+            points: [[srcDev.latitude, srcDev.longitude]], polyline: null, tempMarkers: []
+        };
+        drawCableState.polyline = L.polyline(drawCableState.points, { color: '#f59e0b', weight: 3.5, opacity: 0.8, className: 'active-draw-cable', interactive: false }).addTo(map);
+        const si = L.divIcon({ html: '<div class="w-3 h-3 rounded-full bg-cyan-500 border border-white shadow-md"></div>', className: 'draw-node-icon', iconSize: [12,12], iconAnchor: [6,6] });
+        drawCableState.tempMarkers.push(L.marker([srcDev.latitude, srcDev.longitude], { icon: si, interactive: false }).addTo(map));
+        document.getElementById('drawCableMsg').innerHTML = `Klik di peta untuk menggambar jalur kabel dari <strong>${srcDev.name}</strong> ke <strong>${dstDev.name}</strong>. Klik PIN tujuan untuk snap & simpan.`;
+        document.getElementById('drawCableBanner').classList.remove('hidden');
+        showNotification('Mode tarik kabel infrastruktur aktif.', 'info');
+    }
+
+    function addDrawCablePoint(lat, lng) {
+        if (!drawCableState.active) return;
+        drawCableState.points.push([lat, lng]);
+        drawCableState.polyline.setLatLngs(drawCableState.points);
+        const ni = L.divIcon({ html: '<div class="w-2.5 h-2.5 rounded-full bg-white border-2 border-emerald-500 shadow-md"></div>', className: 'draw-node-icon', iconSize: [10,10], iconAnchor: [5,5] });
+        drawCableState.tempMarkers.push(L.marker([lat, lng], { icon: ni, interactive: false }).addTo(map));
+    }
+
+    function undoDrawCablePoint() {
+        if (!drawCableState.active || drawCableState.points.length <= 1) return;
+        drawCableState.points.pop();
+        drawCableState.polyline.setLatLngs(drawCableState.points);
+        const m = drawCableState.tempMarkers.pop();
+        if (m) map.removeLayer(m);
+    }
+
+    function cancelDrawCable() {
+        if (drawCableState.polyline) map.removeLayer(drawCableState.polyline);
+        drawCableState.tempMarkers.forEach(m => map.removeLayer(m));
+        drawCableState = { active: false, type: 'customer', username: null, odpId: null, srcId: null, dstId: null, srcName: null, dstName: null, srcLat: null, srcLng: null, dstLat: null, dstLng: null, customerLat: null, customerLng: null, points: [], polyline: null, tempMarkers: [] };
+        document.getElementById('drawCableBanner').classList.add('hidden');
+    }
+
+    async function saveCablePath() {
+        if (!drawCableState.active) return;
+        const tLat = drawCableState.type === 'customer' ? drawCableState.customerLat : drawCableState.dstLat;
+        const tLng = drawCableState.type === 'customer' ? drawCableState.customerLng : drawCableState.dstLng;
+        if (drawCableState.points.length < 2) {
+            drawCableState.points.push([tLat, tLng]);
+        } else {
+            const last = drawCableState.points[drawCableState.points.length - 1];
+            if (getGeographicalDistance(last[0], last[1], tLat, tLng) > 0.0001) {
+                drawCableState.points.push([tLat, tLng]);
+            } else {
+                drawCableState.points[drawCableState.points.length - 1] = [tLat, tLng];
+            }
+        }
+        try {
+            let res;
+            if (drawCableState.type === 'customer') {
+                res = await apiCall('/api/map/cables/add', { method: 'POST', body: JSON.stringify({ odp_id: parseInt(drawCableState.odpId), customer_username: drawCableState.username, coordinates: drawCableState.points }) });
+            } else {
+                res = await apiCall('/api/map/infra-connections/add', { method: 'POST', body: JSON.stringify({ src_id: parseInt(drawCableState.srcId), dst_id: parseInt(drawCableState.dstId), coordinates: drawCableState.points }) });
+            }
+            if (res.success) {
+                showNotification('Rute kabel berhasil disimpan!', 'success');
+                if (drawCableState.polyline) map.removeLayer(drawCableState.polyline);
+                drawCableState.tempMarkers.forEach(m => map.removeLayer(m));
+                drawCableState.active = false;
+                document.getElementById('drawCableBanner').classList.add('hidden');
+                await loadMapData();
+            } else {
+                showNotification(res.error || 'Gagal menyimpan rute kabel', 'error');
+            }
+        } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+    }
+
+    async function deleteCable(cableId) {
+        const result = await Swal.fire({ title: 'Putus Koneksi Kabel?', text: 'Kabel fiber akan diputus dari ODP', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, Putus', cancelButtonText: 'Batal', confirmButtonColor: '#ef4444' });
         if (result.isConfirmed) {
             try {
-                const res = await apiCall('/api/map/cables/delete', {
-                    method: 'POST',
-                    body: JSON.stringify({ id: cableId })
-                });
-                
-                if (res.success) {
-                    showNotification('Kabel berhasil diputus', 'success');
-                    await loadMapData();
-                } else {
-                    showNotification(res.error || 'Gagal memutus kabel', 'error');
-                }
-            } catch (e) {
-                showNotification('Error: ' + e.message, 'error');
-            }
+                const res = await apiCall('/api/map/cables/delete', { method: 'POST', body: JSON.stringify({ id: cableId }) });
+                if (res.success) { showNotification('Kabel berhasil diputus', 'success'); await loadMapData(); }
+                else { showNotification(res.error || 'Gagal memutus kabel', 'error'); }
+            } catch (e) { showNotification('Error: ' + e.message, 'error'); }
         }
+    }
+
+    async function deleteInfraConnection(connId) {
+        const result = await Swal.fire({ title: 'Putus Koneksi Infrastruktur?', text: 'Kabel fiber infrastruktur akan diputus', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, Putus', cancelButtonText: 'Batal', confirmButtonColor: '#ef4444' });
+        if (result.isConfirmed) {
+            try {
+                const res = await apiCall('/api/map/infra-connections/delete', { method: 'POST', body: JSON.stringify({ id: connId }) });
+                if (res.success) { showNotification('Koneksi berhasil diputus', 'success'); await loadMapData(); }
+                else { showNotification(res.error || 'Gagal memutus koneksi', 'error'); }
+            } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+        }
+    }
+
+    // Render port name input list inside ODP add form
+    function renderOdpPortList() {
+        const countEl = document.getElementById('odpTotalPorts');
+        const container = document.getElementById('odpPortNamesList');
+        if (!countEl || !container) return;
+        const count = parseInt(countEl.value) || 8;
+        let html = '';
+        for (let p = 1; p <= count; p++) {
+            html += `<div class="flex items-center gap-1.5">
+                <span class="text-[10px] font-bold text-slate-500 w-12 flex-shrink-0">Port ${p}:</span>
+                <input id="odpPortName_${p}" type="text" placeholder="Nama pelanggan..." class="flex-1 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    // Render port name inputs in edit form with existing values
+    function renderEditOdpPortNames(count, existingNames) {
+        const container = document.getElementById('editOdpPortNamesList');
+        if (!container) return;
+        count = parseInt(count) || 8;
+        let html = '';
+        for (let p = 1; p <= count; p++) {
+            const val = (existingNames && existingNames[p]) ? existingNames[p] : '';
+            html += `<div class="flex items-center gap-1.5">
+                <span class="text-[10px] font-bold text-slate-500 w-12 flex-shrink-0">Port ${p}:</span>
+                <input id="editOdpPortName_${p}" type="text" value="${val}" placeholder="Nama pelanggan..." class="flex-1 px-2 py-1 border border-slate-200 rounded text-[10px] focus:outline-none">
+            </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    // CSS keyframe animations for house markers (injected dynamically)
+    if (!document.getElementById('houseMarkerStyle')) {
+        const s = document.createElement('style');
+        s.id = 'houseMarkerStyle';
+        s.textContent = `
+            @keyframes houseGoodPulse {
+                0%, 100% { filter: drop-shadow(0 0 4px rgba(16,185,129,0.6)); }
+                50% { filter: drop-shadow(0 0 9px rgba(16,185,129,1)); }
+            }
+            @keyframes houseWarnPulse {
+                0%, 100% { filter: drop-shadow(0 0 4px rgba(245,158,11,0.6)); }
+                50% { filter: drop-shadow(0 0 9px rgba(245,158,11,1)); }
+            }
+            @keyframes houseBadPulse {
+                0%, 100% { filter: drop-shadow(0 0 5px rgba(239,68,68,0.7)); }
+                50% { filter: drop-shadow(0 0 11px rgba(239,68,68,1)); }
+            }
+        `;
+        document.head.appendChild(s);
     }
 
 </script>

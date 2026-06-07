@@ -51,9 +51,11 @@ def format_file_size(size_bytes):
 
 def ping_nas(ip_address):
     """
-    Cek konektivitas NAS: ICMP ping dulu, jika gagal coba TCP ke port umum router.
+    Cek konektivitas NAS: standard ICMP ping dulu, jika gagal coba nsenter (container host fallback), lalu TCP fallback.
     """
-    # 1. Coba ICMP ping
+    import os
+
+    # 1. Coba standard ICMP ping dulu (karena container sudah memiliki route jika diatur CAP_NET_ADMIN)
     try:
         result = subprocess.run(
             ["ping", "-c", "1", "-W", "1", ip_address],
@@ -64,8 +66,20 @@ def ping_nas(ip_address):
     except Exception:
         pass
 
-    # 2. Jika ping gagal (mungkin ICMP diblokir), coba TCP ke port umum router (Winbox, API, HTTP)
-    for port in [8291, 8728, 80]:
+    # 2. Fallback: Coba nsenter jika dalam container (untuk system dengan route di host saja)
+    if os.path.exists('/.dockerenv'):
+        try:
+            result = subprocess.run(
+                ["nsenter", "-t", "1", "-n", "ping", "-c", "1", "-W", "1", ip_address],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2
+            )
+            if result.returncode == 0:
+                return "online"
+        except Exception:
+            pass
+
+    # 3. Fallback: Coba TCP ke port umum router (Winbox, API, HTTP, SSH)
+    for port in [8291, 8728, 80, 22]:
         try:
             sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
             sock.settimeout(0.5)

@@ -10,6 +10,27 @@ from services.telegram import send_telegram_notification
 
 integrations_bp = Blueprint('integrations', __name__)
 
+def init_integrations_table():
+    try:
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.integrations (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                type VARCHAR(50) DEFAULT 'mikrotik' NOT NULL,
+                host VARCHAR(255) NOT NULL,
+                port INTEGER,
+                username VARCHAR(100),
+                password VARCHAR(255),
+                description TEXT,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """, fetch=False)
+    except Exception as e:
+        print(f"[init-db] Error creating integrations table: {e}")
+
+init_integrations_table()
+
 @integrations_bp.route('/integrations')
 @login_required
 def integrations_page():
@@ -31,11 +52,18 @@ def api_integrations():
 def api_add_integration():
     data = request.get_json()
     try:
+        itype = data.get('type', 'mikrotik')
+        port_raw = data.get('port')
+        if port_raw and str(port_raw).strip():
+            port = int(port_raw)
+        else:
+            port = 7557 if itype == 'genieacs' else 8728
+
         execute_query("""
             INSERT INTO integrations (name, type, host, port, username, password, description, is_active)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
-              data['username'], data['password'], data.get('description',''), data.get('is_active', True)), fetch=False)
+        """, (data['name'], itype, data['host'], port,
+              data.get('username'), data.get('password'), data.get('description',''), data.get('is_active', True)), fetch=False)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -45,18 +73,25 @@ def api_add_integration():
 def api_edit_integration(iid):
     data = request.get_json()
     try:
+        itype = data.get('type', 'mikrotik')
+        port_raw = data.get('port')
+        if port_raw and str(port_raw).strip():
+            port = int(port_raw)
+        else:
+            port = 7557 if itype == 'genieacs' else 8728
+
         if data.get('password'):
             execute_query("""
                 UPDATE integrations SET name=%s, type=%s, host=%s, port=%s, username=%s, password=%s, description=%s, is_active=%s
                 WHERE id=%s
-            """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
-                  data['username'], data['password'], data.get('description',''), data.get('is_active', True), iid), fetch=False)
+            """, (data['name'], itype, data['host'], port,
+                  data.get('username'), data['password'], data.get('description',''), data.get('is_active', True), iid), fetch=False)
         else:
             execute_query("""
                 UPDATE integrations SET name=%s, type=%s, host=%s, port=%s, username=%s, description=%s, is_active=%s
                 WHERE id=%s
-            """, (data['name'], data.get('type','mikrotik'), data['host'], int(data.get('port',8728)),
-                  data['username'], data.get('description',''), data.get('is_active', True), iid), fetch=False)
+            """, (data['name'], itype, data['host'], port,
+                  data.get('username'), data.get('description',''), data.get('is_active', True), iid), fetch=False)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -83,6 +118,18 @@ def api_test_integration(iid):
             identity = list(api('/system/identity/print'))
             api.close()
             return jsonify({'success': True, 'message': f"Connected! Identity: {identity[0].get('name','?')}"})
+        elif ig['type'] == 'genieacs':
+            host = ig['host']
+            if not host.startswith(('http://', 'https://')):
+                host = f"http://{host}"
+            url = f"{host}:{ig['port']}" if ig['port'] else host
+            auth = (ig['username'], ig['password']) if ig['username'] else None
+            
+            resp = requests.get(f"{url}/devices?limit=1", auth=auth, timeout=3)
+            if resp.status_code == 200:
+                return jsonify({'success': True, 'message': 'Connected to GenieACS NBI successfully!'})
+            else:
+                return jsonify({'success': False, 'error': f"GenieACS returned HTTP status {resp.status_code}"})
         return jsonify({'success': False, 'error': 'Unsupported type'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

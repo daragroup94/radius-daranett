@@ -44,7 +44,8 @@ def api_add_nas():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'auto', 'auto')
             """, (data['nasname'], data['shortname'], data['type'], data['ports'], data['secret'],
                   data.get('server', ''), data.get('community', ''), data.get('description', '')), fetch=False)
-        except:
+        except Exception as inner_e:
+            print(f"[api_add_nas] Extended columns not available ({inner_e}), falling back to basic insert")
             execute_query("""
                 INSERT INTO nas (nasname, shortname, type, ports, secret, server, community, description)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -86,22 +87,24 @@ def api_delete_nas(nas_id):
 @login_required
 def get_nas_status():
     try:
+        # Import Redis cache functions
+        from services.nas_monitor import get_nas_status_from_cache
+        
         nas_list = execute_query("SELECT * FROM nas ORDER BY id")
         if not nas_list:
             return jsonify({'success': True, 'nas_status': []})
-            
-        pool = eventlet.GreenPool(50)
         
-        def _check_single_nas(nas):
-            status = ping_nas(nas['nasname'])
-            return {
+        nas_status_list = []
+        for nas in nas_list:
+            # Get cached status from Redis or default to 'offline'
+            cached_status = get_nas_status_from_cache(nas['nasname']) or 'offline'
+            nas_status_list.append({
                 'id': nas['id'],
                 'nasname': nas['nasname'],
                 'shortname': nas['shortname'],
-                'status': status
-            }
+                'status': cached_status
+            })
             
-        nas_status_list = list(pool.imap(_check_single_nas, nas_list))
         return jsonify({'success': True, 'nas_status': nas_status_list})
 
     except Exception as e:

@@ -6,7 +6,7 @@ from flask import current_app
 from extensions import socketio
 from database import execute_query
 from helpers import ping_nas
-from services.genieacs import get_genieacs_device_info
+from services.genieacs import get_genieacs_device_info, get_genieacs_config
 from services.mikrotik_coa import send_coa_disconnect
 
 def _send_telegram_worker(message, reply_markup=None):
@@ -27,11 +27,20 @@ def _send_telegram_worker(message, reply_markup=None):
     # Try current_app config if active
     try:
         if current_app:
-            token = current_app.config.get('TELEGRAM_BOT_TOKEN', token)
-            chat_id = current_app.config.get('TELEGRAM_CHAT_ID', chat_id)
+            token = current_app.config.get('TELEGRAM_BOT_TOKEN', token) or token
+            chat_id = current_app.config.get('TELEGRAM_CHAT_ID', chat_id) or chat_id
     except:
         pass
         
+    # Fallback to Config class if not set
+    if not token or not chat_id:
+        try:
+            from config import Config
+            token = token or Config.TELEGRAM_BOT_TOKEN
+            chat_id = chat_id or Config.TELEGRAM_CHAT_ID
+        except:
+            pass
+            
     if not token or not chat_id:
         return
         
@@ -76,6 +85,14 @@ def background_telegram_bot():
                 except Exception as e:
                     print(f"[telegram-bot] Error reading .telegram.env: {e}")
             
+            # Fallback to Config class if not set
+            if not token:
+                try:
+                    from config import Config
+                    token = Config.TELEGRAM_BOT_TOKEN
+                except:
+                    pass
+
             if not token:
                 print("[telegram-bot] Warning: TELEGRAM_BOT_TOKEN not found!")
                 socketio.sleep(10)
@@ -178,10 +195,20 @@ def background_telegram_bot():
                             }, timeout=5)
                             
                             try:
-                                GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
+                                config = get_genieacs_config()
+                                GENIEACS_NBI = config['url']
+                                auth = config['auth']
+                                import json as _json
+                                query = _json.dumps({
+                                    "$or": [
+                                        {"VirtualParameters.pppoeUsername._value": username},
+                                        {"VirtualParameters.pppoeUsername2._value": username}
+                                    ]
+                                })
                                 resp_acs = requests.get(
                                     f'{GENIEACS_NBI}/devices',
-                                    params={'query': f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}', 'projection': '_id'},
+                                    params={'query': query, 'projection': '_id'},
+                                    auth=auth,
                                     timeout=3
                                 )
                                 devices = resp_acs.json()
@@ -204,7 +231,7 @@ def background_telegram_bot():
                                         import urllib.parse
                                         reboot_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
                                         try:
-                                            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, timeout=15)
+                                            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, auth=auth, timeout=15)
                                             if resp_reboot.status_code in (200, 201, 202):
                                                 requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                                     'chat_id': cb_chat_id,
@@ -231,9 +258,9 @@ def background_telegram_bot():
                                 }, timeout=5)
                     continue
                     
-                message = update.get('message', {})
-                text = message.get('text', '').strip()
-                chat_id = message.get('chat', {}).get('id')
+                msg_obj = update.get('message', {})
+                text = msg_obj.get('text', '').strip()
+                chat_id = msg_obj.get('chat', {}).get('id')
                 
                 if not text or not chat_id:
                     continue
@@ -361,11 +388,11 @@ def background_telegram_bot():
                     reply += "\n📌 <b>Informasi ONT (GenieACS):</b>\n"
                     if acs_found:
                         reply += (
-                            f"• SN / Model: <code>{acs_data['serial']}</code> ({acs_data['manufacturer']} {acs_data['model']})\n"
-                            f"• Redaman (RxPower): <b>{acs_data['rx_power']} dBm</b> ({acs_data['rx_status_emoji']})\n"
-                            f"• Uptime Perangkat: <code>{acs_data['ont_uptime_str']}</code>\n"
-                            f"• Temperatur: <code>{acs_data['temperature']} °C</code>\n"
-                            f"• Mode PON: <code>{acs_data['pon_mode']}</code>\n"
+                            f"• SN / Model: <code>{acs_data.get('serial','N/A')}</code> ({acs_data.get('manufacturer','N/A')} {acs_data.get('model','N/A')})\n"
+                            f"• Redaman (RxPower): <b>{acs_data.get('rx_power','N/A')} dBm</b> ({acs_data.get('rx_status_emoji','⚪ Unknown')})\n"
+                            f"• Uptime Perangkat: <code>{acs_data.get('ont_uptime_str','N/A')}</code>\n"
+                            f"• Temperatur: <code>{acs_data.get('temperature','N/A')} °C</code>\n"
+                            f"• Mode PON: <code>{acs_data.get('pon_mode','N/A')}</code>\n"
                         )
                     else:
                         reply += f"• <i>ONT Detail: {acs_data.get('message', 'Data tidak ditemukan')}</i>\n"
@@ -375,14 +402,14 @@ def background_telegram_bot():
                     
                     if acs_found:
                         try:
-                            rx_float = float(acs_data['rx_power'])
+                            rx_float = float(acs_data.get('rx_power', 'N/A'))
                             if rx_float < -27.0:
                                 recommendations.append(f"⚠️ <b>Redaman Buruk ({rx_float} dBm):</b> Sinyal berada di bawah batas normal (-27 dBm). Disarankan pengecekan sambungan fisik atau redrop kabel optik.")
                         except:
                             pass
                             
                         if acs_data.get('ont_uptime_days', 0) > 60:
-                            recommendations.append(f"💡 <b>ONT Uptime Tinggi ({acs_data['ont_uptime_days']} hari):</b> Perangkat ONT aktif terlalu lama tanpa reboot. Disarankan me-reboot ONT untuk optimalisasi kinerja memori.")
+                            recommendations.append(f"💡 <b>ONT Uptime Tinggi ({acs_data.get('ont_uptime_days', 0)} hari):</b> Perangkat ONT aktif terlalu lama tanpa reboot. Disarankan me-reboot ONT untuk optimalisasi kinerja memori.")
                             
                     if is_online and session_days > 60:
                         recommendations.append(f"🔌 <b>Sesi RADIUS Tinggi ({session_days} hari):</b> Sesi dial-up aktif terlalu lama tanpa refresh. Disarankan 'Kick Session' agar mendapat alokasi IP & rute segar.")
@@ -425,12 +452,21 @@ def background_telegram_bot():
                     username = arg.strip()
                     
                     # 1. Cari device_id di GenieACS
-                    GENIEACS_NBI = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
-                    query_str = f'{{"VirtualParameters.pppoeUsername._value":"{username}"}}'
                     try:
+                        config = get_genieacs_config()
+                        GENIEACS_NBI = config['url']
+                        auth = config['auth']
+                        import json as _json
+                        query = _json.dumps({
+                            "$or": [
+                                {"VirtualParameters.pppoeUsername._value": username},
+                                {"VirtualParameters.pppoeUsername2._value": username}
+                            ]
+                        })
                         resp_acs = requests.get(
                             f'{GENIEACS_NBI}/devices',
-                            params={'query': query_str, 'projection': '_id'},
+                            params={'query': query, 'projection': '_id'},
+                            auth=auth,
                             timeout=3
                         )
                         devices = resp_acs.json()
@@ -457,7 +493,7 @@ def background_telegram_bot():
                         import urllib.parse
                         reboot_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
                         try:
-                            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, timeout=15)
+                            resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, auth=auth, timeout=15)
                             if resp_reboot.status_code in (200, 201, 202):
                                 requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                     'chat_id': chat_id,

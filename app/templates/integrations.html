@@ -142,6 +142,7 @@
           <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Tipe</label>
           <select id="fType" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-semibold">
             <option value="mikrotik">Mikrotik RouterOS</option>
+            <option value="genieacs">GenieACS (TR-069 NBI)</option>
           </select>
         </div>
       </div>
@@ -161,7 +162,7 @@
 
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Username *</label>
+          <label id="fUsernameLabel" class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Username *</label>
           <input id="fUsername" type="text" required placeholder="admin"
             class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium">
         </div>
@@ -208,7 +209,7 @@ async function loadIntegrations() {
       el.innerHTML = `<div class="text-center py-16 text-slate-400 dark:text-slate-500">
         <i class="fas fa-plug text-5xl mb-4 opacity-30 text-slate-300 dark:text-slate-600"></i>
         <p class="font-semibold text-sm">Belum Ada Integrasi Perangkat</p>
-        <p class="text-xs text-slate-400 mt-1">Silakan klik "Tambah Integrasi" untuk menyambungkan koneksi Mikrotik API baru.</p>
+        <p class="text-xs text-slate-400 mt-1">Silakan klik "Tambah Integrasi" untuk menyambungkan koneksi Mikrotik atau GenieACS baru.</p>
       </div>`;
       return;
     }
@@ -216,17 +217,17 @@ async function loadIntegrations() {
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border ${ig.is_active?'border-emerald-200/50 dark:border-emerald-800/40 bg-emerald-500/5 dark:bg-emerald-500/10':'border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-750/30'} mb-3 shadow-sm hover:shadow-md transition-all duration-200">
         <div class="flex items-center gap-3.5 flex-1 min-w-0">
           <div class="icon-wrapper-noc bg-gradient-to-tr from-amber-500 to-orange-600 shadow-md shadow-orange-500/15">
-            <i data-lucide="router" class="lucide icon-noc text-white"></i>
+            <i data-lucide="${ig.type === 'genieacs' ? 'server' : 'router'}" class="lucide icon-noc text-white"></i>
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1 flex-wrap">
               <span class="font-bold text-slate-800 dark:text-white text-sm truncate">${ig.name}</span>
               <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${ig.is_active?'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400':'bg-slate-200 dark:bg-slate-750 text-slate-500 dark:text-slate-450'}">${ig.is_active?'Aktif':'Nonaktif'}</span>
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">${ig.type}</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">${ig.type === 'genieacs' ? 'GenieACS' : 'Mikrotik'}</span>
             </div>
             <div class="text-[11px] text-slate-550 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
-              <span><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.host}:${ig.port}</span>
-              <span><i class="fas fa-user mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.username}</span>
+              <span><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.host}:${ig.port || ''}</span>
+              <span><i class="fas fa-user mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.username || 'No Auth'}</span>
               ${ig.description?`<span><i class="fas fa-info-circle mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.description}</span>`:''}
             </div>
           </div>
@@ -250,6 +251,31 @@ async function loadIntegrations() {
   }
 }
 
+// Handle dynamic validation and port switching on type change
+document.getElementById('fType').addEventListener('change', function() {
+  const isGenie = this.value === 'genieacs';
+  const usernameInput = document.getElementById('fUsername');
+  const passwordInput = document.getElementById('fPassword');
+  const portInput = document.getElementById('fPort');
+  const usernameLabel = document.getElementById('fUsernameLabel');
+  
+  if (isGenie) {
+    if (portInput.value == '8728' || !portInput.value) {
+      portInput.value = '7557';
+    }
+    usernameInput.required = false;
+    usernameInput.placeholder = "Optional (e.g. admin)";
+    usernameLabel.textContent = "Username";
+  } else {
+    if (portInput.value == '7557' || !portInput.value) {
+      portInput.value = '8728';
+    }
+    usernameInput.required = true;
+    usernameInput.placeholder = "admin";
+    usernameLabel.textContent = "Username *";
+  }
+});
+
 function openIntegrationModal(id) {
   document.getElementById('editId').value = '';
   document.getElementById('integrationModalTitle').textContent = 'Tambah Integrasi';
@@ -259,6 +285,9 @@ function openIntegrationModal(id) {
   document.getElementById('passHint').classList.add('hidden');
   document.getElementById('fPassword').required = true;
   document.getElementById('integrationModal').classList.remove('hidden');
+  
+  // Trigger change event to initialize fields
+  document.getElementById('fType').dispatchEvent(new Event('change'));
 }
 
 function editIntegration(id) {
@@ -270,13 +299,16 @@ function editIntegration(id) {
   document.getElementById('fType').value = ig.type;
   document.getElementById('fHost').value = ig.host;
   document.getElementById('fPort').value = ig.port;
-  document.getElementById('fUsername').value = ig.username;
+  document.getElementById('fUsername').value = ig.username || '';
   document.getElementById('fPassword').value = '';
   document.getElementById('fDesc').value = ig.description||'';
   document.getElementById('fActive').checked = ig.is_active;
   document.getElementById('passHint').classList.remove('hidden');
   document.getElementById('fPassword').required = false;
   document.getElementById('integrationModal').classList.remove('hidden');
+  
+  // Trigger change event to apply conditional fields layout
+  document.getElementById('fType').dispatchEvent(new Event('change'));
 }
 
 function closeIntegrationModal() { document.getElementById('integrationModal').classList.add('hidden'); }
