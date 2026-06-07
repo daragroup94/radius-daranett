@@ -36,7 +36,17 @@ def get_genieacs_device_info(username):
         return {'found': False, 'message': 'Username kosong'}
         
     cache_key = f"genieacs:device:{username}"
-    redis_client = current_app.config.get('SESSION_REDIS')
+    
+    # Try fetching Redis client from application context, fallback to Config if outside context
+    redis_client = None
+    try:
+        redis_client = current_app.config.get('SESSION_REDIS')
+    except RuntimeError:
+        try:
+            from config import Config
+            redis_client = Config.SESSION_REDIS
+        except:
+            pass
     
     # 1. Coba ambil dari Redis Cache
     if redis_client:
