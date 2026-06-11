@@ -50,7 +50,9 @@ def api_integrations():
 @integrations_bp.route('/api/integrations/add', methods=['POST'])
 @login_required
 def api_add_integration():
-    data = request.get_json()
+    data = get_request_data()
+    if not data:
+        return jsonify({'success': False, 'error': 'Payload data is required'}), 400
     try:
         itype = data.get('type', 'mikrotik')
         port_raw = data.get('port')
@@ -71,7 +73,9 @@ def api_add_integration():
 @integrations_bp.route('/api/integrations/edit/<int:iid>', methods=['PUT'])
 @login_required
 def api_edit_integration(iid):
-    data = request.get_json()
+    data = get_request_data()
+    if not data:
+        return jsonify({'success': False, 'error': 'Payload data is required'}), 400
     try:
         itype = data.get('type', 'mikrotik')
         port_raw = data.get('port')
@@ -247,3 +251,8 @@ def api_telegram_test():
             return jsonify({'success': False, 'error': f"Telegram: {resp_json.get('description', 'Unknown error')}"}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@integrations_bp.route('/notifications')
+@login_required
+def notifications_page():
+    return render_template('notifications.html')

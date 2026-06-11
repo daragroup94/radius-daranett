@@ -8,6 +8,10 @@ from extensions import socketio, limiter, csrf, sess
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# Enable ProxyFix to resolve real client IP behind reverse proxy (Traefik)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+
 # Load persisted Telegram settings from local .env if available
 _telegram_env = os.path.join(os.path.dirname(__file__), '.telegram.env')
 if os.path.exists(_telegram_env):
@@ -73,8 +77,10 @@ def add_no_cache(response):
 @app.before_request
 def csrf_protect():
     if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
-        if not request.path.startswith('/api/'):
-            csrf.protect()
+        # Exempt public stateless APIs
+        if request.path.startswith('/api/ipoe/get-name') or request.path.startswith('/api/ipoe/sync-static'):
+            return
+        csrf.protect()
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):

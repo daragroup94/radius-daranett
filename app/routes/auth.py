@@ -17,7 +17,7 @@ auth_bp = Blueprint('auth', __name__)
 def login():
     if request.method == 'POST':
         username = request.form['username']
-        password = request.form['password']
+        password = request.form['password'] or session.pop('_mfa_pending_password', '')
         mfa_code = request.form.get('mfa_code')
         
         user = execute_query("SELECT * FROM admin_users WHERE username = %s AND is_active = TRUE", (username,))
@@ -26,12 +26,14 @@ def login():
             # Check MFA
             if user[0]['is_mfa_enabled']:
                 if not mfa_code:
-                    return render_template('login.html', mfa_required=True, username=username, password=password)
+                    session['_mfa_pending_password'] = password
+                    return render_template('login.html', mfa_required=True, username=username)
                 
                 totp = pyotp.TOTP(user[0]['mfa_secret'])
                 if not totp.verify(mfa_code):
                     flash('Invalid MFA code', 'error')
-                    return render_template('login.html', mfa_required=True, username=username, password=password)
+                    session['_mfa_pending_password'] = password
+                    return render_template('login.html', mfa_required=True, username=username)
             
             session['user_id'] = user[0]['id']
             session['username'] = user[0]['username']

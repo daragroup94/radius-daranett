@@ -30,6 +30,13 @@ authorize {
         &User-Name := "%{tolower:%{User-Name}}"
     }
 
+    # Ubah format pemisah titik dua (:) menjadi strip (-) agar cocok dengan data di database
+    if (&User-Name =~ /^([0-9a-f]{2}):([0-9a-f]{2}):([0-9a-f]{2}):([0-9a-f]{2}):([0-9a-f]{2}):([0-9a-f]{2})$/) {
+        update request {
+            &User-Name := "%{1}-%{2}-%{3}-%{4}-%{5}-%{6}"
+        }
+    }
+
     # Cek apakah user terdaftar di grup 'ipoe' (case-insensitive & mengabaikan separator)
     if ("%{sql:SELECT groupname FROM radusergroup WHERE regexp_replace(LOWER(username), '[^a-z0-9]', '', 'g') = regexp_replace(LOWER('%{User-Name}'), '[^a-z0-9]', '', 'g') AND groupname = 'ipoe' LIMIT 1}" != "ipoe") {
         reject

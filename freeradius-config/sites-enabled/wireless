@@ -1,0 +1,122 @@
+server wireless {
+
+listen {
+    type = auth
+    ipaddr = *
+    port = 41812
+    limit {
+          max_connections = 16
+          lifetime = 0
+          idle_timeout = 30
+    }
+}
+
+listen {
+    ipaddr = *
+    port = 41813
+    type = acct
+    limit {
+    }
+}
+
+authorize {
+    # Tolak jika format MAC address (wireless biasanya menggunakan username bukan MAC)
+    if ("%{User-Name}" =~ /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$/) {
+        reject
+    }
+
+    filter_username
+    preprocess
+    chap
+    mschap
+    digest
+    suffix
+    eap {
+        ok = return
+    }
+    files
+    sql
+    -ldap
+    expiration
+    logintime
+    pap
+}
+
+authenticate {
+    Auth-Type PAP {
+        pap
+    }
+    Auth-Type CHAP {
+        chap
+    }
+    Auth-Type MS-CHAP {
+        mschap
+    }
+    mschap
+    digest
+    eap
+}
+
+preacct {
+    preprocess
+    acct_unique
+    suffix
+    files
+}
+
+accounting {
+    unix
+    sql
+    exec
+    attr_filter.accounting_response
+}
+
+session {
+    sql
+}
+
+post-auth {
+    sql
+
+    # Setelah PEAP inner-tunnel selesai, cek grup wireless dengan username asli
+    if (session-state:User-Name) {
+        if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{session-state:User-Name}' AND groupname = 'wireless' LIMIT 1}" != "wireless") {
+            reject
+        }
+    }
+    else {
+        if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname = 'wireless' LIMIT 1}" != "wireless") {
+            reject
+        }
+    }
+
+    if (session-state:User-Name && reply:User-Name && request:User-Name && (reply:User-Name == request:User-Name)) {
+        update reply {
+            &User-Name !* ANY
+        }
+    }
+    update {
+        &reply: += &session-state:
+    }
+
+    remove_reply_message_if_eap
+
+    Post-Auth-Type REJECT {
+        sql
+        attr_filter.access_reject
+        eap
+        remove_reply_message_if_eap
+    }
+
+    Post-Auth-Type Challenge {
+    }
+}
+
+pre-proxy {
+}
+
+post-proxy {
+    eap
+}
+
+}

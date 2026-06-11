@@ -190,7 +190,9 @@ def api_upload_backup():
 @login_required
 def api_restore_backup():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid or missing JSON payload'}), 400
         filename = data.get('filename')
         
         if not filename:

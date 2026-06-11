@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}Notifikasi Telegram - RADIUS Manager{% endblock %}
+{% block page_title %}Notifikasi Telegram{% endblock %}
+{% block page_subtitle %}Konfigurasi Bot Telegram untuk pengiriman alert jaringan{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Font Styling */
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
+    }
+    
+    /* Stat Cards Hover & Shadows */
+    .stat-card-glow {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .stat-card-glow:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 30px rgba(0, 0, 0, 0.05);
+    }
+    .dark .stat-card-glow {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .dark .stat-card-glow:hover {
+        box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
+        border-color: rgba(139, 92, 246, 0.25);
+    }
+
+    /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
+    .icon-wrapper-noc {
+        width: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 1rem !important; /* 16px */
+        flex-shrink: 0 !important;
+    }
+    .icon-noc {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* Guaranteed Custom Gradients */
+    .icon-gradient-notifications { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; }
+    
+    /* Floating icon animation */
+    .floating-icon { 
+        animation: float 3.5s ease-in-out infinite;
+        will-change: transform;
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-notifications mr-4 shadow-lg shadow-violet-500/15 floating-icon">
+                <i data-lucide="bell" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent font-outfit">Notifikasi Telegram</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5 font-medium">Atur dan kelola pemberitahuan real-time langsung ke akun atau grup Telegram Anda.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Telegram Settings Card -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm lg:col-span-2 space-y-6">
+            <div class="flex items-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
+                <div class="icon-wrapper-noc bg-gradient-to-br from-violet-500 to-indigo-600 mr-4 shadow-lg shadow-violet-500/15">
+                    <i data-lucide="settings" class="lucide icon-noc text-white"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-850 dark:text-white font-outfit">Pengaturan Bot Telegram</h3>
+                    <p class="text-xs text-slate-400 dark:text-slate-500 font-medium">Masukkan kredensial bot Telegram Anda untuk mengaktifkan notifikasi.</p>
+                </div>
+            </div>
+
+            <form id="telegramSettingsForm" class="space-y-5">
+                <div>
+                    <label for="bot_token" class="block text-xs font-bold text-slate-655 dark:text-slate-400 mb-2">
+                        Telegram Bot Token *
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="bot_token" name="bot_token" required
+                               class="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-mono font-medium"
+                               placeholder="Masukkan Bot Token (e.g. 123456789:ABCdefGh...)">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                            <i class="fas fa-key text-xs"></i>
+                        </div>
+                        <button type="button" onclick="togglePasswordVisibility('bot_token')" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-350">
+                            <i id="bot_token_eye" class="fas fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="chat_id" class="block text-xs font-bold text-slate-655 dark:text-slate-400 mb-2">
+                        Telegram Chat ID *
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="chat_id" name="chat_id" required
+                               class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-mono font-medium"
+                               placeholder="Masukkan Chat ID (e.g. 987654321 atau -100123456789)">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                            <i class="fas fa-user-circle text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button type="submit" 
+                            class="flex-1 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white py-3 px-5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-[1.01] flex items-center justify-center space-x-2">
+                        <i class="fas fa-save text-xs"></i>
+                        <span>Simpan Konfigurasi</span>
+                    </button>
+                    <button type="button" id="btnTestNotification" onclick="sendTestNotification()"
+                            class="px-5 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-2">
+                        <i class="fas fa-paper-plane text-xs"></i>
+                        <span>Kirim Test Alert</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Guide Card -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm space-y-6">
+            <div class="flex items-center pb-4 border-b border-slate-100 dark:border-slate-700">
+                <div class="w-11 h-11 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-md text-white flex-shrink-0">
+                    <i class="fas fa-book-open text-sm"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-850 dark:text-white font-outfit">Panduan Integrasi</h3>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">Ikuti langkah berikut untuk menghubungkan bot</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div class="flex items-start">
+                    <div class="w-6 h-6 bg-violet-500/10 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 rounded-lg flex items-center justify-center font-bold mr-3 flex-shrink-0">
+                        1
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-700 dark:text-slate-350 mb-0.5">Buat Bot Telegram</p>
+                        <p class="text-slate-500 dark:text-slate-400 leading-relaxed">Cari <a href="https://t.me/BotFather" target="_blank" class="text-violet-500 hover:underline font-bold">@BotFather</a> di Telegram, kirim pesan <code>/newbot</code>, dan ikuti instruksinya untuk mendapatkan <strong>Bot Token</strong>.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start">
+                    <div class="w-6 h-6 bg-violet-500/10 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 rounded-lg flex items-center justify-center font-bold mr-3 flex-shrink-0">
+                        2
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-700 dark:text-slate-350 mb-0.5">Dapatkan Chat ID Anda</p>
+                        <p class="text-slate-500 dark:text-slate-400 leading-relaxed">Cari <a href="https://t.me/userinfobot" target="_blank" class="text-violet-500 hover:underline font-bold">@userinfobot</a> di Telegram, kirim pesan apa saja, bot akan membalas dengan **Chat ID** Anda (berupa angka numerik).</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start">
+                    <div class="w-6 h-6 bg-violet-500/10 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 rounded-lg flex items-center justify-center font-bold mr-3 flex-shrink-0">
+                        3
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-700 dark:text-slate-350 mb-0.5">Mulai Obrolan dengan Bot</p>
+                        <p class="text-slate-500 dark:text-slate-400 leading-relaxed">Sebelum bot dapat mengirimkan pesan kepada Anda, Anda <strong>wajib</strong> mencari username bot Anda di Telegram dan klik tombol <strong>Start</strong> atau ketik <code>/start</code>.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start">
+                    <div class="w-6 h-6 bg-violet-500/10 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400 rounded-lg flex items-center justify-center font-bold mr-3 flex-shrink-0">
+                        4
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-700 dark:text-slate-350 mb-0.5">Kirim Notifikasi Grup (Opsional)</p>
+                        <p class="text-slate-500 dark:text-slate-400 leading-relaxed">Jika ingin mengirim notifikasi ke grup, masukkan bot ke dalam grup tersebut, jadikan admin, lalu gunakan bot seperti <a href="https://t.me/GetIdsBot" target="_blank" class="text-violet-500 hover:underline font-bold">@GetIdsBot</a> untuk mencari ID grup (ID grup biasanya diawali dengan tanda minus, contoh: <code>-100xxxxxxxxxx</code>).</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load Telegram configuration on page load
+    async function loadTelegramSettings() {
+        try {
+            const result = await apiCall('/api/telegram/settings');
+            if (result) {
+                document.getElementById('bot_token').value = result.bot_token || '';
+                document.getElementById('chat_id').value = result.chat_id || '';
+            }
+        } catch (error) {
+            showNotification('Gagal memuat konfigurasi Telegram', 'error');
+            console.error('Error loading settings:', error);
+        }
+    }
+
+    // Toggle Bot Token visibility (password/text)
+    function togglePasswordVisibility(id) {
+        const input = document.getElementById(id);
+        const eyeIcon = document.getElementById(id + '_eye');
+        if (input.type === 'password') {
+            input.type = 'text';
+            eyeIcon.classList.remove('fa-eye');
+            eyeIcon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            eyeIcon.classList.remove('fa-eye-slash');
+            eyeIcon.classList.add('fa-eye');
+        }
+    }
+
+    // Handle form submit to save settings
+    document.getElementById('telegramSettingsForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const botToken = document.getElementById('bot_token').value.trim();
+        const chatId = document.getElementById('chat_id').value.trim();
+        
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i><span>Menyimpan...</span>';
+        submitBtn.disabled = true;
+        
+        try {
+            const result = await apiCall('/api/telegram/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    bot_token: botToken,
+                    chat_id: chatId
+                })
+            });
+            
+            if (result && result.success) {
+                showNotification(result.message || 'Konfigurasi Telegram berhasil disimpan!', 'success');
+            } else {
+                showNotification('Gagal menyimpan: ' + (result?.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            showNotification('Error menyimpan konfigurasi', 'error');
+            console.error('Save error:', error);
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
+    // Send test notification
+    async function sendTestNotification() {
+        const testBtn = document.getElementById('btnTestNotification');
+        const originalText = testBtn.innerHTML;
+        testBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i><span>Mengirim...</span>';
+        testBtn.disabled = true;
+        
+        try {
+            const result = await apiCall('/api/telegram/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (result && result.success) {
+                showNotification(result.message || 'Pesan test berhasil dikirim!', 'success');
+            } else {
+                showNotification('Gagal mengirim: ' + (result?.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            showNotification('Error mengirim test alert. Pastikan konfigurasi sudah disimpan terlebih dahulu.', 'error');
+            console.error('Test error:', error);
+        } finally {
+            testBtn.innerHTML = originalText;
+            testBtn.disabled = false;
+        }
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTelegramSettings();
+    });
+</script>
+{% endblock %}

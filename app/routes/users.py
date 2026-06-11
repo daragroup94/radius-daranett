@@ -9,6 +9,7 @@ from database import execute_query
 from helpers import get_request_data, convert_data_limit_to_bytes
 from services.telegram import send_telegram_notification
 from services.mikrotik_coa import send_coa_update, send_coa_update_async
+from extensions import limiter
 from services.genieacs import get_genieacs_device_info
 
 users_bp = Blueprint('users', __name__)
@@ -90,6 +91,11 @@ def redirect_ipoe():
 def redirect_8021x():
     return redirect(url_for('users.users_page', tab='8021x'))
 
+@users_bp.route('/wireless-users')
+@login_required
+def redirect_wireless():
+    return redirect(url_for('users.users_page', tab='wireless'))
+
 
 # ============================================================
 # PPPOE USER APIS
@@ -98,11 +104,6 @@ def redirect_8021x():
 @login_required
 def api_users():
     try:
-        try:
-            from services.session_tasks import sync_active_sessions_with_routers
-            sync_active_sessions_with_routers()
-        except Exception as sync_err:
-            print(f"Failed to sync sessions in api_users: {sync_err}")
 
         search = request.args.get('search', '')
         page = int(request.args.get('page', 1))
@@ -119,10 +120,10 @@ def api_users():
                    (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
             FROM radcheck c
             WHERE c.attribute = 'Cleartext-Password'
-            AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('ipoe', 'vpn', '8021x', 'hotspot'))
+            AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('ipoe', 'vpn', '8021x', 'hotspot', 'wireless'))
         """
         
-        count_query = "SELECT COUNT(*) as total FROM radcheck c WHERE c.attribute = 'Cleartext-Password' AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('ipoe', 'vpn', '8021x', 'hotspot'))"
+        count_query = "SELECT COUNT(*) as total FROM radcheck c WHERE c.attribute = 'Cleartext-Password' AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('ipoe', 'vpn', '8021x', 'hotspot', 'wireless'))"
 
         params = []
         if search:
@@ -393,11 +394,6 @@ def api_delete_user_by_username(username):
 @login_required
 def api_ipoe_users():
     try:
-        try:
-            from services.session_tasks import sync_active_sessions_with_routers
-            sync_active_sessions_with_routers()
-        except Exception as sync_err:
-            print(f"Failed to sync sessions in api_ipoe_users: {sync_err}")
 
         search = request.args.get('search', '')
         page = int(request.args.get('page', 1))
@@ -516,6 +512,7 @@ def api_ipoe_delete_user(username):
 
 @users_bp.route('/api/ipoe/get-name')
 @users_bp.route('/api/ipoe/get-name/<mac>')
+@limiter.limit("60 per minute")
 def api_ipoe_get_name(mac=None):
     """API endpoint public for MikroTik Lease Script."""
     try:
@@ -627,21 +624,29 @@ def api_ipoe_dhcp_leases():
             errors.append({'router': ig['name'], 'error': str(e)})
 
     if leases:
-        macs = list(leases.keys())
-        placeholders = ','.join(['%s'] * len(macs))
+        clean_macs = [mac.replace(':', '').replace('-', '').replace('_', '') for mac in leases.keys()]
+        placeholders = ','.join(['%s'] * len(clean_macs))
         radius_data = execute_query(
-            f"SELECT username, attribute, value FROM radreply WHERE username IN ({placeholders}) AND attribute IN ('Framed-IP-Address','Mikrotik-Rate-Limit','Framed-Pool')",
-            tuple(macs)
+            f"""
+            SELECT username, attribute, value, REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g') as clean_username 
+            FROM radreply 
+            WHERE REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g') IN ({placeholders}) 
+              AND attribute IN ('Framed-IP-Address','Mikrotik-Rate-Limit','Framed-Pool')
+            """,
+            tuple(clean_macs)
         ) or []
+        
+        clean_to_original = {mac.replace(':', '').replace('-', '').replace('_', ''): mac for mac in leases.keys()}
         for row in radius_data:
-            mac = row['username']
-            if mac in leases:
+            clean_user = row['clean_username']
+            orig_mac = clean_to_original.get(clean_user)
+            if orig_mac:
                 if row['attribute'] == 'Framed-IP-Address':
-                    leases[mac]['radius_ip'] = row['value']
+                    leases[orig_mac]['radius_ip'] = row['value']
                 elif row['attribute'] == 'Mikrotik-Rate-Limit':
-                    leases[mac]['radius_rate'] = row['value']
+                    leases[orig_mac]['radius_rate'] = row['value']
                 elif row['attribute'] == 'Framed-Pool':
-                    leases[mac]['radius_pool'] = row['value']
+                    leases[orig_mac]['radius_pool'] = row['value']
 
     return jsonify({'success': True, 'leases': list(leases.values()), 'errors': errors})
 
@@ -923,11 +928,6 @@ def api_hotspot_packages():
 @login_required
 def api_vpn_users():
     try:
-        try:
-            from services.session_tasks import sync_active_sessions_with_routers
-            sync_active_sessions_with_routers()
-        except Exception as sync_err:
-            print(f"Failed to sync sessions in api_vpn_users: {sync_err}")
 
         search = request.args.get('search', '')
         page = int(request.args.get('page', 1))
@@ -1240,5 +1240,164 @@ def api_x8021x_delete_user(username):
         execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
         execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = '8021x'", (username,), fetch=False)
         return jsonify({'success': True, 'message': f'802.1X user {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================================
+# WIRELESS USER APIS
+# ============================================================
+@users_bp.route('/api/wireless/users')
+@login_required
+def api_wireless_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+
+        base_where = "c.attribute = 'Cleartext-Password' AND EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname = 'wireless')"
+        params = []
+        if search:
+            base_where += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+
+        data_query = f"""
+            SELECT c.id, c.username, c.value as password,
+                   (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
+            FROM radcheck c WHERE {base_where}
+            ORDER BY c.id DESC LIMIT %s OFFSET %s
+        """
+        count_query = f"SELECT COUNT(*) as total FROM radcheck c WHERE {base_where}"
+
+        users = execute_query(data_query, tuple(params + [limit, offset]))
+        total = execute_query(count_query, tuple(params))[0]['total']
+        return jsonify({'users': users, 'total': total, 'page': page, 'limit': limit,
+                        'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@users_bp.route('/api/wireless/users/add', methods=['POST'])
+@login_required
+def api_wireless_add_user():
+    try:
+        data = get_request_data()
+        username = data.get('username', '').strip().lower()
+        password = data.get('password', '').strip()
+
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Username dan Password wajib diisi'}), 400
+
+        existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if existing:
+            return jsonify({'success': False, 'error': 'Username sudah ada'}), 400
+
+        execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)", (username, password), fetch=False)
+        execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, 'wireless', 1) ON CONFLICT DO NOTHING", (username,), fetch=False)
+
+        return jsonify({'success': True, 'message': 'Wireless user berhasil ditambahkan'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@users_bp.route('/api/wireless/users/update/<username>', methods=['PUT'])
+@login_required
+def api_wireless_update_user(username):
+    try:
+        data = get_request_data()
+        new_username = data.get('username', '').strip().lower()
+        new_password = data.get('password', '').strip()
+
+        if not new_username:
+            return jsonify({'success': False, 'error': 'Username wajib diisi'}), 400
+
+        # Update username if changed
+        if new_username != username.lower():
+            execute_query("UPDATE radcheck SET username = %s WHERE username = %s AND attribute = 'Cleartext-Password'", (new_username, username), fetch=False)
+            execute_query("UPDATE radreply SET username = %s WHERE username = %s", (new_username, username), fetch=False)
+            execute_query("UPDATE radusergroup SET username = %s WHERE username = %s AND groupname = 'wireless'", (new_username, username), fetch=False)
+
+        # Update password if provided
+        if new_password:
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'", (new_password, new_username), fetch=False)
+
+        return jsonify({'success': True, 'message': 'Wireless user berhasil diupdate'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@users_bp.route('/api/wireless/users/delete/<username>', methods=['DELETE'])
+@login_required
+def api_wireless_delete_user(username):
+    try:
+        execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = 'wireless'", (username,), fetch=False)
+        return jsonify({'success': True, 'message': f'Wireless user {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@users_bp.route('/api/wireless/users/detail/<username>')
+@login_required
+def api_wireless_user_detail(username):
+    try:
+        sessions = execute_query("""
+            SELECT 
+                acctsessionid,
+                nasipaddress,
+                framedipaddress,
+                calledstationid,
+                callingstationid,
+                acctstarttime,
+                acctupdatetime,
+                acctsessiontime,
+                acctinputoctets,
+                acctoutputoctets,
+                acctterminatecause,
+                acctstoptime
+            FROM radacct
+            WHERE LOWER(username) = LOWER(%s)
+            ORDER BY acctstarttime DESC
+            LIMIT 5
+        """, (username,))
+
+        def fmt_bytes(b):
+            if not b:
+                return '0 B'
+            b = int(b)
+            for unit in ['B','KB','MB','GB','TB']:
+                if b < 1024:
+                    return f"{b:.1f} {unit}"
+                b /= 1024
+            return f"{b:.1f} TB"
+
+        def fmt_duration(secs):
+            if not secs:
+                return '0 detik'
+            secs = int(secs)
+            h = secs // 3600
+            m = (secs % 3600) // 60
+            s = secs % 60
+            if h > 0:
+                return f"{h} jam {m} menit"
+            elif m > 0:
+                return f"{m} menit {s} detik"
+            return f"{s} detik"
+
+        result = []
+        for s in (sessions or []):
+            result.append({
+                'acctsessionid': s['acctsessionid'],
+                'nasipaddress': str(s['nasipaddress']) if s['nasipaddress'] else '-',
+                'framedipaddress': str(s['framedipaddress']) if s['framedipaddress'] else '-',
+                'calledstationid': s['calledstationid'] or '-',
+                'callingstationid': s['callingstationid'] or '-',
+                'acctstarttime': s['acctstarttime'].strftime('%Y-%m-%d %H:%M:%S') if s['acctstarttime'] else '-',
+                'acctupdatetime': s['acctupdatetime'].strftime('%Y-%m-%d %H:%M:%S') if s['acctupdatetime'] else '-',
+                'duration': fmt_duration(s['acctsessiontime']),
+                'download': fmt_bytes(s['acctinputoctets']),
+                'upload': fmt_bytes(s['acctoutputoctets']),
+                'status': 'Online' if not s['acctstoptime'] else 'Offline',
+                'acctterminatecause': s['acctterminatecause'] or '-',
+            })
+
+        return jsonify({'success': True, 'username': username, 'sessions': result})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

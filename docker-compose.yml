@@ -27,7 +27,7 @@ services:
       - "traefik.http.routers.radius-ipoe.service=radius-service"
       # IPoE Raw IP Router (For RouterOS v6 compatibility where URL overrides host header)
       - "traefik.http.routers.radius-ipoe-ip.entrypoints=web"
-      - "traefik.http.routers.radius-ipoe-ip.rule=Host(`10.100.0.1`) && PathPrefix(`/api/ipoe/`)"
+      - "traefik.http.routers.radius-ipoe-ip.rule=(Host(`10.100.0.1`) || Host(`10.30.0.1`) || Host(`10.50.0.1`)) && PathPrefix(`/api/ipoe/`)"
       - "traefik.http.routers.radius-ipoe-ip.service=radius-service"
       # HTTPS (Secure)
       - "traefik.http.routers.radius-secure.entrypoints=websecure"
@@ -177,6 +177,8 @@ services:
       - "21813:21813/udp"  # Accounting Hotspot
       - "31812:31812/udp"  # Authentication VPN
       - "31813:31813/udp"  # Accounting VPN
+      - "41812:41812/udp"  # Authentication Wireless
+      - "41813:41813/udp"  # Accounting Wireless
     # Volumes
     volumes:
       - ./clients.conf:/etc/freeradius/3.0/clients.conf:ro
@@ -187,6 +189,11 @@ services:
       - ./freeradius-config/sites-enabled/ipoe:/etc/freeradius/3.0/sites-enabled/ipoe:ro
       - ./freeradius-config/sites-enabled/hotspot:/etc/freeradius/3.0/sites-enabled/hotspot:ro
       - ./freeradius-config/sites-enabled/vpn:/etc/freeradius/3.0/sites-enabled/vpn:ro
+      - ./freeradius-config/sites-enabled/wireless:/etc/freeradius/3.0/sites-enabled/wireless:ro
+      - ./freeradius-config/sites-enabled/inner-tunnel:/etc/freeradius/3.0/sites-enabled/inner-tunnel:ro
+      - ./app/freeradius-config/certs/server.pem:/etc/freeradius/3.0/certs/server.pem:ro
+      - ./app/freeradius-config/certs/server.key:/etc/freeradius/3.0/certs/server.key:ro
+      - ./freeradius-config/mods-available/eap:/etc/freeradius/3.0/mods-enabled/eap:ro
       - ./freeradius-config/mods-available/sql_hotspot:/etc/freeradius/3.0/mods-available/sql_hotspot:ro
       - ./freeradius-config/dictionary:/etc/freeradius/3.0/dictionary:ro
       - ./freeradius-logs:/var/log/freeradius
@@ -197,8 +204,8 @@ services:
     # Allow adding routes to VPN subnets via host gateway
     cap_add:
       - NET_ADMIN
-    # Command (Production mode)
-    command: freeradius -f -l stdout
+    # Command (Debug mode)
+    command: freeradius -f
     # Dependencies
     depends_on:
       postgres:

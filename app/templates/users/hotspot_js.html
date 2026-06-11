@@ -1,0 +1,279 @@
+<script>
+let _page = 1, _total = 0, _limit = 20, _debounce;
+
+function debounceLoad() { clearTimeout(_debounce); _debounce = setTimeout(loadVouchers, 400); }
+
+// Load hotspot domain on page load
+document.addEventListener('DOMContentLoaded', () => {
+    let savedDomain = localStorage.getItem('hotspot_domain');
+    if (!savedDomain || savedDomain === 'http://10.5.50.1' || savedDomain === 'http://dara.hotspot') {
+        savedDomain = 'http://daranett.hs.com';
+        localStorage.setItem('hotspot_domain', savedDomain);
+    }
+    document.getElementById('hotspotDomain').value = savedDomain;
+});
+
+function saveHotspotDomain() {
+    let domain = document.getElementById('hotspotDomain').value.trim();
+    if (domain && !domain.startsWith('http://') && !domain.startsWith('https://')) {
+        domain = 'http://' + domain;
+    }
+    document.getElementById('hotspotDomain').value = domain;
+    localStorage.setItem('hotspot_domain', domain);
+    loadVouchers(_page); // Reload to update share URLs
+}
+
+async function loadVouchers(page = 1) {
+    _page = page;
+    const search = document.getElementById('searchInput').value;
+    const status = document.getElementById('filterStatus').value;
+    const res = await fetch(`/api/hotspot/vouchers?page=${page}&limit=${_limit}&search=${encodeURIComponent(search)}&status=${status}`);
+    const data = await res.json();
+    _total = data.total;
+
+    // Update stats
+    const all = await fetch('/api/hotspot/vouchers?limit=1').then(r=>r.json());
+    const active = await fetch('/api/hotspot/vouchers?limit=1&status=active').then(r=>r.json());
+    const unused = await fetch('/api/hotspot/vouchers?limit=1&status=unused').then(r=>r.json());
+    const expired = await fetch('/api/hotspot/vouchers?limit=1&status=expired').then(r=>r.json());
+    
+    // Fetch live stats from API/stats to get exact online session count
+    const liveStats = await fetch('/api/stats').then(r=>r.json()).catch(()=>({}));
+    const onlineSessions = liveStats.hotspot_sessions || 0;
+
+    document.getElementById('statTotal').textContent = all.total;
+    document.getElementById('statActive').textContent = active.total;
+    document.getElementById('statHotspotOnline').innerHTML = `<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping mr-1"></span>(${onlineSessions} Online)`;
+    document.getElementById('statUnused').textContent = unused.total;
+    document.getElementById('statExpired').textContent = expired.total;
+
+    const grid = document.getElementById('voucherGrid');
+    if (!data.vouchers?.length) {
+        grid.innerHTML = '<div class="col-span-full text-center py-20 text-slate-400 dark:text-slate-500"><i class="fas fa-ticket-alt text-5xl mb-4 opacity-30 text-violet-500 animate-pulse"></i><p class="font-bold text-slate-600 dark:text-slate-350">Tidak ada voucher ditemukan</p></div>';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+    }
+
+    const hostDomain = document.getElementById('hotspotDomain').value.trim() || 'http://daranett.hs.com';
+
+    grid.innerHTML = `
+        <div class="overflow-x-auto min-w-full">
+            <table class="w-full text-left border-collapse align-middle">
+                <thead>
+                    <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        <th class="pb-3 pt-1 px-4 font-extrabold">KODE / PAKET</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">KREDENSIAL</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">KECEPATAN</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">STATUS & MASA AKTIF</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold text-right">AKSI</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50 dark:divide-slate-750">
+    ` + data.vouchers.map(v => {
+        const statusBadge = {
+            'unused': '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 border border-violet-100 dark:border-violet-900/30">Belum Dipakai</span>',
+            'active': '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30"><span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse mr-1"></span>Aktif</span>',
+            'expired': '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-450 border border-rose-100 dark:border-rose-900/30">Expired</span>',
+        }[v.status] || '';
+
+        const credentialsHtml = `
+            <div class="flex flex-col gap-0.5">
+                <span class="text-xs font-mono text-slate-700 dark:text-slate-350">U: <strong class="select-all font-black text-slate-800 dark:text-white">${v.username}</strong></span>
+                <span class="text-xs font-mono text-slate-500 dark:text-slate-400">P: <strong class="select-all font-semibold text-slate-650 dark:text-slate-300">${v.password}</strong></span>
+            </div>
+        `;
+
+        let timeInfoHtml = '';
+        if (v.first_login) {
+            timeInfoHtml = `
+                <div class="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>Mulai: ${fmtDate(v.first_login)}</span>
+                    <span>Expired: ${fmtDate(v.expires_at)}</span>
+                    ${v.status === 'active' ? `<span class="text-emerald-600 dark:text-emerald-400 font-bold">Sisa: ${fmtSecs(v.remaining_seconds)}</span>` : ''}
+                </div>
+            `;
+        } else {
+            timeInfoHtml = '<span class="text-[11px] text-slate-400 dark:text-slate-500 italic">Belum digunakan</span>';
+        }
+
+        // Direct Login URL for QR & WhatsApp share
+        const loginUrl = `${hostDomain}/login?username=${v.username}&password=${v.password}`;
+        
+        // Formatted text for WhatsApp Share
+        const waText = encodeURIComponent(
+            `*VOUCHER INTERNET HOTSPOT*\n` +
+            `-----------------------------------------\n` +
+            `• Paket: *${v.package_name}*\n` +
+            `• Kode Voucher: *${v.voucher_code}*\n` +
+            `• Username: \`${v.username}\`\n` +
+            `• Password: \`${v.password}\`\n` +
+            `• Kecepatan: *${v.rate_limit || 'Tidak Dibatasi'}*\n` +
+            `-----------------------------------------\n` +
+            `*Cara Penggunaan:*\n` +
+            `1. Hubungkan Wi-Fi ke jaringan Hotspot.\n` +
+            `2. Klik link login otomatis di bawah ini:\n` +
+            `${loginUrl}`
+        );
+
+        return '<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-750/30 transition-colors">'
+            + '<td class="py-3 px-4">'
+            + '<div class="flex items-center gap-3">'
+            + '<div class="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm flex-shrink-0" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"><i class="fas fa-ticket-alt text-xs text-white"></i></div>'
+            + '<div class="flex flex-col">'
+            + '<span class="font-black text-slate-800 dark:text-slate-100 text-sm tracking-wide font-mono">' + v.voucher_code + '</span>'
+            + '<span class="text-[10px] font-extrabold text-violet-600 dark:text-violet-500 uppercase tracking-wider mt-0.5">' + v.package_name + '</span>'
+            + '</div>'
+            + '</div>'
+            + '</td>'
+            + '<td class="py-3 px-4">' + credentialsHtml + '</td>'
+            + '<td class="py-3 px-4"><span class="text-xs font-mono text-indigo-650 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-100/50 dark:border-indigo-900/30"><i class="fas fa-tachometer-alt text-indigo-400 dark:text-indigo-500 mr-1"></i>' + (v.rate_limit || 'Tidak Dibatasi') + '</span></td>'
+            + '<td class="py-3 px-4">'
+            + '<div class="flex flex-col gap-1">'
+            + '<div>' + statusBadge + '</div>'
+            + timeInfoHtml
+            + '</div>'
+            + '</td>'
+            + '<td class="py-3 px-4 text-right">'
+            + '<div class="flex gap-1.5 justify-end">'
+            + '<button onclick="copyToClipboard(\'' + v.voucher_code + '\')" class="w-8 h-8 rounded-lg bg-slate-50 hover:bg-slate-200 dark:bg-slate-700/50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-650 dark:text-slate-350 flex items-center justify-center transition-all shadow-sm" title="Salin Kode"><i class="far fa-copy text-xs"></i></button>'
+            + '<button onclick="showQrModal(\'' + v.voucher_code + '\', \'' + loginUrl + '\')" class="w-8 h-8 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-500 text-blue-600 dark:text-blue-400 hover:text-white dark:hover:text-white border border-blue-100/10 dark:border-blue-900/30 rounded-lg flex items-center justify-center transition-all" title="QR Code"><i class="fas fa-qrcode text-xs"></i></button>'
+            + '<a href="https://api.whatsapp.com/send?text=' + waText + '" target="_blank" class="w-8 h-8 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white dark:hover:text-white border border-emerald-100/10 dark:border-emerald-900/30 rounded-lg flex items-center justify-center transition-all" title="WhatsApp Share"><i class="fab fa-whatsapp text-xs"></i></a>'
+            + '<button onclick="deleteVoucher(' + v.id + ')" class="w-8 h-8 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-500 text-rose-600 dark:text-rose-450 hover:text-white dark:hover:text-white border border-rose-100/10 dark:border-rose-900/30 rounded-lg flex items-center justify-center transition-all" title="Hapus"><i class="fas fa-trash text-xs"></i></button>'
+            + '</div>'
+            + '</td>'
+            + '</tr>';
+    }).join('') + `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // Pagination
+    const totalPages = data.total_pages;
+    document.getElementById('pagination').innerHTML = totalPages <= 1 ? `
+        <span class="text-xs text-slate-500 dark:text-slate-400 font-semibold">Total: ${_total} voucher</span>` : `
+        <span class="text-xs text-slate-500 dark:text-slate-400 font-semibold">Total: ${_total} voucher</span>
+        <div class="flex gap-1.5">
+            ${_page > 1 ? `<button onclick="loadVouchers(${_page-1})" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-650 text-slate-700 dark:text-slate-250 transition-all">‹</button>` : ''}
+            <span class="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-750 rounded-xl">${_page} / ${totalPages}</span>
+            ${_page < totalPages ? `<button onclick="loadVouchers(${_page+1})" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-650 text-slate-700 dark:text-slate-250 transition-all">›</button>` : ''}
+        </div>`;
+}
+
+function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('id-ID', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function fmtSecs(s) {
+    if (!s) return '0 detik';
+    const d = Math.floor(s/86400), h = Math.floor((s%86400)/3600), m = Math.floor((s%3600)/60);
+    return [d&&`${d}d`, h&&`${h}j`, m&&`${m}m`].filter(Boolean).join(' ') || '<1m';
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showNotification('Kode voucher berhasil disalin!', 'success');
+    }).catch(err => {
+        const el = document.createElement('textarea');
+        el.value = text;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        showNotification('Kode voucher berhasil disalin!', 'success');
+    });
+}
+
+function showQrModal(code, url) {
+    const size = '200x200';
+    document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}&data=${encodeURIComponent(url)}`;
+    document.getElementById('qrLinkText').textContent = url;
+    document.getElementById('qrModal').classList.remove('hidden');
+}
+
+function closeQrModal() {
+    document.getElementById('qrModal').classList.add('hidden');
+}
+
+async function deleteVoucher(id) {
+    if (!confirm('Hapus voucher ini?')) return;
+    const r = await fetch(`/api/hotspot/vouchers/delete/${id}`, {method:'DELETE'});
+    const d = await r.json();
+    if (d.success) loadVouchers(_page);
+    else alert(d.error);
+}
+
+async function deleteExpired() {
+    if (!confirm('Hapus semua voucher expired?')) return;
+    const r = await fetch('/api/hotspot/vouchers/delete-expired', {method:'DELETE'});
+    const d = await r.json();
+    if (d.success) { showNotification(`${d.deleted} voucher expired berhasil dihapus!`, 'success'); loadVouchers(1); }
+    else alert(d.error);
+}
+
+function openGenerateModal() {
+    document.getElementById('generateResult').classList.add('hidden');
+    document.getElementById('generateModal').classList.remove('hidden');
+}
+function closeGenerateModal() {
+    document.getElementById('generateModal').classList.add('hidden');
+    loadVouchers(_page);
+}
+
+async function submitGenerate() {
+    const form = document.getElementById('generateForm');
+    const body = {
+        package: form.package.value,
+        rate_limit: form.rate_limit.value,
+        count: parseInt(form.count.value)
+    };
+    const r = await fetch('/api/hotspot/vouchers/generate', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.content || ''},
+        body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+        const lines = d.vouchers.map(v => `Kode: ${v.voucher_code} | User: ${v.username} | Pass: ${v.password} | ${v.package}`).join('\n');
+        document.getElementById('generateOutput').value = lines;
+        document.getElementById('generateResult').classList.remove('hidden');
+        showNotification('Voucher berhasil digenerate!', 'success');
+    } else {
+        alert(d.error);
+    }
+}
+
+function openCreateModal() {
+    document.getElementById('createForm').reset();
+    document.getElementById('createModal').classList.remove('hidden');
+}
+function closeCreateModal() {
+    document.getElementById('createModal').classList.add('hidden');
+}
+async function submitCreate() {
+    const form = document.getElementById('createForm');
+    const body = {
+        voucher_code: form.voucher_code.value.trim(),
+        username: form.username.value.trim(),
+        password: form.password.value.trim(),
+        package: form.package.value,
+        rate_limit: form.rate_limit.value.trim()
+    };
+    const r = await fetch('/api/hotspot/vouchers/create', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.content || ''},
+        body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+        closeCreateModal();
+        showNotification('Voucher manual berhasil dibuat!', 'success');
+        loadVouchers(1);
+    } else {
+        alert(d.error || 'Gagal membuat voucher');
+    }
+}
+
+loadVouchers();
+</script>

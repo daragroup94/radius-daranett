@@ -15,6 +15,7 @@ def api_logs():
     try:
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 50))
+        limit = min(limit, 500)  # Cap at 500 to prevent OOM
         search = request.args.get('search', '')
         reply_filter = request.args.get('reply', '')
         offset = (page - 1) * limit

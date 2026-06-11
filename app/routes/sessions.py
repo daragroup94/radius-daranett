@@ -16,12 +16,6 @@ def sessions_page():
 @login_required
 def api_sessions():
     try:
-        # Sync active sessions with MikroTik live status in real-time
-        try:
-            from services.session_tasks import sync_active_sessions_with_routers
-            sync_active_sessions_with_routers()
-        except Exception as sync_err:
-            print(f"Failed to sync sessions in API endpoint: {sync_err}")
 
         sessions = execute_query("""
             SELECT radacctid, acctsessionid, acctuniqueid, username,

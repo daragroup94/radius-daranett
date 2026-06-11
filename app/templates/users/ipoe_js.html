@@ -66,12 +66,14 @@ async function loadIpoeUsers() {
     // Build lease map by MAC
     _leaseMap = {};
     for (const l of (leaseRes.leases || [])) {
-        _leaseMap[l.mac_address] = l;
+        const normMac = l.mac_address.toLowerCase().replace(/[^a-z0-9]/g, '');
+        _leaseMap[normMac] = l;
     }
 
     // Merge lease data into users
     for (const u of _allUsers) {
-        const lease = _leaseMap[u.mac_address];
+        const normMac = u.mac_address.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const lease = _leaseMap[normMac];
         if (lease) {
             u.lease_ip = lease.address;
             u.lease_status = lease.status;

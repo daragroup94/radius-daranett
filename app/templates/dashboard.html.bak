@@ -1,0 +1,890 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - RADIUS Manager{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Real-time Network Monitoring & Analytics{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Font Styling */
+    .font-outfit {
+        font-family: 'Outfit', 'Inter', sans-serif;
+    }
+    
+    /* Stat Cards Hover & Shadows */
+    .stat-card-glow {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .stat-card-glow:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 30px rgba(0, 0, 0, 0.05);
+    }
+    .dark .stat-card-glow {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .dark .stat-card-glow:hover {
+        box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
+        border-color: rgba(59, 130, 246, 0.25);
+    }
+
+    /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
+    .icon-wrapper-noc {
+        width: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 1rem !important; /* 16px */
+        flex-shrink: 0 !important;
+    }
+    .icon-noc {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* Guaranteed Custom Gradients for wrappers */
+    .icon-gradient-pppoe { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; }
+    .icon-gradient-ipoe { background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%) !important; }
+    .icon-gradient-hotspot { background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%) !important; }
+    .icon-gradient-vpn { background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%) !important; }
+    .icon-gradient-x8021x { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important; }
+    .icon-gradient-nas { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; }
+    .icon-gradient-total { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; }
+    
+    .icon-gradient-charts-1 { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%) !important; }
+    .icon-gradient-charts-2 { background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%) !important; }
+    .icon-gradient-server { background: linear-gradient(135deg, #ef4444 0%, #f97316 100%) !important; }
+    .icon-gradient-history { background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%) !important; }
+    
+    /* Radial gauge SVG path transition */
+    svg path {
+        transition: stroke-dasharray 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    /* Activity Feed Hover Effect */
+    .activity-item-modern {
+        transition: all 0.3s ease;
+    }
+    .activity-item-modern:hover {
+        transform: translateX(4px);
+    }
+
+    /* Scrollbar for widgets */
+    .custom-scroll::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+        background: rgba(156, 163, 175, 0.2);
+        border-radius: 10px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(156, 163, 175, 0.4);
+    }
+
+    /* Floating icon animation */
+    .floating-icon { 
+        animation: float 3.5s ease-in-out infinite;
+        will-change: transform;
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-5px); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Hero Header / Welcome Greeting Section -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <!-- Abstract glowing accent circles -->
+        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/15 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <div class="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-2xl -ml-16 -mb-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0">
+            <div class="flex items-center space-x-2">
+                <span class="flex h-2 w-2 relative">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">NOC Active & Online</span>
+            </div>
+            <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight mt-1 bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent" id="welcomeGreeting">Selamat Pagi, Admin!</h2>
+            <p class="text-slate-300 text-xs md:text-sm mt-0.5">Sistem manajemen billing dan monitoring ISP berbasis Docker.</p>
+        </div>
+        
+        <!-- Live Clock & Date Widget -->
+        <div class="z-10 bg-white/10 dark:bg-black/20 backdrop-blur-md border border-white/10 dark:border-white/5 px-5 py-3 rounded-2xl flex flex-col items-center md:items-end justify-center min-w-[190px]">
+            <div class="text-xl md:text-2xl font-black tracking-widest font-mono text-cyan-300" id="liveClock">00:00:00</div>
+            <div class="text-[10px] font-bold text-slate-300 uppercase tracking-wider mt-1" id="liveDate">Jumat, 29 Mei 2026</div>
+        </div>
+    </div>
+
+
+    <!-- Modern Stats Cards Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mb-8">
+        <!-- PPPoE Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group">
+            <div class="flex items-center justify-between mb-3.5">
+                <div class="icon-wrapper-noc icon-gradient-pppoe shadow-lg shadow-purple-500/10 group-hover:scale-105 transition-transform duration-300 floating-icon">
+                    <i data-lucide="wifi" class="lucide icon-noc text-white"></i>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">PPPoE Users</p>
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-0.5 tracking-tight font-outfit" id="pppoeUsers">0</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="font-bold text-purple-600 dark:text-purple-400 flex items-center">
+                        <span class="w-1.5 h-1.5 bg-purple-500 rounded-full inline-block mr-1.5 animate-pulse"></span>
+                        PPPoE
+                    </span>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">
+                        <span id="pppoeSessions" class="font-bold text-slate-700 dark:text-slate-200">0</span> online
+                    </span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                    <div id="pppoeBar" class="h-full bg-gradient-to-r from-purple-600 to-indigo-500 rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IPoE Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group">
+            <div class="flex items-center justify-between mb-3.5">
+                <div class="icon-wrapper-noc icon-gradient-ipoe shadow-lg shadow-pink-500/10 group-hover:scale-105 transition-transform duration-300 floating-icon" style="animation-delay: 0.5s">
+                    <i data-lucide="network" class="lucide icon-noc text-white"></i>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">IPoE Users</p>
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-0.5 tracking-tight font-outfit" id="ipoeUsers">0</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="font-bold text-pink-600 dark:text-pink-400 flex items-center">
+                        <span class="w-1.5 h-1.5 bg-pink-500 rounded-full inline-block mr-1.5 animate-pulse"></span>
+                        IPoE
+                    </span>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">
+                        <span id="ipoeSessions" class="font-bold text-slate-700 dark:text-slate-200">0</span> online
+                    </span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                    <div id="ipoeBar" class="h-full bg-gradient-to-r from-pink-600 to-rose-500 rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hotspot Vouchers -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group">
+            <div class="flex items-center justify-between mb-3.5">
+                <div class="icon-wrapper-noc icon-gradient-hotspot shadow-lg shadow-amber-500/10 group-hover:scale-105 transition-transform duration-300 floating-icon" style="animation-delay: 1s">
+                    <i data-lucide="ticket" class="lucide icon-noc text-white"></i>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Hotspot Vouchers</p>
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-0.5 tracking-tight font-outfit" id="hotspotUsers">0</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="font-bold text-amber-600 dark:text-amber-400 flex items-center">
+                        <span class="w-1.5 h-1.5 bg-amber-500 rounded-full inline-block mr-1.5 animate-pulse"></span>
+                        Hotspot
+                    </span>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">
+                        <span id="hotspotSessions" class="font-bold text-slate-700 dark:text-slate-200">0</span> online
+                    </span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                    <div id="hotspotBar" class="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VPN Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group">
+            <div class="flex items-center justify-between mb-3.5">
+                <div class="icon-wrapper-noc icon-gradient-vpn shadow-lg shadow-blue-500/10 group-hover:scale-105 transition-transform duration-300 floating-icon" style="animation-delay: 0.2s">
+                    <i data-lucide="shield" class="lucide icon-noc text-white"></i>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">VPN Users</p>
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-0.5 tracking-tight font-outfit" id="vpnUsers">0</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="font-bold text-blue-600 dark:text-blue-400 flex items-center">
+                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full inline-block mr-1.5 animate-pulse"></span>
+                        VPN
+                    </span>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">
+                        <span id="vpnSessions" class="font-bold text-slate-700 dark:text-slate-200">0</span> online
+                    </span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                    <div id="vpnBar" class="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 802.1X Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group">
+            <div class="flex items-center justify-between mb-3.5">
+                <div class="icon-wrapper-noc icon-gradient-x8021x shadow-lg shadow-teal-500/10 group-hover:scale-105 transition-transform duration-300 floating-icon" style="animation-delay: 0.7s">
+                    <i data-lucide="lock" class="lucide icon-noc text-white"></i>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">802.1X Users</p>
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-0.5 tracking-tight font-outfit" id="x8021xUsers">0</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="font-bold text-teal-600 dark:text-teal-400 flex items-center">
+                        <span class="w-1.5 h-1.5 bg-teal-500 rounded-full inline-block mr-1.5 animate-pulse"></span>
+                        802.1X
+                    </span>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">
+                        <span id="x8021xSessions" class="font-bold text-slate-700 dark:text-slate-200">0</span> online
+                    </span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                    <div id="x8021xBar" class="h-full bg-gradient-to-r from-teal-600 to-emerald-500 rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NAS Devices -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group">
+            <div class="flex items-center justify-between mb-3.5">
+                <div class="icon-wrapper-noc icon-gradient-nas shadow-lg shadow-emerald-500/10 group-hover:scale-105 transition-transform duration-300 floating-icon" style="animation-delay: 1.5s">
+                    <i data-lucide="hard-drive" class="lucide icon-noc text-white"></i>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">NAS Devices</p>
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-0.5 tracking-tight font-outfit" id="nasDevices">0</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center">
+                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block mr-1.5 animate-pulse"></span>
+                        Status NAS
+                    </span>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">Aktif terintegrasi</span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                    <div id="nasBar" class="h-full bg-gradient-to-r from-emerald-600 to-teal-500 rounded-full transition-all duration-1000 ease-out" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group sm:col-span-2 lg:col-span-1 xl:col-span-2">
+            <div class="flex items-center justify-between mb-3.5">
+                <div class="icon-wrapper-noc icon-gradient-total shadow-lg shadow-indigo-500/10 group-hover:scale-105 transition-transform duration-300 floating-icon" style="animation-delay: 2s">
+                    <i data-lucide="users" class="lucide icon-noc text-white"></i>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Users Terdaftar</p>
+                    <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-0.5 tracking-tight font-outfit" id="totalUsers">0</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center">
+                        <i data-lucide="shield-check" class="lucide w-3.5 h-3.5 mr-1 text-emerald-500"></i>
+                        Otentikasi Sukses
+                    </span>
+                    <span class="text-slate-500 dark:text-slate-400 font-medium">
+                        <span id="authAttempts" class="font-bold text-slate-700 dark:text-slate-200">0</span> hari ini
+                    </span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                    <div id="authBar" class="h-full bg-gradient-to-r from-indigo-600 to-blue-500 rounded-full transition-all duration-1000 ease-out" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Section: Charts and Resources -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
+        
+        <!-- Left Side: Analytics Charts (Grid-cols-2) -->
+        <div class="xl:col-span-2 space-y-8">
+            <!-- Authentication Activity -->
+            <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-3">
+                        <div class="icon-wrapper-noc icon-gradient-charts-1 shadow-md shadow-blue-500/10">
+                            <i data-lucide="line-chart" class="lucide icon-noc text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base md:text-lg font-bold text-slate-800 dark:text-white">Aktivitas Otentikasi</h3>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 font-medium">Jumlah log autentikasi selama 24 jam terakhir</p>
+                        </div>
+                    </div>
+                    <button onclick="refreshActivityChart()" class="w-9 h-9 flex items-center justify-center bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all duration-200 border border-slate-100 dark:border-slate-700">
+                        <i data-lucide="refresh-ccw" class="lucide w-4 h-4 text-slate-500 dark:text-slate-400"></i>
+                    </button>
+                </div>
+                <div id="authActivityChart" class="w-full" style="height: 330px;"></div>
+            </div>
+
+            <!-- Sessions Distribution -->
+            <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-3">
+                        <div class="icon-wrapper-noc icon-gradient-charts-2 shadow-md shadow-violet-500/10">
+                            <i data-lucide="pie-chart" class="lucide icon-noc text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base md:text-lg font-bold text-slate-800 dark:text-white">Sesi Berdasarkan Perangkat NAS</h3>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 font-medium">Distribusi beban sesi aktif di setiap hardware jaringan</p>
+                        </div>
+                    </div>
+                    <button onclick="refreshSessionsChart()" class="w-9 h-9 flex items-center justify-center bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all duration-200 border border-slate-100 dark:border-slate-700">
+                        <i data-lucide="refresh-ccw" class="lucide w-4 h-4 text-slate-500 dark:text-slate-400"></i>
+                    </button>
+                </div>
+                <div id="sessionsPieChart" class="w-full" style="height: 330px;"></div>
+            </div>
+        </div>
+
+        <!-- Right Side: Server Metrics & Recent Events -->
+        <div class="xl:col-span-1 space-y-8">
+            
+            <!-- Real-time Performance Monitor -->
+            <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-3">
+                        <div class="icon-wrapper-noc icon-gradient-server shadow-md shadow-red-500/10">
+                            <i data-lucide="cpu" class="lucide icon-noc text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base md:text-lg font-bold text-slate-800 dark:text-white">Performa Server</h3>
+                            <p class="text-xs text-slate-400 dark:text-slate-500 font-medium">Monitor real-time infrastuktur</p>
+                        </div>
+                    </div>
+                    <!-- Live indicator pulse -->
+                    <span class="flex h-2.5 w-2.5 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                    </span>
+                </div>
+
+                <!-- Radial Performance Gauges Grid -->
+                <div class="grid grid-cols-3 gap-3 mb-6 text-center">
+                    <!-- CPU usage gauge -->
+                    <div class="flex flex-col items-center">
+                        <div class="relative w-20 h-20 mb-2 flex items-center justify-center">
+                            <svg class="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                <path class="text-slate-100 dark:text-slate-700/60" stroke-width="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path id="cpuGauge" class="text-blue-500 transition-all duration-700 ease-out" stroke-dasharray="0, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="text-sm font-extrabold text-slate-700 dark:text-white font-outfit" id="cpuLabel">0%</div>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">CPU</span>
+                    </div>
+
+                    <!-- RAM usage gauge -->
+                    <div class="flex flex-col items-center">
+                        <div class="relative w-20 h-20 mb-2 flex items-center justify-center">
+                            <svg class="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                <path class="text-slate-100 dark:text-slate-700/60" stroke-width="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path id="ramGauge" class="text-emerald-500 transition-all duration-700 ease-out" stroke-dasharray="0, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="text-sm font-extrabold text-slate-700 dark:text-white font-outfit" id="ramLabel">0%</div>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">RAM</span>
+                    </div>
+
+                    <!-- Storage Disk usage gauge -->
+                    <div class="flex flex-col items-center">
+                        <div class="relative w-20 h-20 mb-2 flex items-center justify-center">
+                            <svg class="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                <path class="text-slate-100 dark:text-slate-700/60" stroke-width="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path id="diskGauge" class="text-purple-500 transition-all duration-700 ease-out" stroke-dasharray="0, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="text-sm font-extrabold text-slate-700 dark:text-white font-outfit" id="diskLabel">0%</div>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">DISK</span>
+                    </div>
+                </div>
+
+                <!-- Metrics Text list -->
+                <div class="border-t border-slate-100 dark:border-slate-700/80 pt-4 space-y-3 text-xs">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                        <span class="flex items-center">
+                            <i data-lucide="hard-drive" class="lucide w-4 h-4 mr-2 text-purple-500"></i>
+                            Ruang Disk BACKUP:
+                        </span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200" id="diskDetails">0GB / 0GB</span>
+                    </div>
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                        <span class="flex items-center">
+                            <i data-lucide="database" class="lucide w-4 h-4 mr-2 text-cyan-500"></i>
+                            Koneksi PostgreSQL Aktif:
+                        </span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200">
+                            <span id="dbConnections" class="font-bold">0</span> / <span id="dbMaxConnections" class="text-slate-400 font-normal">100</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                        <span class="flex items-center">
+                            <i data-lucide="cpu" class="lucide w-4 h-4 mr-2 text-emerald-500"></i>
+                            Kapasitas RAM Terpakai:
+                        </span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200" id="ramDetails">0GB / 0GB</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity Timeline Feed -->
+            <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+                <div class="flex items-center mb-6">
+                    <div class="icon-wrapper-noc icon-gradient-history shadow-md shadow-purple-500/10">
+                        <i data-lucide="history" class="lucide icon-noc text-white"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base md:text-lg font-bold text-slate-800 dark:text-white">Aktivitas Terkini</h3>
+                        <p class="text-xs text-slate-400 dark:text-slate-500 font-medium">Log aktivitas network 30 menit terakhir</p>
+                    </div>
+                </div>
+                <div class="space-y-3.5 max-h-[350px] overflow-y-auto pr-1 custom-scroll" id="recentActivityList">
+                    <div class="flex items-center p-4 bg-slate-50 dark:bg-slate-700/30 rounded-2xl border border-slate-100 dark:border-slate-700/50">
+                        <div class="w-2 h-2 bg-slate-400 rounded-full mr-3 animate-pulse"></div>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 font-semibold">Loading data aktivitas...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let authActivityChart = null;
+let sessionsPieChart = null;
+
+// Clock and Greetings Logic
+function updateClock() {
+    const clockEl = document.getElementById('liveClock');
+    const dateEl = document.getElementById('liveDate');
+    if (!clockEl || !dateEl) return;
+    
+    const now = new Date();
+    
+    // Time formatted to 24-hour style
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+    clockEl.textContent = now.toLocaleTimeString('id-ID', timeOptions);
+    
+    // Localized Indonesian date
+    const dateOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString('id-ID', dateOptions);
+}
+
+// Greetings based on local time
+function updateWelcomeGreeting() {
+    const greetingEl = document.getElementById('welcomeGreeting');
+    if (!greetingEl) return;
+    
+    const hour = new Date().getHours();
+    let greeting = 'Selamat datang kembali';
+    
+    if (hour >= 5 && hour < 11) {
+        greeting = 'Selamat Pagi, Admin!';
+    } else if (hour >= 11 && hour < 15) {
+        greeting = 'Selamat Siang, Admin!';
+    } else if (hour >= 15 && hour < 18) {
+        greeting = 'Selamat Sore, Admin!';
+    } else {
+        greeting = 'Selamat Malam, Admin!';
+    }
+    
+    greetingEl.textContent = greeting;
+}
+
+// Smooth Number Counter Animation
+function animateValue(id, endValue, duration = 600, suffix = '') {
+    const element = document.getElementById(id);
+    if (!element) return;
+    
+    const startValue = parseInt(element.textContent.replace(suffix, '')) || 0;
+    if (startValue === endValue) {
+        element.textContent = endValue + suffix;
+        return;
+    }
+    
+    const range = endValue - startValue;
+    const startTime = performance.now();
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Quad Easing out
+        const easeOutQuad = progress * (2 - progress);
+        const currentValue = Math.round(startValue + (range * easeOutQuad));
+        
+        element.textContent = currentValue + suffix;
+        
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+    
+    requestAnimationFrame(update);
+}
+
+// Helper to update progress bars dynamically
+function updateProgressBar(elementId, sessions, users) {
+    const bar = document.getElementById(elementId);
+    if (!bar) return;
+    const total = parseInt(users) || 0;
+    const active = parseInt(sessions) || 0;
+    const percent = total > 0 ? Math.min(Math.round((active / total) * 100), 100) : 0;
+    bar.style.width = percent + '%';
+}
+
+// Fetch stats and trigger animations
+async function loadStats() {
+    try {
+        const data = await apiCall('/api/stats');
+        
+        animateValue('totalUsers', data.total_users || 0);
+        animateValue('pppoeUsers', data.pppoe_users || 0);
+        animateValue('pppoeSessions', data.pppoe_sessions || 0);
+        animateValue('ipoeUsers', data.ipoe_users || 0);
+        animateValue('ipoeSessions', data.ipoe_sessions || 0);
+        animateValue('hotspotUsers', data.hotspot_users || 0);
+        animateValue('hotspotSessions', data.hotspot_sessions || 0);
+        animateValue('vpnUsers', data.vpn_users || 0);
+        animateValue('vpnSessions', data.vpn_sessions || 0);
+        animateValue('x8021xUsers', data.x8021x_users || 0);
+        animateValue('x8021xSessions', data.x8021x_sessions || 0);
+        animateValue('authAttempts', data.today_auth || 0);
+        animateValue('nasDevices', data.total_nas || 0);
+
+        // Update progress bar widths
+        updateProgressBar('pppoeBar', data.pppoe_sessions, data.pppoe_users);
+        updateProgressBar('ipoeBar', data.ipoe_sessions, data.ipoe_users);
+        updateProgressBar('hotspotBar', data.hotspot_sessions, data.hotspot_users);
+        updateProgressBar('vpnBar', data.vpn_sessions, data.vpn_users);
+        updateProgressBar('x8021xBar', data.x8021x_sessions, data.x8021x_users);
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Helper to update SVG gauge dasharray
+function updateGauge(gaugeId, percent) {
+    const gauge = document.getElementById(gaugeId);
+    if (!gauge) return;
+    const strokeDash = Math.min(Math.max(percent, 0), 100);
+    gauge.setAttribute('stroke-dasharray', `${strokeDash}, 100`);
+}
+
+// Fetch real-time system resource metrics
+async function loadSystemMetrics() {
+    try {
+        const metrics = await apiCall('/api/system-metrics');
+        if (!metrics) return;
+        
+        // Percent text counters
+        animateValue('cpuLabel', Math.round(metrics.cpu_percent || 0), 600, '%');
+        animateValue('ramLabel', Math.round(metrics.memory_percent || 0), 600, '%');
+        animateValue('diskLabel', Math.round(metrics.disk_percent || 0), 600, '%');
+        
+        // Radial gauges
+        updateGauge('cpuGauge', metrics.cpu_percent || 0);
+        updateGauge('ramGauge', metrics.memory_percent || 0);
+        updateGauge('diskGauge', metrics.disk_percent || 0);
+        
+        // Text stats details
+        document.getElementById('diskDetails').textContent = `${metrics.disk_used || '0GB'} / ${metrics.disk_total || '0GB'}`;
+        document.getElementById('ramDetails').textContent = `${metrics.memory_used || '0GB'} / ${metrics.memory_total || '0GB'}`;
+        document.getElementById('dbConnections').textContent = metrics.db_connections || 0;
+        document.getElementById('dbMaxConnections').textContent = metrics.db_max_connections || 100;
+    } catch (error) {
+        console.error('Error loading system metrics:', error);
+    }
+}
+
+// Fetch auth activity and build ECharts
+async function createAuthActivityChart() {
+    try {
+        const response = await fetch('/api/auth-activity');
+        const result = await response.json();
+        
+        const chartDom = document.getElementById('authActivityChart');
+        const isDark = document.documentElement.classList.contains('dark');
+        
+        // ECharts Theme Custom Variables for sleek look
+        const axisColor = isDark ? '#64748b' : '#94a3b8';
+        const splitLineColor = isDark ? '#334155' : '#f1f5f9';
+        const tooltipBg = isDark ? 'rgba(30, 41, 59, 0.98)' : 'rgba(255, 255, 255, 0.98)';
+        const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
+        const tooltipText = isDark ? '#f1f5f9' : '#1e293b';
+
+        if (!authActivityChart) {
+            authActivityChart = echarts.init(chartDom, isDark ? 'dark' : null);
+        }
+        
+        const option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: tooltipBg,
+                borderColor: tooltipBorder,
+                borderWidth: 1,
+                textStyle: { color: tooltipText, fontSize: 13, fontWeight: 500 },
+                extraCssText: 'box-shadow: 0 10px 30px rgba(0,0,0,0.15); border-radius: 16px; padding: 12px;'
+            },
+            grid: { left: '2%', right: '2%', bottom: '2%', top: '10%', containLabel: true },
+            xAxis: {
+                type: 'category',
+                data: result.labels || [],
+                axisLine: { show: true, lineStyle: { color: isDark ? '#334155' : '#e2e8f0' } },
+                axisTick: { show: false },
+                axisLabel: { color: axisColor, fontSize: 11, fontWeight: 600 }
+            },
+            yAxis: {
+                type: 'value',
+                axisLine: { show: false },
+                axisTick: { show: false },
+                axisLabel: { color: axisColor, fontSize: 11, fontWeight: 600 },
+                splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } }
+            },
+            series: [{
+                name: 'Percobaan Auth',
+                type: 'line',
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                showSymbol: false,
+                lineStyle: { width: 3.5 },
+                itemStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                        { offset: 0, color: '#3b82f6' },
+                        { offset: 1, color: '#6366f1' }
+                    ])
+                },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(59, 130, 246, 0.25)' },
+                        { offset: 1, color: 'rgba(99, 102, 241, 0.01)' }
+                    ])
+                },
+                data: result.data || []
+            }]
+        };
+        
+        authActivityChart.setOption(option, { notMerge: false, lazyUpdate: true });
+    } catch (error) {
+        console.error('Error loading auth activity:', error);
+    }
+}
+
+// Fetch active sessions distribution across NAS
+async function createSessionsPieChart() {
+    try {
+        const response = await fetch('/api/sessions-by-nas');
+        const result = await response.json();
+        
+        const chartDom = document.getElementById('sessionsPieChart');
+        const isDark = document.documentElement.classList.contains('dark');
+        
+        const tooltipBg = isDark ? 'rgba(30, 41, 59, 0.98)' : 'rgba(255, 255, 255, 0.98)';
+        const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
+        const tooltipText = isDark ? '#f1f5f9' : '#1e293b';
+
+        if (!sessionsPieChart) {
+            sessionsPieChart = echarts.init(chartDom, isDark ? 'dark' : null);
+        }
+        
+        const data = (result.labels || []).map((label, index) => ({
+            name: label,
+            value: (result.data || [])[index] || 0
+        }));
+        
+        // Sleek gradient matching colors
+        const colors = ['#3b82f6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#14b8a6'];
+        
+        const option = {
+            backgroundColor: 'transparent',
+            color: colors,
+            tooltip: {
+                trigger: 'item',
+                formatter: '{b}: <span class="font-bold">{c}</span> ({d}%)',
+                backgroundColor: tooltipBg,
+                borderColor: tooltipBorder,
+                borderWidth: 1,
+                textStyle: { color: tooltipText, fontSize: 13, fontWeight: 500 },
+                extraCssText: 'box-shadow: 0 10px 30px rgba(0,0,0,0.15); border-radius: 16px;'
+            },
+            legend: {
+                bottom: '0%',
+                left: 'center',
+                icon: 'circle',
+                textStyle: { color: isDark ? '#94a3b8' : '#64748b', fontSize: 11, fontWeight: 600 }
+            },
+            series: [{
+                name: 'Active Sessions',
+                type: 'pie',
+                radius: ['45%', '70%'],
+                center: ['50%', '42%'],
+                avoidLabelOverlap: false,
+                itemStyle: {
+                    borderRadius: 10,
+                    borderColor: isDark ? '#1e293b' : '#fff',
+                    borderWidth: 3
+                },
+                label: { show: false },
+                emphasis: {
+                    label: { 
+                        show: true, 
+                        fontSize: 16, 
+                        fontWeight: 'bold',
+                        formatter: '{b}\n{c} Sesi',
+                        color: isDark ? '#f1f5f9' : '#1e293b'
+                    }
+                },
+                labelLine: { show: false },
+                data: data
+            }]
+        };
+        
+        sessionsPieChart.setOption(option, { notMerge: false, lazyUpdate: true });
+    } catch (error) {
+        console.error('Error loading sessions distribution:', error);
+    }
+}
+
+// Fetch recent activity and render a timeline
+async function loadRecentActivity() {
+    try {
+        const activities = await apiCall('/api/recent-activity');
+        const activityList = document.getElementById('recentActivityList');
+        
+        if (!activities || activities.length === 0) {
+            activityList.innerHTML = '<div class="text-center py-8 text-slate-400 dark:text-slate-500 text-xs font-semibold">Tidak ada aktivitas baru</div>';
+            return;
+        }
+        
+        activityList.innerHTML = activities.map(activity => {
+            const colors = {
+                green: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300',
+                red: 'bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30 text-rose-800 dark:text-rose-300',
+                blue: 'bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30 text-blue-800 dark:text-blue-300',
+                purple: 'bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/30 text-purple-800 dark:text-purple-300'
+            };
+            const iconBg = {
+                green: 'bg-emerald-500 shadow-lg shadow-emerald-500/20 text-white',
+                red: 'bg-rose-500 shadow-lg shadow-rose-500/20 text-white',
+                blue: 'bg-blue-500 shadow-lg shadow-blue-500/20 text-white',
+                purple: 'bg-purple-500 shadow-lg shadow-purple-500/20 text-white'
+            };
+            
+            return `
+            <div class="activity-item-modern flex items-center p-3.5 ${colors[activity.color] || colors.blue} rounded-2xl border transition-all duration-300 hover:scale-[1.01] hover:shadow-sm">
+                <div class="w-10 h-10 ${iconBg[activity.color] || iconBg.blue} rounded-xl flex items-center justify-center mr-3.5 shadow-md flex-shrink-0">
+                    <i data-lucide="${activity.icon}" class="lucide w-5 h-5 text-white"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-bold text-xs truncate text-slate-800 dark:text-slate-200">${activity.text}</p>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">${activity.time}</p>
+                </div>
+                ${activity.color === 'green' || activity.color === 'blue' ? `
+                <div class="flex-shrink-0 ml-2 relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-${activity.color === 'green' ? 'emerald' : 'blue'}-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-${activity.color === 'green' ? 'emerald' : 'blue'}-500"></span>
+                </div>
+                ` : ''}
+            </div>
+            `;
+        }).join('');
+        
+        // Re-trigger Lucide icon compiler
+        lucide.createIcons();
+    } catch (error) {
+        console.error('Error loading recent activity:', error);
+    }
+}
+
+function refreshActivityChart() {
+    createAuthActivityChart();
+    showNotification('Chart aktivitas berhasil disegarkan', 'success');
+}
+
+function refreshSessionsChart() {
+    createSessionsPieChart();
+    showNotification('Chart sesi NAS berhasil disegarkan', 'success');
+}
+
+function refreshAllData() {
+    loadStats();
+    loadSystemMetrics();
+    loadRecentActivity();
+    createAuthActivityChart();
+    createSessionsPieChart();
+}
+
+// Handle layout resize triggers
+window.addEventListener('resize', () => {
+    if (authActivityChart) authActivityChart.resize();
+    if (sessionsPieChart) sessionsPieChart.resize();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateClock();
+    updateWelcomeGreeting();
+    
+    // Trigger tick-tock live time
+    setInterval(updateClock, 1000);
+    setInterval(updateWelcomeGreeting, 60000);
+
+    lucide.createIcons();
+
+    // Initial loading sequence
+    loadStats();
+    loadSystemMetrics();
+    createAuthActivityChart();
+    createSessionsPieChart();
+    loadRecentActivity();    
+    
+    // Auto-refresh sequences (every 30s)
+    setInterval(refreshAllData, 30000);
+});
+
+window.addEventListener('beforeunload', () => {
+    if (authActivityChart) authActivityChart.dispose();
+    if (sessionsPieChart) sessionsPieChart.dispose();
+});
+
+// Reacting to Theme changes dynamically for ECharts
+let _lastDarkMode = document.documentElement.classList.contains('dark');
+new MutationObserver(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+    if (isDark === _lastDarkMode) return;
+    _lastDarkMode = isDark;
+    
+    if (authActivityChart) { authActivityChart.dispose(); authActivityChart = null; }
+    if (sessionsPieChart) { sessionsPieChart.dispose(); sessionsPieChart = null; }
+    
+    createAuthActivityChart();
+    createSessionsPieChart();
+}).observe(document.documentElement, { attributeFilter: ['class'] });
+</script>
+{% endblock %}

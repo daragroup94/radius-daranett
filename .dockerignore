@@ -35,6 +35,7 @@ docker-compose.*.yml
 
 # Folder lain yang ada di proyek Anda
 freeradius-config/
+app/freeradius-config/
 init.db
 radiusd.conf.default
 clients.conf

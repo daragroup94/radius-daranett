@@ -7,6 +7,7 @@ ip route add 10.50.0.0/24 via 100.204.0.1 2>/dev/null || true
 ip route add 10.30.0.0/24 via 100.204.0.1 2>/dev/null || true
 ip route add 172.0.0.0/16 via 100.204.0.1 2>/dev/null || true
 ip route add 10.206.0.0/24 via 100.204.0.1 2>/dev/null || true
+ip route add 203.0.16.0/24 via 100.204.0.1 2>/dev/null || true
 
 echo "[entrypoint] VPN routes configured"
 

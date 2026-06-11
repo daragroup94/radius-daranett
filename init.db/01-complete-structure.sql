@@ -356,6 +356,27 @@ CREATE TABLE public.radusergroup (
 
 
 --
+-- Name: hotspot_vouchers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hotspot_vouchers (
+    id integer NOT NULL,
+    voucher_code character varying(100) NOT NULL,
+    username character varying(100) NOT NULL,
+    password character varying(100) NOT NULL,
+    duration_seconds integer,
+    package_name character varying(100),
+    rate_limit character varying(100),
+    first_login timestamp without time zone,
+    expires_at timestamp without time zone,
+    locked_mac character varying(50),
+    created_at timestamp without time zone DEFAULT now(),
+    deleted_at timestamp without time zone
+);
+
+
+
+--
 -- Name: radusergroup_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -373,6 +394,26 @@ CREATE SEQUENCE public.radusergroup_id_seq
 --
 
 ALTER SEQUENCE public.radusergroup_id_seq OWNED BY public.radusergroup.id;
+
+
+--
+-- Name: hotspot_vouchers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.hotspot_vouchers_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: hotspot_vouchers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.hotspot_vouchers_id_seq OWNED BY public.hotspot_vouchers.id;
 
 
 --
@@ -436,6 +477,13 @@ ALTER TABLE ONLY public.radreply ALTER COLUMN id SET DEFAULT nextval('public.rad
 --
 
 ALTER TABLE ONLY public.radusergroup ALTER COLUMN id SET DEFAULT nextval('public.radusergroup_id_seq'::regclass);
+
+
+--
+-- Name: hotspot_vouchers id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hotspot_vouchers ALTER COLUMN id SET DEFAULT nextval('public.hotspot_vouchers_id_seq'::regclass);
 
 
 --
@@ -535,6 +583,14 @@ ALTER TABLE ONLY public.radusergroup
 
 
 --
+-- Name: hotspot_vouchers hotspot_vouchers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hotspot_vouchers
+    ADD CONSTRAINT hotspot_vouchers_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: nas_nasname; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -602,6 +658,14 @@ CREATE INDEX radreply_username ON public.radreply USING btree (username, attribu
 --
 
 CREATE INDEX radusergroup_username ON public.radusergroup USING btree (username);
+
+
+-- Unique constraints for ON CONFLICT queries in application
+ALTER TABLE ONLY public.radcheck
+    ADD CONSTRAINT radcheck_username_attribute_unique UNIQUE (username, attribute);
+
+ALTER TABLE ONLY public.radusergroup
+    ADD CONSTRAINT radusergroup_username_groupname_unique UNIQUE (username, groupname);
 
 
 -- =============================================================================

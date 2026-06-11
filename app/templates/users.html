@@ -13,6 +13,8 @@
         {% include "users/vpn_css.html" %}
     {% elif active_tab == '8021x' %}
         {% include "users/x8021x_css.html" %}
+    {% elif active_tab == 'wireless' %}
+        {% include "users/wireless_css.html" %}
     {% endif %}
     
     <style>
@@ -58,6 +60,10 @@
             <i data-lucide="lock" class="w-4 h-4"></i>
             <span>802.1X</span>
         </a>
+        <a href="/users?tab=wireless" class="tab-item flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold text-slate-600 dark:text-slate-300 {% if active_tab == 'wireless' %}active{% endif %}">
+            <i data-lucide="radio" class="w-4 h-4"></i>
+            <span>Wireless</span>
+        </a>
     </div>
 
     <!-- Active Tab Content -->
@@ -72,6 +78,8 @@
             {% include "users/vpn_content.html" %}
         {% elif active_tab == '8021x' %}
             {% include "users/x8021x_content.html" %}
+        {% elif active_tab == 'wireless' %}
+            {% include "users/wireless_content.html" %}
         {% endif %}
     </div>
 </div>
@@ -88,5 +96,7 @@
         {% include "users/vpn_js.html" %}
     {% elif active_tab == '8021x' %}
         {% include "users/x8021x_js.html" %}
+    {% elif active_tab == 'wireless' %}
+        {% include "users/wireless_js.html" %}
     {% endif %}
 {% endblock %}

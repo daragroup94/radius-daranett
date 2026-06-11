@@ -14,6 +14,46 @@ from services.mikrotik_coa import send_coa_disconnect
 
 diagnostics_bp = Blueprint('diagnostics', __name__)
 
+# Initialize tables at module load (once)
+def _init_diagnostics_tables():
+    try:
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.ont_health_issues (
+                username VARCHAR(100) PRIMARY KEY,
+                serial VARCHAR(100),
+                model VARCHAR(100),
+                manufacturer VARCHAR(100),
+                rx_power VARCHAR(20),
+                temperature VARCHAR(20),
+                pon_mode VARCHAR(50),
+                last_inform VARCHAR(100),
+                detected_at TIMESTAMP DEFAULT NOW()
+            )
+        """, fetch=False)
+        execute_query("ALTER TABLE public.ont_health_issues ADD COLUMN IF NOT EXISTS pon_mode VARCHAR(50)", fetch=False)
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.ont_serial_mapping (
+                username VARCHAR(100) PRIMARY KEY,
+                serial_number VARCHAR(100) UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """, fetch=False)
+    except Exception as e:
+        print(f"[diagnostics] Table init warning: {e}")
+
+_init_diagnostics_tables()
+
+import re as _re_mod
+
+def _validate_network_target(target):
+    """Validate that target is a valid IP address or hostname (no shell metacharacters)."""
+    if not target or len(target) > 255:
+        return False
+    # Allow: alphanumeric, dots, hyphens, colons (IPv6)
+    if not _re_mod.match(r'^[a-zA-Z0-9.:\-]+$', target):
+        return False
+    return True
+
 @diagnostics_bp.route('/diagnostics')
 @login_required
 def diagnostics_page():
@@ -72,21 +112,9 @@ def api_acs_reboot_user(username):
 @login_required
 def api_optical_health_issues():
     try:
-        execute_query("""
-            CREATE TABLE IF NOT EXISTS public.ont_health_issues (
-                username VARCHAR(100) PRIMARY KEY,
-                serial VARCHAR(100),
-                model VARCHAR(100),
-                manufacturer VARCHAR(100),
-                rx_power VARCHAR(20),
-                temperature VARCHAR(20),
-                last_inform VARCHAR(100),
-                detected_at TIMESTAMP DEFAULT NOW()
-            )
-        """, fetch=False)
 
         rows = execute_query("""
-            SELECT username, serial, model, manufacturer, rx_power, temperature,
+            SELECT username, serial, model, manufacturer, rx_power, temperature, pon_mode,
                    TO_CHAR(detected_at, 'YYYY-MM-DD HH24:MI:SS') as detected_at,
                    last_inform, 'critical' as rx_status
             FROM ont_health_issues
@@ -141,13 +169,7 @@ def api_optical_health():
             
         # Load manual serial mappings from database
         try:
-            execute_query("""
-                CREATE TABLE IF NOT EXISTS public.ont_serial_mapping (
-                    username VARCHAR(100) PRIMARY KEY,
-                    serial_number VARCHAR(100) UNIQUE NOT NULL,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """, fetch=False)
+            pass  # Table created at module init
             mappings = execute_query("SELECT username, serial_number FROM ont_serial_mapping") or []
         except Exception:
             mappings = []
@@ -595,17 +617,38 @@ def api_topology_status():
         nodes = []
         nas_list = execute_query("SELECT id, nasname, shortname, description FROM nas") or []
         
+        def check_traefik():
+            traefik_ok = False
+            traefik_lat = 999
+            for host in ['traefik', 'localhost', '127.0.0.1']:
+                ok, lat = check_latency(host, port=80)
+                if ok:
+                    traefik_ok = True
+                    traefik_lat = lat
+                    break
+            return {
+                'id': 'traefik',
+                'name': 'Traefik Ingress Proxy',
+                'type': 'proxy',
+                'ip': 'traefik (Docker)',
+                'online': traefik_ok,
+                'latency': traefik_lat,
+                'info': 'Ingress Routing & SSL Edge'
+            }
+
         with ThreadPoolExecutor(max_workers=10) as executor:
             future_postgres = executor.submit(check_postgres)
             future_redis = executor.submit(check_redis)
             future_freeradius = executor.submit(check_freeradius)
             future_genieacs = executor.submit(check_genieacs)
+            future_traefik = executor.submit(check_traefik)
             
             future_nas_list = [executor.submit(check_nas, nas) for nas in nas_list]
             
             nodes.append(future_postgres.result())
             nodes.append(future_redis.result())
             nodes.append(future_freeradius.result())
+            nodes.append(future_traefik.result())
             
             nodes.append({
                 'id': 'dashboard',
@@ -701,6 +744,14 @@ def api_diagnostics_ping():
         
         if not target:
             return jsonify({'success': False, 'error': 'Target wajib diisi'}), 400
+        if not _validate_network_target(target):
+            return jsonify({'success': False, 'error': 'Target tidak valid. Gunakan IP address atau hostname.'}), 400
+        try:
+            count = int(count)
+            if count < 1 or count > 10:
+                count = 5
+        except (ValueError, TypeError):
+            count = 5
             
         ig = None
         if router_id:
@@ -740,6 +791,8 @@ def api_diagnostics_traceroute():
         
         if not router_id or not target:
             return jsonify({'success': False, 'error': 'Router dan Target wajib diisi'}), 400
+        if not _validate_network_target(target):
+            return jsonify({'success': False, 'error': 'Target tidak valid. Gunakan IP address atau hostname.'}), 400
             
         ig = execute_query("SELECT * FROM integrations WHERE id = %s AND type='mikrotik'", (router_id,))
         if not ig:

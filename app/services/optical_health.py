@@ -21,10 +21,12 @@ def background_optical_health_scan():
                 manufacturer VARCHAR(100),
                 rx_power VARCHAR(20),
                 temperature VARCHAR(20),
+                pon_mode VARCHAR(50),
                 last_inform VARCHAR(100),
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         """, fetch=False)
+        execute_query("ALTER TABLE public.ont_status ADD COLUMN IF NOT EXISTS pon_mode VARCHAR(50)", fetch=False)
         
         execute_query("""
             CREATE TABLE IF NOT EXISTS public.ont_health_issues (
@@ -34,10 +36,12 @@ def background_optical_health_scan():
                 manufacturer VARCHAR(100),
                 rx_power VARCHAR(20),
                 temperature VARCHAR(20),
+                pon_mode VARCHAR(50),
                 last_inform VARCHAR(100),
                 detected_at TIMESTAMP DEFAULT NOW()
             )
         """, fetch=False)
+        execute_query("ALTER TABLE public.ont_health_issues ADD COLUMN IF NOT EXISTS pon_mode VARCHAR(50)", fetch=False)
         print("[optical-health-scan] Tables verified/created.")
     except Exception as ex:
         print(f"[optical-health-scan] Failed to verify/create tables: {ex}")
@@ -48,7 +52,7 @@ def background_optical_health_scan():
             config = get_genieacs_config()
             GENIEACS_NBI = config['url']
             auth = config['auth']
-            projection = '_deviceId,_lastInform,VirtualParameters.RXPower,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,VirtualParameters.gettemp,VirtualParameters.getSerialNumber'
+            projection = '_deviceId,_lastInform,VirtualParameters.RXPower,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber'
             resp = requests.get(
                 f'{GENIEACS_NBI}/devices',
                 params={'projection': projection},
@@ -89,6 +93,7 @@ def background_optical_health_scan():
                         username = val(vp.get('pppoeUsername2'))
                     rx = val(vp.get('RXPower'))
                     temp = val(vp.get('gettemp'))
+                    pon_mode = val(vp.get('getponmode'))
                     serial = val(vp.get('getSerialNumber')) or dev_id.get('_SerialNumber', 'N/A')
                     model = dev_id.get('_ProductClass', 'N/A')
                     manufacturer = dev_id.get('_Manufacturer', 'N/A')
@@ -106,7 +111,7 @@ def background_optical_health_scan():
                         db_username = username.strip()
                     else:
                         db_username = f"unconfigured-{serial_clean}"
-
+ 
                     # Clean up old duplicate entries for this serial in ont_status
                     try:
                         execute_query("DELETE FROM ont_status WHERE serial = %s AND username != %s", (serial_clean, db_username), fetch=False)
@@ -116,12 +121,12 @@ def background_optical_health_scan():
                     # 2. Upsert ke tabel ont_status untuk SEMUA ONT yang valid
                     try:
                         execute_query("""
-                            INSERT INTO ont_status (username, serial, model, manufacturer, rx_power, temperature, last_inform, updated_at)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                            INSERT INTO ont_status (username, serial, model, manufacturer, rx_power, temperature, pon_mode, last_inform, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
                             ON CONFLICT (username) DO UPDATE 
                             SET serial = EXCLUDED.serial, model = EXCLUDED.model, manufacturer = EXCLUDED.manufacturer,
-                                rx_power = EXCLUDED.rx_power, temperature = EXCLUDED.temperature, last_inform = EXCLUDED.last_inform, updated_at = NOW()
-                        """, (db_username, serial_clean, model, manufacturer, rx, temp, d.get('_lastInform', 'N/A')), fetch=False)
+                                rx_power = EXCLUDED.rx_power, temperature = EXCLUDED.temperature, pon_mode = EXCLUDED.pon_mode, last_inform = EXCLUDED.last_inform, updated_at = NOW()
+                        """, (db_username, serial_clean, model, manufacturer, rx, temp, pon_mode, d.get('_lastInform', 'N/A')), fetch=False)
                     except Exception as upsert_err:
                         print(f"[optical-health-scan] Upsert ont_status failed for {db_username}: {upsert_err}")
                         
@@ -132,11 +137,11 @@ def background_optical_health_scan():
                         # Sinyal dianggap buruk/warning jika di bawah -23.0 dBm
                         if rx_float < -23.0:
                             execute_query("""
-                                INSERT INTO ont_health_issues (username, serial, model, manufacturer, rx_power, temperature, last_inform)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                INSERT INTO ont_health_issues (username, serial, model, manufacturer, rx_power, temperature, pon_mode, last_inform)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                 ON CONFLICT (username) DO UPDATE 
-                                SET rx_power = EXCLUDED.rx_power, temperature = EXCLUDED.temperature, last_inform = EXCLUDED.last_inform, detected_at = NOW()
-                            """, (db_username, serial, model, manufacturer, rx, temp, d.get('_lastInform', 'N/A')), fetch=False)
+                                SET rx_power = EXCLUDED.rx_power, temperature = EXCLUDED.temperature, pon_mode = EXCLUDED.pon_mode, last_inform = EXCLUDED.last_inform, detected_at = NOW()
+                            """, (db_username, serial, model, manufacturer, rx, temp, pon_mode, d.get('_lastInform', 'N/A')), fetch=False)
                             
                             # Hanya kirim notifikasi Telegram jika redaman buruk (di atas -25 dBm / <= -25.0 dBm)
                             if rx_float <= -25.0:

@@ -1,11 +1,12 @@
 <div class="fade-in space-y-6">
 
     <!-- NOC Operations Header -->
-    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
-        <div class="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+    <div class="mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden border border-slate-800 dark:border-slate-850">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <div class="absolute bottom-0 left-0 w-64 h-64 bg-purple-600/5 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
         
-        <div class="z-10 mb-4 md:mb-0 flex items-center">
-            <div class="icon-wrapper-noc icon-gradient-hotspot mr-4 shadow-lg shadow-amber-500/15 floating-icon">
+        <div class="z-10 mb-5 lg:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-hotspot mr-4 shadow-lg shadow-violet-500/20 floating-icon">
                 <i data-lucide="ticket" class="lucide icon-noc text-white"></i>
             </div>
             <div>
@@ -14,23 +15,27 @@
             </div>
         </div>
         
-        <div class="z-10 flex gap-2.5 flex-wrap">
-            <button onclick="openCreateModal()" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white px-4 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg transition-all hover:scale-[1.02] whitespace-nowrap">
-                <i data-lucide="plus" class="lucide w-5 h-5 text-white"></i>
+        <div class="z-10 flex gap-3 flex-wrap">
+            <button onclick="openCreateModal()" class="bg-slate-800 hover:bg-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-700/80 text-white px-4 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap">
+                <i data-lucide="plus" class="w-5 h-5 text-white"></i>
                 <span>Buat Manual</span>
             </button>
-            <button onclick="openGenerateModal()" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.02] whitespace-nowrap">
-                <i data-lucide="plus-circle" class="lucide w-5 h-5 text-white"></i>
+            <button onclick="openGenerateModal()" class="bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-violet-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap">
+                <i data-lucide="plus-circle" class="w-5 h-5 text-white"></i>
                 <span>Generate Voucher</span>
+            </button>
+            <button onclick="deleteExpired()" class="bg-slate-800 hover:bg-rose-950/40 border border-slate-750 hover:border-rose-900/50 text-slate-300 hover:text-rose-400 px-4 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap">
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                <span>Hapus Expired</span>
             </button>
         </div>
     </div>
 
     <!-- Stats Cards Row -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-5">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-5">
         <!-- Total Voucher -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
-            <div class="icon-wrapper-noc icon-gradient-hotspot shadow-md shadow-amber-500/10">
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300 flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-hotspot shadow-md shadow-violet-500/10">
                 <i data-lucide="ticket" class="lucide icon-noc text-white"></i>
             </div>
             <div>
@@ -39,17 +44,22 @@
             </div>
         </div>
         <!-- Active Vouchers -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300 flex items-center gap-4">
             <div class="icon-wrapper-noc icon-gradient-nas shadow-md shadow-emerald-500/10">
                 <i data-lucide="activity" class="lucide icon-noc text-white"></i>
             </div>
-            <div>
-                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Aktif (Online)</p>
-                <p class="text-2xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statActive">—</p>
+            <div class="flex-1">
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Voucher Aktif</p>
+                <div class="flex flex-wrap items-baseline gap-2 mt-1">
+                    <p class="text-2xl font-extrabold text-slate-800 dark:text-white font-outfit" id="statActive">—</p>
+                    <span class="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5" id="statHotspotOnline">
+                        <span class="w-1.5 h-1.5 bg-emerald-550 rounded-full animate-pulse"></span>(— Online)
+                    </span>
+                </div>
             </div>
         </div>
         <!-- Unused Vouchers -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300 flex items-center gap-4">
             <div class="icon-wrapper-noc bg-gradient-to-tr from-purple-500 to-indigo-600 shadow-md shadow-purple-500/10">
                 <i data-lucide="clock" class="lucide icon-noc text-white"></i>
             </div>
@@ -59,7 +69,7 @@
             </div>
         </div>
         <!-- Expired Vouchers -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300 flex items-center gap-4">
             <div class="icon-wrapper-noc bg-gradient-to-tr from-rose-500 to-red-600 shadow-md shadow-red-500/10">
                 <i data-lucide="power" class="lucide icon-noc text-white"></i>
             </div>
@@ -73,79 +83,73 @@
     <!-- Main List Card Container -->
     <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
         <!-- Sub-header dengan Search Bar & Domain Link -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
-            <div class="flex gap-2.5 flex-wrap items-center">
-                <div class="relative">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-700/50 pb-5">
+            <div>
+                <h3 class="text-base font-extrabold text-slate-800 dark:text-white">Daftar Voucher Hotspot</h3>
+                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Pantau, cari, cetak QR, bagikan ke WhatsApp, atau hapus voucher hotspot.</p>
+            </div>
+            <div class="flex gap-2.5 flex-wrap items-center w-full lg:w-auto lg:justify-end">
+                <div class="relative w-full sm:w-auto">
                     <i data-lucide="search" class="lucide w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
                     <input type="text" id="searchInput" placeholder="Cari voucher / username..."
-                        class="pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-xs font-medium w-52 transition-all"
+                        class="pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-xs font-semibold w-full sm:w-52 transition-all"
                         oninput="debounceLoad()">
                 </div>
-                <select id="filterStatus" onchange="loadVouchers()" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-amber-500">
+                <select id="filterStatus" onchange="loadVouchers()" class="w-full sm:w-auto bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-violet-500 focus:outline-none">
                     <option value="">Semua Status</option>
                     <option value="unused">Belum Dipakai</option>
                     <option value="active">Aktif</option>
                     <option value="expired">Expired</option>
                 </select>
                 <!-- Hotspot Domain Settings (Saved in LocalStorage) -->
-                <div class="flex items-center gap-1.5 border border-amber-100 dark:border-amber-900/30 rounded-xl px-3 py-2.5 bg-amber-50/30 dark:bg-amber-950/20">
-                    <span class="text-[10px] text-amber-700 dark:text-amber-400 font-extrabold uppercase tracking-wider whitespace-nowrap"><i data-lucide="link" class="lucide w-3.5 h-3.5 inline mr-1"></i>Hotspot Link:</span>
+                <div class="flex items-center gap-1.5 border border-violet-100 dark:border-violet-900/30 rounded-xl px-3 py-2 bg-violet-50/30 dark:bg-violet-950/20 w-full sm:w-auto">
+                    <span class="text-[10px] text-violet-700 dark:text-violet-400 font-extrabold uppercase tracking-wider whitespace-nowrap"><i data-lucide="link" class="lucide w-3.5 h-3.5 inline mr-1"></i>Hotspot Link:</span>
                     <input type="text" id="hotspotDomain" placeholder="http://daranett.hs.com" 
-                        class="border-none p-0 text-xs focus:ring-0 focus:outline-none bg-transparent w-36 font-mono font-bold text-amber-900 dark:text-amber-200"
+                        class="border-none p-0 text-xs focus:ring-0 focus:outline-none bg-transparent w-full sm:w-32 font-mono font-bold text-violet-900 dark:text-violet-200"
                         onchange="saveHotspotDomain()">
                 </div>
             </div>
-            <div class="flex gap-2">
-                <button onclick="openCreateModal()" class="px-4 py-2 rounded-xl text-sm font-medium bg-slate-700 hover:bg-slate-650 text-white shadow-md transition-all">
-                    <i class="fas fa-plus mr-1"></i> Buat Manual
-                </button>
-                <button onclick="openGenerateModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-white shadow-md hover:opacity-90 transition-all bg-gradient-to-r from-amber-500 to-orange-600">
-                    <i class="fas fa-plus mr-1"></i> Generate Voucher
-                </button>
-                <button onclick="deleteExpired()" class="px-4 py-2 rounded-xl text-sm font-medium text-white shadow-md hover:opacity-90 transition-all" style="background:linear-gradient(135deg,#ef4444,#dc2626)">
-                    <i class="fas fa-trash mr-1"></i> Hapus Expired
-                </button>
-            </div>
         </div>
-    </div>
 
-    <!-- Vouchers Grid -->
-    <div>
+        <!-- Vouchers Grid -->
         <div id="voucherGrid" class="w-full">
             <!-- Content will be loaded dynamically here -->
-            <div class="text-center py-20 text-gray-400 bg-white rounded-3xl border border-slate-150 p-6 shadow-sm"><i class="fas fa-spinner fa-spin text-3xl mb-4 text-amber-500"></i><p>Memuat...</p></div>
+            <div class="text-center py-20 text-slate-400 dark:text-slate-500">
+                <i class="fas fa-spinner fa-spin text-3xl mb-4 text-violet-500"></i>
+                <p class="font-medium text-sm">Memuat daftar voucher...</p>
+            </div>
         </div>
         
         <!-- Pagination -->
-        <div id="pagination" class="flex items-center justify-between px-5 py-4 border-t border-gray-100 bg-white rounded-2xl shadow mt-5"></div>
+        <div id="pagination" class="flex items-center justify-between px-2 py-4 border-t border-slate-100 dark:border-slate-700/50 mt-5"></div>
     </div>
 </div>
 
 <!-- Create Manual Modal -->
-<div id="createModal" class="fixed inset-0 bg-black bg-opacity-40 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
-            <h3 class="text-base font-bold text-gray-800"><i class="fas fa-plus-circle text-amber-500 mr-2"></i>Buat Voucher Manual</h3>
-            <button onclick="closeCreateModal()" class="w-8 h-8 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-lg transition-all flex items-center justify-center">
-                <i class="fas fa-times"></i>
+<div id="createModal" class="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-all duration-300">
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl shadow-2xl w-full max-w-md p-6 transform transition-all">
+        <div class="flex justify-between items-center mb-5 border-b border-slate-100 dark:border-slate-750 pb-3">
+            <h3 class="text-base font-extrabold text-slate-800 dark:text-white flex items-center"><i data-lucide="plus-circle" class="w-5 h-5 text-violet-500 mr-2"></i>Buat Voucher Manual</h3>
+            <button onclick="closeCreateModal()" class="w-8 h-8 bg-slate-50 hover:bg-red-50 dark:bg-slate-700/50 dark:hover:bg-red-950/30 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 rounded-xl transition-all flex items-center justify-center">
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
         <form id="createForm" class="space-y-4">
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Kode Voucher <span class="text-gray-400 font-normal">(opsional, misal: BUDI)</span></label>
-                <input type="text" name="voucher_code" placeholder="Kosongkan untuk acak" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Kode Voucher <span class="text-slate-400 dark:text-slate-500 font-normal">(opsional, misal: BUDI)</span></label>
+                <input type="text" name="voucher_code" placeholder="Kosongkan untuk acak" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-800 dark:text-slate-200">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Username <span class="text-gray-400 font-normal">(opsional, misal: budi)</span></label>
-                <input type="text" name="username" placeholder="Kosongkan untuk default 'hs-kode'" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Username <span class="text-slate-450 dark:text-slate-550 font-normal">(opsional, misal: budi)</span></label>
+                <input type="text" name="username" placeholder="Kosongkan untuk default 'hs-kode'" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-800 dark:text-slate-200">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Password <span class="text-gray-400 font-normal">(opsional, misal: 123456)</span></label>
-                <input type="text" name="password" placeholder="Kosongkan untuk acak" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Password <span class="text-slate-450 dark:text-slate-550 font-normal">(opsional, misal: 123456)</span></label>
+                <input type="text" name="password" placeholder="Kosongkan untuk acak" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-800 dark:text-slate-200">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Paket</label>
-                <select name="package" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Paket</label>
+                <select name="package" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-800 dark:text-slate-200">
                     <option value="3h">Quick 3 Jam</option>
                     <option value="1d">Daily 24 Jam</option>
                     <option value="7d">Weekly 7 Hari</option>
@@ -153,25 +157,30 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Rate Limit <span class="text-gray-400 font-normal">(opsional, misal: 10M/10M)</span></label>
-                <input type="text" name="rate_limit" placeholder="10M/10M" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Rate Limit <span class="text-slate-450 dark:text-slate-550 font-normal">(opsional, misal: 10M/10M)</span></label>
+                <input type="text" name="rate_limit" placeholder="10M/10M" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-800 dark:text-slate-200">
             </div>
         </form>
-        <div class="flex gap-2 mt-5">
-            <button onclick="submitCreate()" class="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 shadow-md">Simpan</button>
-            <button onclick="closeCreateModal()" class="flex-1 py-2 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700">Batal</button>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeCreateModal()" class="flex-1 py-2.5 rounded-xl text-sm font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-700 dark:text-slate-200 transition-all">Batal</button>
+            <button onclick="submitCreate()" class="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 shadow-md shadow-violet-500/10 transition-all">Simpan</button>
         </div>
     </div>
 </div>
 
 <!-- Generate Modal -->
-<div id="generateModal" class="fixed inset-0 bg-black bg-opacity-40 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-ticket-alt text-purple-500 mr-2"></i>Generate Voucher</h3>
+<div id="generateModal" class="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-all duration-300">
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl shadow-2xl w-full max-w-md p-6 transform transition-all">
+        <div class="flex justify-between items-center mb-5 border-b border-slate-100 dark:border-slate-750 pb-3">
+            <h3 class="text-base font-extrabold text-slate-800 dark:text-white flex items-center"><i data-lucide="ticket" class="w-5 h-5 text-purple-500 mr-2"></i>Generate Voucher</h3>
+            <button onclick="closeGenerateModal()" class="w-8 h-8 bg-slate-50 hover:bg-red-50 dark:bg-slate-700/50 dark:hover:bg-red-950/30 text-slate-555 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 rounded-xl transition-all flex items-center justify-center">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
         <form id="generateForm" class="space-y-4">
             <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Paket</label>
-                <select name="package" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Paket</label>
+                <select name="package" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-200">
                     <option value="3h">Quick 3 Jam</option>
                     <option value="1d">Daily 24 Jam</option>
                     <option value="7d">Weekly 7 Hari</option>
@@ -179,315 +188,41 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Rate Limit <span class="text-gray-400">(opsional, misal: 5M/5M)</span></label>
-                <input type="text" name="rate_limit" placeholder="5M/5M" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Rate Limit <span class="text-slate-450 dark:text-slate-550 font-normal">(opsional, misal: 5M/5M)</span></label>
+                <input type="text" name="rate_limit" placeholder="5M/5M" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-200">
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Jumlah Voucher</label>
-                <input type="number" name="count" value="1" min="1" max="100" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Jumlah Voucher</label>
+                <input type="number" name="count" value="1" min="1" max="100" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-200">
             </div>
             <div id="generateResult" class="hidden">
-                <label class="block text-xs font-medium text-gray-600 mb-1">Voucher Dihasilkan</label>
-                <textarea id="generateOutput" rows="6" readonly class="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono bg-gray-50 focus:outline-none"></textarea>
+                <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Voucher Dihasilkan</label>
+                <textarea id="generateOutput" rows="6" readonly class="w-full bg-slate-550 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-700 dark:text-slate-350 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
             </div>
         </form>
-        <div class="flex gap-2 mt-4">
-            <button onclick="submitGenerate()" class="flex-1 py-2 rounded-xl text-sm font-medium text-white" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">Generate</button>
-            <button onclick="closeGenerateModal()" class="flex-1 py-2 rounded-xl text-sm font-medium bg-gray-100 text-gray-700">Tutup</button>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeGenerateModal()" class="flex-1 py-2.5 rounded-xl text-sm font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-700 dark:text-slate-200 transition-all">Tutup</button>
+            <button onclick="submitGenerate()" class="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-purple-500 to-indigo-650 hover:from-purple-600 hover:to-indigo-700 shadow-md shadow-purple-500/10 transition-all">Generate</button>
         </div>
     </div>
 </div>
 
 <!-- QR Code Modal -->
-<div id="qrModal" class="fixed inset-0 bg-black bg-opacity-40 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-base font-bold text-gray-800"><i class="fas fa-qrcode text-purple-500 mr-2"></i>Login QR Code</h3>
-            <button onclick="closeQrModal()" class="w-8 h-8 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-lg transition-all flex items-center justify-center">
-                <i class="fas fa-times"></i>
+<div id="qrModal" class="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-all duration-300">
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center transform transition-all">
+        <div class="flex justify-between items-center mb-5 border-b border-slate-100 dark:border-slate-750 pb-3">
+            <h3 class="text-base font-extrabold text-slate-800 dark:text-white flex items-center"><i data-lucide="qr-code" class="w-5 h-5 text-indigo-500 mr-2"></i>Login QR Code</h3>
+            <button onclick="closeQrModal()" class="w-8 h-8 bg-slate-50 hover:bg-red-50 dark:bg-slate-700/50 dark:hover:bg-red-950/30 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 rounded-xl transition-all flex items-center justify-center">
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
-        <div class="bg-purple-50 p-4 rounded-2xl inline-block mb-3 border border-purple-100">
+        <div class="bg-indigo-50 dark:bg-indigo-950/20 p-4 rounded-2xl inline-block mb-3 border border-indigo-100 dark:border-indigo-900/30">
             <img id="qrImage" src="" alt="QR Code" class="w-48 h-48 mx-auto bg-white p-2 rounded-xl">
         </div>
-        <p class="text-xs font-bold text-purple-700 mb-1">Scan untuk Login Otomatis</p>
-        <p class="text-[10px] text-gray-400 font-mono break-all px-2 select-all" id="qrLinkText"></p>
-        <div class="mt-4 flex gap-2">
-            <button onclick="closeQrModal()" class="w-full py-2 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:opacity-90">Tutup</button>
+        <p class="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 mb-1">Scan untuk Login Otomatis</p>
+        <p class="text-[10px] text-slate-400 dark:text-slate-500 font-mono break-all px-2 select-all" id="qrLinkText"></p>
+        <div class="mt-5">
+            <button onclick="closeQrModal()" class="w-full py-2.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-600/10 transition-all">Tutup</button>
         </div>
     </div>
 </div>
-
-<script>
-let _page = 1, _total = 0, _limit = 20, _debounce;
-
-function debounceLoad() { clearTimeout(_debounce); _debounce = setTimeout(loadVouchers, 400); }
-
-// Load hotspot domain on page load
-document.addEventListener('DOMContentLoaded', () => {
-    let savedDomain = localStorage.getItem('hotspot_domain');
-    if (!savedDomain || savedDomain === 'http://10.5.50.1' || savedDomain === 'http://dara.hotspot') {
-        savedDomain = 'http://daranett.hs.com';
-        localStorage.setItem('hotspot_domain', savedDomain);
-    }
-    document.getElementById('hotspotDomain').value = savedDomain;
-});
-
-function saveHotspotDomain() {
-    let domain = document.getElementById('hotspotDomain').value.trim();
-    if (domain && !domain.startsWith('http://') && !domain.startsWith('https://')) {
-        domain = 'http://' + domain;
-    }
-    document.getElementById('hotspotDomain').value = domain;
-    localStorage.setItem('hotspot_domain', domain);
-    loadVouchers(_page); // Reload to update share URLs
-}
-
-async function loadVouchers(page = 1) {
-    _page = page;
-    const search = document.getElementById('searchInput').value;
-    const status = document.getElementById('filterStatus').value;
-    const res = await fetch(`/api/hotspot/vouchers?page=${page}&limit=${_limit}&search=${encodeURIComponent(search)}&status=${status}`);
-    const data = await res.json();
-    _total = data.total;
-
-    // Update stats
-    const all = await fetch('/api/hotspot/vouchers?limit=1').then(r=>r.json());
-    const active = await fetch('/api/hotspot/vouchers?limit=1&status=active').then(r=>r.json());
-    const unused = await fetch('/api/hotspot/vouchers?limit=1&status=unused').then(r=>r.json());
-    const expired = await fetch('/api/hotspot/vouchers?limit=1&status=expired').then(r=>r.json());
-    document.getElementById('statTotal').textContent = all.total;
-    document.getElementById('statActive').textContent = active.total;
-    document.getElementById('statUnused').textContent = unused.total;
-    document.getElementById('statExpired').textContent = expired.total;
-
-    const grid = document.getElementById('voucherGrid');
-    if (!data.vouchers?.length) {
-        grid.innerHTML = '<div class="col-span-full text-center py-20 text-gray-400 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm"><i class="fas fa-ticket-alt text-5xl mb-4 opacity-30 text-purple-400"></i><p class="font-semibold text-gray-600">Tidak ada voucher ditemukan</p></div>';
-        document.getElementById('pagination').innerHTML = '';
-        return;
-    }
-
-    const hostDomain = document.getElementById('hotspotDomain').value.trim() || 'http://daranett.hs.com';
-
-    grid.innerHTML = `
-        <div class="overflow-x-auto min-w-full bg-white rounded-3xl border border-slate-150 p-4 shadow-sm">
-            <table class="w-full text-left border-collapse align-middle">
-                <thead>
-                    <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
-                        <th class="pb-3 pt-1 px-4 font-extrabold">KODE / PAKET</th>
-                        <th class="pb-3 pt-1 px-4 font-extrabold">KREDENSIAL</th>
-                        <th class="pb-3 pt-1 px-4 font-extrabold">KECEPATAN</th>
-                        <th class="pb-3 pt-1 px-4 font-extrabold">STATUS & MASA AKTIF</th>
-                        <th class="pb-3 pt-1 px-4 font-extrabold text-right">AKSI</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-50 dark:divide-slate-750">
-    ` + data.vouchers.map(v => {
-        const statusBadge = {
-            'unused': '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100">Belum Dipakai</span>',
-            'active': '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100"><span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse mr-1"></span>Aktif</span>',
-            'expired': '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">Expired</span>',
-        }[v.status] || '';
-
-        const credentialsHtml = `
-            <div class="flex flex-col gap-0.5">
-                <span class="text-xs font-mono text-slate-700">U: <strong class="select-all">${v.username}</strong></span>
-                <span class="text-xs font-mono text-slate-550">P: <strong class="select-all">${v.password}</strong></span>
-            </div>
-        `;
-
-        let timeInfoHtml = '';
-        if (v.first_login) {
-            timeInfoHtml = `
-                <div class="flex flex-col gap-0.5 text-[11px] text-slate-500">
-                    <span>Mulai: ${fmtDate(v.first_login)}</span>
-                    <span>Expired: ${fmtDate(v.expires_at)}</span>
-                    ${v.status === 'active' ? `<span class="text-emerald-600 font-bold">Sisa: ${fmtSecs(v.remaining_seconds)}</span>` : ''}
-                </div>
-            `;
-        } else {
-            timeInfoHtml = '<span class="text-[11px] text-slate-400 italic">Belum digunakan</span>';
-        }
-
-        // Direct Login URL for QR & WhatsApp share
-        const loginUrl = `${hostDomain}/login?username=${v.username}&password=${v.password}`;
-        
-        // Formatted text for WhatsApp Share
-        const waText = encodeURIComponent(
-            `*VOUCHER INTERNET HOTSPOT*\n` +
-            `-----------------------------------------\n` +
-            `• Paket: *${v.package_name}*\n` +
-            `• Kode Voucher: *${v.voucher_code}*\n` +
-            `• Username: \`${v.username}\`\n` +
-            `• Password: \`${v.password}\`\n` +
-            `• Kecepatan: *${v.rate_limit || 'Tidak Dibatasi'}*\n` +
-            `-----------------------------------------\n` +
-            `*Cara Penggunaan:*\n` +
-            `1. Hubungkan Wi-Fi ke jaringan Hotspot.\n` +
-            `2. Klik link login otomatis di bawah ini:\n` +
-            `${loginUrl}`
-        );
-
-        return '<tr class="hover:bg-slate-50/50 transition-colors">'
-            + '<td class="py-3 px-4">'
-            + '<div class="flex items-center gap-3">'
-            + '<div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-tr from-amber-500 to-orange-600 text-white shadow-sm flex-shrink-0"><i class="fas fa-ticket-alt text-xs text-white"></i></div>'
-            + '<div class="flex flex-col">'
-            + '<span class="font-black text-slate-800 text-sm tracking-wide font-mono">' + v.voucher_code + '</span>'
-            + '<span class="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider mt-0.5">' + v.package_name + '</span>'
-            + '</div>'
-            + '</div>'
-            + '</td>'
-            + '<td class="py-3 px-4">' + credentialsHtml + '</td>'
-            + '<td class="py-3 px-4"><span class="text-xs font-mono text-indigo-650 bg-indigo-50/60 px-2 py-0.5 rounded border border-indigo-100/50"><i class="fas fa-tachometer-alt text-indigo-400 mr-1"></i>' + (v.rate_limit || 'Tidak Dibatasi') + '</span></td>'
-            + '<td class="py-3 px-4">'
-            + '<div class="flex flex-col gap-1">'
-            + '<div>' + statusBadge + '</div>'
-            + timeInfoHtml
-            + '</div>'
-            + '</td>'
-            + '<td class="py-3 px-4 text-right">'
-            + '<div class="flex gap-1.5 justify-end">'
-            + '<button onclick="copyToClipboard(\'' + v.voucher_code + '\')" class="w-8 h-8 rounded-lg bg-slate-50 hover:bg-slate-200 border border-slate-200 text-slate-600 flex items-center justify-center transition-all shadow-sm" title="Salin Kode"><i class="far fa-copy text-xs"></i></button>'
-            + '<button onclick="showQrModal(\'' + v.voucher_code + '\', \'' + loginUrl + '\')" class="w-8 h-8 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg flex items-center justify-center transition-all" title="QR Code"><i class="fas fa-qrcode text-xs"></i></button>'
-            + '<a href="https://api.whatsapp.com/send?text=' + waText + '" target="_blank" class="w-8 h-8 bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white rounded-lg flex items-center justify-center transition-all" title="WhatsApp Share"><i class="fab fa-whatsapp text-xs"></i></a>'
-            + '<button onclick="deleteVoucher(' + v.id + ')" class="w-8 h-8 bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white rounded-lg flex items-center justify-center transition-all" title="Hapus"><i class="fas fa-trash text-xs"></i></button>'
-            + '</div>'
-            + '</td>'
-            + '</tr>';
-    }).join('') + `
-                </tbody>
-            </table>
-        </div>
-    `;
-
-    // Pagination
-    const totalPages = data.total_pages;
-    document.getElementById('pagination').innerHTML = totalPages <= 1 ? `
-        <span class="text-xs text-gray-500">Total: ${_total} voucher</span>` : `
-        <span class="text-xs text-gray-500">Total: ${_total} voucher</span>
-        <div class="flex gap-1">
-            ${_page > 1 ? `<button onclick="loadVouchers(${_page-1})" class="px-3 py-1 rounded-lg text-xs bg-gray-100 hover:bg-gray-200">‹</button>` : ''}
-            <span class="px-3 py-1 text-xs text-gray-600">${_page} / ${totalPages}</span>
-            ${_page < totalPages ? `<button onclick="loadVouchers(${_page+1})" class="px-3 py-1 rounded-lg text-xs bg-gray-100 hover:bg-gray-200">›</button>` : ''}
-        </div>`;
-}
-
-function fmtDate(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleString('id-ID', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-
-function fmtSecs(s) {
-    if (!s) return '0 detik';
-    const d = Math.floor(s/86400), h = Math.floor((s%86400)/3600), m = Math.floor((s%3600)/60);
-    return [d&&`${d}d`, h&&`${h}j`, m&&`${m}m`].filter(Boolean).join(' ') || '<1m';
-}
-
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        showNotification('Kode voucher berhasil disalin!', 'success');
-    }).catch(err => {
-        const el = document.createElement('textarea');
-        el.value = text;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-        showNotification('Kode voucher berhasil disalin!', 'success');
-    });
-}
-
-function showQrModal(code, url) {
-    const size = '200x200';
-    document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}&data=${encodeURIComponent(url)}`;
-    document.getElementById('qrLinkText').textContent = url;
-    document.getElementById('qrModal').classList.remove('hidden');
-}
-
-function closeQrModal() {
-    document.getElementById('qrModal').classList.add('hidden');
-}
-
-async function deleteVoucher(id) {
-    if (!confirm('Hapus voucher ini?')) return;
-    const r = await fetch(`/api/hotspot/vouchers/delete/${id}`, {method:'DELETE'});
-    const d = await r.json();
-    if (d.success) loadVouchers(_page);
-    else alert(d.error);
-}
-
-async function deleteExpired() {
-    if (!confirm('Hapus semua voucher expired?')) return;
-    const r = await fetch('/api/hotspot/vouchers/delete-expired', {method:'DELETE'});
-    const d = await r.json();
-    if (d.success) { showNotification(`${d.deleted} voucher expired berhasil dihapus!`, 'success'); loadVouchers(1); }
-    else alert(d.error);
-}
-
-function openGenerateModal() {
-    document.getElementById('generateResult').classList.add('hidden');
-    document.getElementById('generateModal').classList.remove('hidden');
-}
-function closeGenerateModal() {
-    document.getElementById('generateModal').classList.add('hidden');
-    loadVouchers(_page);
-}
-
-async function submitGenerate() {
-    const form = document.getElementById('generateForm');
-    const body = {
-        package: form.package.value,
-        rate_limit: form.rate_limit.value,
-        count: parseInt(form.count.value)
-    };
-    const r = await fetch('/api/hotspot/vouchers/generate', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.content || ''},
-        body: JSON.stringify(body)
-    });
-    const d = await r.json();
-    if (d.success) {
-        const lines = d.vouchers.map(v => `Kode: ${v.voucher_code} | User: ${v.username} | Pass: ${v.password} | ${v.package}`).join('\n');
-        document.getElementById('generateOutput').value = lines;
-        document.getElementById('generateResult').classList.remove('hidden');
-        showNotification('Voucher berhasil digenerate!', 'success');
-    } else {
-        alert(d.error);
-    }
-}
-
-function openCreateModal() {
-    document.getElementById('createForm').reset();
-    document.getElementById('createModal').classList.remove('hidden');
-}
-function closeCreateModal() {
-    document.getElementById('createModal').classList.add('hidden');
-}
-async function submitCreate() {
-    const form = document.getElementById('createForm');
-    const body = {
-        voucher_code: form.voucher_code.value.trim(),
-        username: form.username.value.trim(),
-        password: form.password.value.trim(),
-        package: form.package.value,
-        rate_limit: form.rate_limit.value.trim()
-    };
-    const r = await fetch('/api/hotspot/vouchers/create', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json', 'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.content || ''},
-        body: JSON.stringify(body)
-    });
-    const d = await r.json();
-    if (d.success) {
-        closeCreateModal();
-        showNotification('Voucher manual berhasil dibuat!', 'success');
-        loadVouchers(1);
-    } else {
-        alert(d.error || 'Gagal membuat voucher');
-    }
-}
-
-loadVouchers();
-</script>

@@ -17,6 +17,8 @@ sql {
     
     authorize_reply_query = "SELECT id, username, attribute, value, op FROM radreply WHERE username = '%{SQL-User-Name}' AND attribute != 'Description' ORDER BY id"
     
+    group_membership_query = "SELECT groupname FROM radusergroup WHERE username='%{SQL-User-Name}'"
+    
     accounting {
         reference = "%{tolower:type.%{Acct-Status-Type}.query}"
         

@@ -1,0 +1,235 @@
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-wireless mr-4 shadow-lg shadow-purple-500/15 floating-icon">
+                <i data-lucide="radio" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Pelanggan Wireless</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola otentikasi wireless WPA2/WPA3 Enterprise untuk access point dan perangkat mobile.</p>
+            </div>
+        </div>
+        
+        <button onclick="openAddModal()" class="z-10 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] whitespace-nowrap">
+            <i data-lucide="user-plus" class="lucide w-5 h-5 text-white"></i>
+            <span>Tambah User Wireless</span>
+        </button>
+    </div>
+
+    <!-- Stats Cards Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Total Wireless Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-wireless shadow-md shadow-purple-500/10">
+                <i data-lucide="radio" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total User Wireless</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statTotal">—</p>
+            </div>
+        </div>
+        <!-- Online Devices -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc icon-gradient-nas shadow-md shadow-emerald-500/10">
+                <i data-lucide="activity" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Device Aktif (Online)</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statOnline">—</p>
+            </div>
+        </div>
+        <!-- Protocol Details -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
+            <div class="icon-wrapper-noc bg-gradient-to-tr from-purple-500 to-indigo-600 shadow-md shadow-purple-500/10">
+                <i data-lucide="shield" class="lucide icon-noc text-white"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Protocol</p>
+                <p class="text-lg font-extrabold text-slate-800 dark:text-white font-outfit truncate">WPA2/WPA3 Enterprise</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Management Cards Section -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+        <!-- Top Toolbar -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div class="flex flex-col md:flex-row md:items-center gap-3">
+                <div class="relative">
+                    <input type="text" id="searchInput" placeholder="Cari username..." class="pl-10 pr-4 py-3 w-full md:w-80 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                </div>
+                <select id="limitSelect" class="px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="20">20 per halaman</option>
+                    <option value="50">50 per halaman</option>
+                    <option value="100">100 per halaman</option>
+                </select>
+            </div>
+            <button onclick="loadUsers()" class="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 font-medium transition-all hover:scale-[1.02]">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                <span>Refresh</span>
+            </button>
+        </div>
+
+        <!-- Users Table -->
+        <div class="overflow-hidden border border-slate-200 dark:border-slate-600 rounded-2xl">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-750 dark:to-slate-700 border-b border-slate-200 dark:border-slate-600">
+                            <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Username</th>
+                            <th class="text-left px-6 py-4 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Password</th>
+                            <th class="text-center px-6 py-4 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                            <th class="text-center px-6 py-4 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Sesi Aktif</th>
+                            <th class="text-center px-6 py-4 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody" class="divide-y divide-slate-200 dark:divide-slate-600">
+                        <!-- Dynamic content will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12 hidden">
+            <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-slate-500 bg-slate-200 transition ease-in-out duration-150">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Memuat data...
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 hidden">
+            <div class="max-w-md mx-auto">
+                <div class="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                    <i data-lucide="radio" class="w-8 h-8 text-slate-400"></i>
+                </div>
+                <h3 class="text-lg font-medium text-slate-900 dark:text-white mb-2">Belum ada user wireless</h3>
+                <p class="text-slate-500 dark:text-slate-400 mb-4">Mulai dengan menambahkan user wireless pertama.</p>
+                <button onclick="openAddModal()" class="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-all">
+                    Tambah User Pertama
+                </button>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div id="pagination" class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-6"></div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div id="addModal" class="fixed inset-0 z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4 bg-black bg-opacity-50">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl transform transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Tambah User Wireless</h3>
+                <button onclick="closeAddModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <form id="addUserForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Username</label>
+                        <input type="text" id="addUsername" required class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Password</label>
+                        <input type="password" id="addPassword" required class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeAddModal()" class="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                        Batal
+                    </button>
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white px-4 py-3 rounded-xl font-medium transition-all">
+                        Tambah User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editModal" class="fixed inset-0 z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4 bg-black bg-opacity-50">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl transform transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-slate-900 dark:text-white">Edit User Wireless</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <form id="editUserForm">
+                <input type="hidden" id="editOriginalUsername">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Username</label>
+                        <input type="text" id="editUsername" required class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Password Baru (kosongkan jika tidak diubah)</label>
+                        <input type="password" id="editPassword" class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                        Batal
+                    </button>
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white px-4 py-3 rounded-xl font-medium transition-all">
+                        Update User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Session Modal -->
+<div id="detailModal" class="fixed inset-0 z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4 bg-black bg-opacity-50">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-2xl shadow-2xl transform transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-tr from-violet-500 to-purple-600 shadow-md">
+                        <i data-lucide="radio" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-900 dark:text-white">Detail Sesi</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400" id="detailUsername"></p>
+                    </div>
+                </div>
+                <button onclick="closeDetailModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Loading -->
+            <div id="detailLoading" class="text-center py-10 hidden">
+                <svg class="animate-spin mx-auto h-8 w-8 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-slate-500 mt-3 text-sm">Memuat data sesi...</p>
+            </div>
+
+            <!-- Empty -->
+            <div id="detailEmpty" class="text-center py-10 hidden">
+                <i data-lucide="inbox" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
+                <p class="text-slate-500 dark:text-slate-400 font-medium">Belum ada riwayat sesi</p>
+            </div>
+
+            <!-- Sessions List -->
+            <div id="detailContent" class="space-y-4 max-h-[60vh] overflow-y-auto pr-1"></div>
+        </div>
+    </div>
+</div>

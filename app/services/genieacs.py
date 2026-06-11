@@ -65,7 +65,9 @@ def get_genieacs_device_info(username):
         query = _json.dumps({
             "$or": [
                 {"VirtualParameters.pppoeUsername._value": username},
-                {"VirtualParameters.pppoeUsername2._value": username}
+                {"VirtualParameters.pppoeUsername2._value": username},
+                {"_deviceId._SerialNumber": username},
+                {"VirtualParameters.getSerialNumber._value": username}
             ]
         })
         projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime'

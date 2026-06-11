@@ -4,10 +4,19 @@ from extensions import socketio
 from database import execute_query
 from services.mikrotik_coa import send_coa_disconnect
 
+_latest_cpu_percent = 0.0
+
+def get_latest_cpu_percent():
+    global _latest_cpu_percent
+    return _latest_cpu_percent
+
 def api_system_metrics_data():
     """Helper to get system metrics without request context"""
+    global _latest_cpu_percent
     try:
         cpu_percent = psutil.cpu_percent()
+        if cpu_percent is not None:
+            _latest_cpu_percent = cpu_percent
         memory = psutil.virtual_memory()
         # Count connections in pg pool if available
         conn_count = 0
@@ -15,7 +24,7 @@ def api_system_metrics_data():
             res = execute_query("SELECT count(*) as count FROM pg_stat_activity")
             if res:
                 conn_count = res[0]['count']
-        except:
+        except Exception:
             pass
             
         return {
@@ -190,8 +199,9 @@ def sync_active_sessions_with_routers():
             print(f"[session-sync] Error in interim-update self-healing: {reopen_err}")
 
         # Get active sessions in RADIUS
+        # [EDIT 1] Tambah callingstationid agar MAC address client wireless bisa diambil
         active_sessions = execute_query("""
-            SELECT radacctid, username, nasipaddress, acctsessionid, calledstationid, acctupdatetime, acctstarttime 
+            SELECT radacctid, username, nasipaddress, acctsessionid, calledstationid, callingstationid, acctupdatetime, acctstarttime 
             FROM radacct 
             WHERE acctstoptime IS NULL
         """)
@@ -217,7 +227,7 @@ def sync_active_sessions_with_routers():
             nas_sessions = sessions_by_nas.get(nas_ip, [])
             
             try:
-                api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=2)
+                api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=10)
                 
                 # Fetch active PPP users
                 active_ppp_users = None
@@ -237,6 +247,24 @@ def sync_active_sessions_with_routers():
                     print(f"[session-sync] Error fetching Leases from {r['name']}: {lease_err}")
                     
                 api.close()
+
+                # [EDIT 2] Fetch active Wireless clients dari registration table Mikrotik
+                active_wireless_macs = None
+                try:
+                    api2 = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=10)
+                    wireless_macs = set()
+                    for endpoint in ['/interface/wireless/registration-table/print', '/interface/wifi/registration-table/print']:
+                        try:
+                            for w in api2(endpoint):
+                                mac = w.get('mac-address', '').lower().replace(':', '').replace('-', '').replace('_', '')
+                                if mac:
+                                    wireless_macs.add(mac)
+                        except Exception:
+                            pass
+                    api2.close()
+                    active_wireless_macs = wireless_macs
+                except Exception as w_err:
+                    print(f"[session-sync] Error fetching Wireless from {r['name']}: {w_err}")
                 
                 # Build sets of active usernames/macs in the DB for this NAS
                 db_active_ppp_unames = set()
@@ -248,8 +276,11 @@ def sync_active_sessions_with_routers():
                     if is_ppp:
                         db_active_ppp_unames.add(uname)
                     else:
-                        clean_mac = uname.replace(':', '').replace('-', '').replace('_', '')
+                        clean_mac = uname.replace(':', '').replace('-', '').replace('_', '').lower()
                         db_active_ipoe_macs_clean.add(clean_mac)
+                        calling_mac = (s.get('callingstationid') or '').replace(':', '').replace('-', '').replace('_', '').lower()
+                        if calling_mac:
+                            db_active_ipoe_macs_clean.add(calling_mac)
                 
                 # --- A. REOPEN SESSIONS (Router shows online, DB shows offline) ---
                 
@@ -266,7 +297,7 @@ def sync_active_sessions_with_routers():
                             if closed_s:
                                 execute_query("""
                                     UPDATE radacct
-                                    SET acctstoptime = NULL, acctterminatecause = NULL
+                                    SET acctstoptime = NULL, acctterminatecause = NULL, acctupdatetime = NOW()
                                     WHERE radacctid = %s
                                 """, (closed_s[0]['radacctid'],), fetch=False)
                                 print(f"[session-sync] Router active mismatch: Reopened closed PPP session {closed_s[0]['radacctid']} for {uname_router} on NAS {nas_ip}")
@@ -281,19 +312,17 @@ def sync_active_sessions_with_routers():
                             mac_clean = mac_router.lower().replace(':', '').replace('-', '').replace('_', '')
                             if mac_clean not in db_active_ipoe_macs_clean:
                                 # Find and reopen last closed session for this MAC
-                                mac_with_colons = mac_router.upper()
-                                mac_without_colons = mac_clean.upper()
                                 closed_s = execute_query("""
                                     SELECT radacctid FROM radacct
-                                    WHERE (LOWER(username) = %s OR LOWER(username) = %s)
+                                    WHERE REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g') = %s
                                       AND nasipaddress = %s
                                       AND acctstoptime IS NOT NULL
                                     ORDER BY acctstarttime DESC LIMIT 1
-                                """, (mac_with_colons.lower(), mac_without_colons.lower(), nas_ip))
+                                """, (mac_clean, nas_ip))
                                 if closed_s:
                                     execute_query("""
                                         UPDATE radacct
-                                        SET acctstoptime = NULL, acctterminatecause = NULL
+                                        SET acctstoptime = NULL, acctterminatecause = NULL, acctupdatetime = NOW()
                                         WHERE radacctid = %s
                                     """, (closed_s[0]['radacctid'],), fetch=False)
                                     print(f"[session-sync] Router active mismatch: Reopened closed IPoE session {closed_s[0]['radacctid']} for {mac_router} on NAS {nas_ip}")
@@ -304,6 +333,8 @@ def sync_active_sessions_with_routers():
                     uname = s['username'].lower() if s.get('username') else ''
                     called = (s.get('calledstationid') or '').lower()
                     is_ppp = 'pppoe' in called or 'l2tp' in called or 'sstp' in called or 'pptp' in called or not called
+                    # [EDIT 3] Deteksi wireless: calledstationid format MAC:SSID mengandung ':'
+                    is_wireless = ':' in called and not is_ppp
                     
                     is_online = False
                     if is_ppp:
@@ -311,10 +342,19 @@ def sync_active_sessions_with_routers():
                             is_online = uname in active_ppp_users
                         else:
                             is_online = True
+                    # [EDIT 4] Blok khusus wireless, tidak menyentuh logika IPoE di bawahnya
+                    elif is_wireless:
+                        mac = (s.get('callingstationid') or '').replace(':', '').replace('-', '').replace('_', '').lower()
+                        if active_wireless_macs:
+                            is_online = mac in active_wireless_macs
+                        else:
+                            is_online = True
                     else:
                         if active_macs is not None:
-                            clean_uname = uname.replace(':', '').replace('-', '').replace('_', '')
-                            is_online = clean_uname in active_macs
+                            mac = s.get('callingstationid') or ''
+                            clean_mac = mac.replace(':', '').replace('-', '').replace('_', '').lower()
+                            clean_uname = uname.replace(':', '').replace('-', '').replace('_', '').lower()
+                            is_online = (clean_uname in active_macs) or (clean_mac in active_macs)
                         else:
                             is_online = True
                             
@@ -339,6 +379,25 @@ def sync_active_sessions_with_routers():
                             WHERE radacctid = %s AND acctstoptime IS NULL
                         """, (stop_time, s['radacctid']), fetch=False)
                         print(f"[session-sync] Marked stale session {s['radacctid']} ({s['username']}) on NAS {nas_ip} as disconnected")
+                    else:
+                        # Session is confirmed online on router. Prevent stale-session cleaner from closing it.
+                        last_update = s.get('acctupdatetime') or s.get('acctstarttime')
+                        needs_update = False
+                        if not last_update:
+                            needs_update = True
+                        else:
+                            if last_update.tzinfo is not None:
+                                age = (datetime.now(last_update.tzinfo) - last_update).total_seconds()
+                            else:
+                                age = (datetime.now() - last_update).total_seconds()
+                            if age > 300: # 5 minutes
+                                needs_update = True
+                        if needs_update:
+                            execute_query("""
+                                UPDATE radacct
+                                SET acctupdatetime = NOW()
+                                WHERE radacctid = %s
+                            """, (s['radacctid'],), fetch=False)
             except Exception as router_err:
                 print(f"[session-sync] Error connecting to router {r['name']} ({nas_ip}): {router_err}")
     except Exception as e:

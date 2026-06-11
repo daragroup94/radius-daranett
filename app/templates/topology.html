@@ -156,6 +156,27 @@
                 <!-- SVG Canvas for visual connection maps -->
                 <svg id="topology-svg" class="absolute inset-0 pointer-events-none w-full h-full" style="z-index: 1; min-height: 500px;"></svg>
                 
+                <!-- TIER 0: Edge Ingress Gateway -->
+                <div class="w-full">
+                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center mb-4">Tingkat 0: Edge Ingress Gateway (Reverse Proxy)</p>
+                    <div class="flex justify-center">
+                        <!-- Traefik Node -->
+                        <div id="node-traefik" onclick="inspectNode('traefik')" class="node-card bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-750 rounded-2xl p-4 w-full md:w-56 text-center flex flex-col items-center shadow-sm">
+                            <div class="w-10 h-10 bg-sky-500/10 text-sky-500 rounded-xl flex items-center justify-center mb-2">
+                                <i class="fas fa-route text-lg"></i>
+                            </div>
+                            <h4 class="font-bold text-xs text-slate-800 dark:text-white">Traefik Ingress</h4>
+                            <p class="text-[10px] text-slate-450 dark:text-slate-500 mt-1 font-mono">radius.go.daragroup.cloud</p>
+                            <span class="mt-2 inline-flex items-center gap-1 text-[9px] font-bold text-slate-400" id="status-traefik">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span> Memuat...
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vertical Connector Divider -->
+                <div class="h-6 w-0.5 bg-slate-200 dark:bg-slate-750"></div>
+
                 <!-- TIER 1: Core Services -->
                 <div class="w-full">
                     <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center mb-4">Tingkat 1: Core Infrastructure (Dockerized)</p>
@@ -438,6 +459,15 @@
     let activeInspectId = null;
 
     const nodeMetadata = {
+        traefik: {
+            icon: 'route',
+            bg: 'bg-sky-500',
+            role: 'Traefik Ingress Proxy & Load Balancer. Bertindak sebagai gerbang terdepan (Edge Proxy) yang menerima semua trafik web (HTTP/HTTPS) dari internet, memecah SSL dengan Cloudflare TLS, dan meneruskannya ke Flask Dashboard serta GenieACS.',
+            connections: [
+                { to: 'Flask Dashboard', desc: 'Menerusan request web pengguna di Port 80/443 (HTTP/HTTPS) ke backend Flask (Port 5000) berdasarkan routing domain.' },
+                { to: 'GenieACS TR-069', desc: 'Menerusan request koneksi CWMP dari ONT pelanggan ke GenieACS endpoint TR-069 secara aman.' }
+            ]
+        },
         postgres: {
             icon: 'database',
             bg: 'bg-blue-500',
@@ -591,6 +621,11 @@
         // Clear SVG and append gradients
         svg.innerHTML = `
             <defs>
+                <linearGradient id="flow-gradient-proxy" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.1"/>
+                    <stop offset="50%" stop-color="#0ea5e9" stop-opacity="1"/>
+                    <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.1"/>
+                </linearGradient>
                 <linearGradient id="flow-gradient-db" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.1"/>
                     <stop offset="50%" stop-color="#3b82f6" stop-opacity="1"/>
@@ -616,6 +651,8 @@
         
         // Core Connections List
         const conns = [
+            { from: 'node-traefik', to: 'node-dashboard', color: '#0ea5e9', grad: 'flow-gradient-proxy' },
+            { from: 'node-traefik', to: 'node-genieacs', color: '#0ea5e9', grad: 'flow-gradient-proxy' },
             { from: 'node-postgres', to: 'node-dashboard', color: '#3b82f6', grad: 'flow-gradient-db' },
             { from: 'node-postgres', to: 'node-freeradius', color: '#3b82f6', grad: 'flow-gradient-db' },
             { from: 'node-redis', to: 'node-dashboard', color: '#ef4444', grad: 'flow-gradient-control' },
