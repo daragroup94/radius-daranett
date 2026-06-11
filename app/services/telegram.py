@@ -503,39 +503,35 @@ def execute_prov_push(state_data):
             # Pada FiberHome (has_gpon_link_config=True), VLAN sudah di-handle oleh GPON Link Config.
             # Jangan set VLANEnable=True di level WAN connection karena menyebabkan double-tagging.
             if state_data.get('vlan_enabled'):
-                if not has_gpon_link_config:
-                    # Non-FiberHome: set VLAN di level WAN connection
-                    vlan_enable_path = None
-                    for leaf in ["VLANEnabled", "VLANEnable", "VLANMark", "X_HW_VLAN_Enable", "X_ZTE_VLAN_Enable"]:
-                        found_path = check_param_exists_on_device(device_doc, base_path, leaf)
-                        if found_path:
-                            vlan_enable_path = found_path
-                            break
-                    if not vlan_enable_path:
-                        vlan_enable_path = f"{base_path}.VLANEnabled"
-                        
-                    vlan_id_path = None
-                    for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN"]:
-                        found_path = check_param_exists_on_device(device_doc, base_path, leaf)
-                        if found_path:
-                            vlan_id_path = found_path
-                            break
-                    if not vlan_id_path:
-                        vlan_id_path = f"{base_path}.VLANIDMark"
-                        
-                    parameter_values.append([vlan_enable_path, True])
-                    parameter_values.append([vlan_id_path, int(state_data['vlan_id'])])
-                # FiberHome: VLAN sudah di-set di GPON Link Config, skip VLANEnable di PPP level
+                vlan_enable_path = None
+                for leaf in ["VLANEnabled", "VLANEnable", "VLANMark", "X_HW_VLAN_Enable", "X_ZTE_VLAN_Enable"]:
+                    found_path = check_param_exists_on_device(device_doc, base_path, leaf)
+                    if found_path:
+                        vlan_enable_path = found_path
+                        break
+                if not vlan_enable_path:
+                    vlan_enable_path = f"{base_path}.VLANEnabled"
+                    
+                vlan_id_path = None
+                for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN"]:
+                    found_path = check_param_exists_on_device(device_doc, base_path, leaf)
+                    if found_path:
+                        vlan_id_path = found_path
+                        break
+                if not vlan_id_path:
+                    vlan_id_path = f"{base_path}.VLANIDMark"
+                    
+                parameter_values.append([vlan_enable_path, True])
+                parameter_values.append([vlan_id_path, int(state_data['vlan_id'])])
             else:
-                if not has_gpon_link_config:
-                    vlan_enable_path = None
-                    for leaf in ["VLANEnabled", "VLANEnable", "VLANMark"]:
-                        found_path = check_param_exists_on_device(device_doc, base_path, leaf)
-                        if found_path:
-                            vlan_enable_path = found_path
-                            break
-                    if vlan_enable_path:
-                        parameter_values.append([vlan_enable_path, False])
+                vlan_enable_path = None
+                for leaf in ["VLANEnabled", "VLANEnable", "VLANMark"]:
+                    found_path = check_param_exists_on_device(device_doc, base_path, leaf)
+                    if found_path:
+                        vlan_enable_path = found_path
+                        break
+                if vlan_enable_path:
+                    parameter_values.append([vlan_enable_path, False])
 
             # Set Port Binding (LAN/SSID)
             full_binds = []
