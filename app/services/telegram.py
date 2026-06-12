@@ -6,7 +6,7 @@ from flask import current_app
 from extensions import socketio
 from database import execute_query
 from helpers import ping_nas
-from services.genieacs import get_genieacs_device_info, get_genieacs_config
+from services.genieacs import get_genieacs_device_info, get_genieacs_config, run_wifi_scan, analyze_wifi_neighbors, set_wifi_channel
 from services.mikrotik_coa import send_coa_disconnect
 
 _prov_states = {}
@@ -861,6 +861,410 @@ def execute_delete_wan(device_id, wcd_idx, conn_type, conn_idx):
     except Exception as e:
         return False, f"Exception: {str(e)}"
 
+def handle_cek_command(chat_id, username, token):
+    """
+    Menangani perintah /cek dengan lookup data RADIUS & GenieACS,
+    mendukung caching serial-username di Redis untuk respon cepat (<100ms).
+    """
+    # 1. Cek cache mapping di Redis dahulu untuk pencarian instan
+    resolved_username = username
+    resolved_serial = None
+    
+    redis_client = None
+    try:
+        from flask import current_app
+        redis_client = current_app.config.get('SESSION_REDIS')
+    except RuntimeError:
+        try:
+            from config import Config
+            redis_client = Config.SESSION_REDIS
+        except:
+            pass
+            
+    if redis_client:
+        try:
+            # Coba cari apakah input adalah username PPPoE
+            cached_sn = redis_client.get(f"mapping:user_to_sn:{username}")
+            if cached_sn:
+                resolved_serial = cached_sn.decode('utf-8') if isinstance(cached_sn, bytes) else cached_sn
+            else:
+                # Coba cari apakah input adalah Serial Number
+                cached_un = redis_client.get(f"mapping:sn_to_user:{username}")
+                if cached_un:
+                    resolved_username = cached_un.decode('utf-8') if isinstance(cached_un, bytes) else cached_un
+                    resolved_serial = username
+        except Exception as cache_err:
+            print(f"[telegram-bot] Error reading mapping cache: {cache_err}")
+            
+    # Jika mapping ditemukan di Redis, cari GenieACS dengan Serial Number secara langsung (sangat cepat)
+    acs_data = None
+    acs_found = False
+    if resolved_serial:
+        acs_data = get_genieacs_device_info(resolved_serial)
+        acs_found = acs_data.get('found', False)
+    else:
+        # Query GenieACS service dengan username input langsung
+        acs_data = get_genieacs_device_info(username)
+        acs_found = acs_data.get('found', False)
+        
+    # Fallback jika pencarian via PPPoE username tidak ketemu di GenieACS:
+    # Cek apakah username ini terdaftar di ont_serial_mapping untuk mencari Serial Number-nya
+    if not acs_found:
+        try:
+            mapping_res = execute_query("SELECT serial_number FROM ont_serial_mapping WHERE username = %s LIMIT 1", (username,))
+            if mapping_res:
+                db_serial = mapping_res[0]['serial_number'].strip()
+                acs_data = get_genieacs_device_info(db_serial)
+                acs_found = acs_data.get('found', False)
+                if acs_found and redis_client:
+                    # Simpan ke Redis cache agar selanjutnya instan
+                    try:
+                        redis_client.setex(f"mapping:user_to_sn:{username}", 86400, db_serial)
+                        redis_client.setex(f"mapping:sn_to_user:{db_serial}", 86400, username)
+                    except:
+                        pass
+            else:
+                # Coba cari sebaliknya di db: input adalah serial_number
+                mapping_res = execute_query("SELECT username FROM ont_serial_mapping WHERE serial_number = %s LIMIT 1", (username,))
+                if mapping_res:
+                    db_user = mapping_res[0]['username'].strip()
+                    # query by serial number directly
+                    acs_data = get_genieacs_device_info(username)
+                    acs_found = acs_data.get('found', False)
+                    if acs_found and redis_client:
+                        try:
+                            redis_client.setex(f"mapping:user_to_sn:{db_user}", 86400, username)
+                            redis_client.setex(f"mapping:sn_to_user:{username}", 86400, db_user)
+                        except:
+                            pass
+        except Exception as e:
+            print(f"[telegram-bot] Error mapping username/serial in DB: {e}")
+            
+    # Simpan hasil mapping ke Redis jika berhasil diselesaikan tapi belum ada di Redis
+    if acs_found and redis_client:
+        try:
+            sn_val = acs_data.get('serial')
+            un_val = acs_data.get('pppoe_username')
+            if sn_val and sn_val != 'N/A' and un_val and un_val != 'N/A' and un_val.strip():
+                redis_client.setex(f"mapping:user_to_sn:{un_val}", 86400, sn_val)
+                redis_client.setex(f"mapping:sn_to_user:{sn_val}", 86400, un_val)
+        except Exception as cache_err:
+            print(f"[telegram-bot] Error saving resolved mapping to cache: {cache_err}")
+
+    # Dapatkan pppoe_username jika tersedia dari GenieACS
+    radius_username = username
+    if acs_found and acs_data.get('pppoe_username') and acs_data.get('pppoe_username') not in ('N/A', ''):
+        radius_username = acs_data.get('pppoe_username')
+    else:
+        # Fallback 1 jika pencarian via SN tapi pppoe_username kosong di GenieACS (karena bug firmware):
+        # Cek database ont_serial_mapping untuk mendapatkan username PPPoE yang terikat
+        try:
+            mapping_res = execute_query("SELECT username FROM ont_serial_mapping WHERE serial_number = %s LIMIT 1", (username,))
+            if mapping_res:
+                radius_username = mapping_res[0]['username'].strip()
+                # Push tag ke GenieACS NBI agar muncul di GenieACS Dashboard
+                try:
+                    config_acs = get_genieacs_config()
+                    url_acs = config_acs['url']
+                    auth_acs = config_acs['auth']
+                    import urllib.parse
+                    device_id_acs = acs_data.get('id') or f"{acs_data.get('manufacturer','000AC2')}-{acs_data.get('model','HG6145D2')}-{username}"
+                    tag_url = f"{url_acs}/devices/{urllib.parse.quote(device_id_acs)}/tags/{urllib.parse.quote(radius_username)}"
+                    requests.post(tag_url, auth=auth_acs, timeout=3)
+                except Exception as tag_err:
+                    print(f"[telegram-bot] Error pushing tag in fallback 1: {tag_err}")
+            elif acs_found and acs_data.get('mac_address') and acs_data.get('mac_address') != 'N/A':
+                # Fallback 2 (Otomatis & Cerdas): Cari kecocokan MAC address prefix di radacct
+                mac_base = acs_data.get('mac_address').strip()
+                if len(mac_base) >= 14:
+                    mac_prefix = mac_base[:14] # Ambil 5 octet pertama
+                    mac_query = execute_query("SELECT username FROM radacct WHERE callingstationid LIKE %s ORDER BY acctstarttime DESC LIMIT 1", (mac_prefix + '%',))
+                    if mac_query:
+                        radius_username = mac_query[0]['username']
+                        # Simpan otomatis ke ont_serial_mapping agar pencarian berikutnya instan
+                        try:
+                            execute_query("INSERT INTO ont_serial_mapping (username, serial_number) VALUES (%s, %s) ON CONFLICT (username) DO UPDATE SET serial_number = EXCLUDED.serial_number", (radius_username, username), fetch=False)
+                            # Push tag ke GenieACS NBI
+                            try:
+                                config_acs = get_genieacs_config()
+                                url_acs = config_acs['url']
+                                auth_acs = config_acs['auth']
+                                import urllib.parse
+                                device_id_acs = acs_data.get('id') or f"{acs_data.get('manufacturer','000AC2')}-{acs_data.get('model','HG6145D2')}-{username}"
+                                tag_url = f"{url_acs}/devices/{urllib.parse.quote(device_id_acs)}/tags/{urllib.parse.quote(radius_username)}"
+                                requests.post(tag_url, auth=auth_acs, timeout=3)
+                            except Exception as tag_err:
+                                print(f"[telegram-bot] Error pushing tag in fallback 2: {tag_err}")
+                        except Exception as db_err:
+                            print(f"[telegram-bot] Error inserting auto-mapping: {db_err}")
+        except Exception as e:
+            print(f"[telegram-bot] Error mapping serial to username: {e}")
+            
+    # 2. Query PostgreSQL untuk status sesi RADIUS
+    session_res = execute_query("""
+        SELECT * FROM radacct 
+        WHERE username = %s 
+        ORDER BY acctstarttime DESC LIMIT 1
+    """, (radius_username,))
+    
+    # Jika masih tidak ketemu, coba username aslinya jika berbeda
+    if not session_res and radius_username != username:
+        session_res = execute_query("""
+            SELECT * FROM radacct 
+            WHERE username = %s 
+            ORDER BY acctstarttime DESC LIMIT 1
+        """, (username,))
+        
+    is_online = False
+    nas_ip = "N/A"
+    nas_name = "N/A"
+    framed_ip = "N/A"
+    mac_address = "N/A"
+    uptime_str = "N/A"
+    session_days = 0
+    
+    if session_res:
+        s = session_res[0]
+        if s.get('acctstoptime') is None:
+            is_online = True
+            start_time = s.get('acctstarttime')
+            if start_time:
+                now = datetime.now(start_time.tzinfo) if start_time.tzinfo else datetime.now()
+                diff = now - start_time
+                hours, remainder = divmod(diff.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                uptime_str = f"{diff.days}d {hours}h {minutes}m"
+                session_days = diff.days
+                
+        nas_ip = s.get('nasipaddress', 'N/A')
+        framed_ip = s.get('framedipaddress', 'N/A')
+        mac_address = s.get('callingstationid', 'N/A')
+        
+        # Dapatkan nama NAS
+        nas_info = execute_query("SELECT shortname FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
+        if nas_info:
+            nas_name = nas_info[0]['shortname'] or nas_ip
+            
+    # 3. Formulasikan Balasan HTML & Smart Diagnostics
+    status_str = "🟢 <b>ONLINE</b>" if is_online else "🔴 <b>OFFLINE</b>"
+    
+    reply = (
+        f"👤 <b>Informasi Pelanggan:</b>\n"
+        f"• Username: <code>{username}</code>\n"
+    )
+    if radius_username != username:
+        reply += f"• PPPoE Account: <code>{radius_username}</code>\n"
+        
+    reply += f"• Status Sesi: {status_str}\n"
+    
+    if session_res:
+        reply += (
+            f"• Router NAS: <b>{nas_name}</b> (<code>{nas_ip}</code>)\n"
+            f"• IP Address: <code>{framed_ip}</code>\n"
+            f"• MAC Address: <code>{mac_address}</code>\n"
+            f"• Sesi Aktif Uptime: <code>{uptime_str}</code>\n"
+        )
+    else:
+        reply += "• <i>Log Sesi RADIUS tidak ditemukan.</i>\n"
+        
+    reply += "\n📌 <b>Informasi ONT (GenieACS):</b>\n"
+    if acs_found:
+        reply += (
+            f"• SN / Model: <code>{acs_data.get('serial','N/A')}</code> ({acs_data.get('manufacturer','N/A')} {acs_data.get('model','N/A')})\n"
+            f"• Redaman (RxPower): <b>{acs_data.get('rx_power','N/A')} dBm</b> ({acs_data.get('rx_status_emoji','⚪ Unknown')})\n"
+            f"• Uptime Perangkat: <code>{acs_data.get('ont_uptime_str','N/A')}</code>\n"
+            f"• Temperatur: <code>{acs_data.get('temperature','N/A')} °C</code>\n"
+            f"• Mode PON: <code>{acs_data.get('pon_mode','N/A')}</code>\n"
+        )
+    else:
+        reply += f"• <i>ONT Detail: {acs_data.get('message', 'Data tidak ditemukan')}</i>\n"
+        
+    # === NOC SMART DIAGNOSTICS & RECOMMENDATIONS ===
+    recommendations = []
+    
+    if acs_found:
+        try:
+            rx_float = float(acs_data.get('rx_power', 'N/A'))
+            if rx_float < -27.0:
+                recommendations.append(f"⚠️ <b>Redaman Buruk ({rx_float} dBm):</b> Sinyal berada di bawah batas normal (-27 dBm). Disarankan pengecekan sambungan fisik atau redrop kabel optik.")
+        except:
+            pass
+            
+        if acs_data.get('ont_uptime_days', 0) > 60:
+            recommendations.append(f"💡 <b>ONT Uptime Tinggi ({acs_data.get('ont_uptime_days', 0)} hari):</b> Perangkat ONT aktif terlalu lama tanpa reboot. Disarankan me-reboot ONT untuk optimalisasi kinerja memori.")
+            
+    if is_online and session_days > 60:
+        recommendations.append(f"🔌 <b>Sesi RADIUS Tinggi ({session_days} hari):</b> Sesi dial-up aktif terlalu lama tanpa refresh. Disarankan 'Kick Session' agar mendapat alokasi IP & rute segar.")
+        
+    if recommendations:
+        reply += "\n🧠 <b>Rekomendasi Pintar (NOC Diagnostic):</b>\n"
+        for rec in recommendations:
+            reply += f"• {rec}\n"
+            
+    # Tambahkan Tombol Interaktif
+    inline_keyboard = []
+    row = []
+    if is_online:
+        row.append({"text": "⚡ Kick Session", "callback_data": f"kick_session:{username}"})
+    if acs_found:
+        row.append({"text": "🔄 Reboot ONT", "callback_data": f"reboot_ont:{username}"})
+    if row:
+        inline_keyboard.append(row)
+        
+    row2 = []
+    if acs_found:
+        row2.append({"text": "📡 Scan Wi-Fi Sekitar", "callback_data": f"scan_wifi:{username}"})
+        row2.append({"text": "🛠️ Provisioning Wizard", "callback_data": f"prov_menu:{username}"})
+    if row2:
+        inline_keyboard.append(row2)
+        
+    payload = {
+        'chat_id': chat_id,
+        'text': reply,
+        'parse_mode': 'HTML'
+    }
+    
+    if inline_keyboard:
+        import json as _json
+        payload['reply_markup'] = _json.dumps({"inline_keyboard": inline_keyboard})
+        
+    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data=payload)
+
+def _wifi_scan_worker(chat_id, username, token):
+    try:
+        # 1. Cari device info (agar dapat device_id)
+        acs_data = get_genieacs_device_info(username)
+        if not acs_data.get('found'):
+            # Fallback DB
+            try:
+                mapping_res = execute_query("SELECT serial_number FROM ont_serial_mapping WHERE username = %s LIMIT 1", (username,))
+                if mapping_res:
+                    db_serial = mapping_res[0]['serial_number'].strip()
+                    acs_data = get_genieacs_device_info(db_serial)
+            except Exception as db_err:
+                print(f"Error mapping username in scan worker: {db_err}")
+                
+        if not acs_data.get('found'):
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                'chat_id': chat_id,
+                'text': f"❌ <b>Gagal:</b> ONT untuk user <code>{username}</code> tidak ditemukan di GenieACS.",
+                'parse_mode': 'HTML'
+            })
+            return
+            
+        device_id = acs_data.get('id')
+        if not device_id:
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                'chat_id': chat_id,
+                'text': f"❌ <b>Gagal:</b> ID Perangkat tidak valid.",
+                'parse_mode': 'HTML'
+            })
+            return
+            
+        # Kirim update progress
+        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+            'chat_id': chat_id,
+            'text': f"📡 <b>[1/3] Pemicuan Scan...</b>\nONT sedang memindai jaringan Wi-Fi tetangga via CWMP. Mohon tunggu...",
+            'parse_mode': 'HTML'
+        })
+        
+        # 2. Jalankan scan
+        scan_res = run_wifi_scan(device_id)
+        if not scan_res.get('success'):
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                'chat_id': chat_id,
+                'text': f"❌ <b>Gagal Scan Wi-Fi:</b> {scan_res.get('message', 'Timeout / Error NBI')}",
+                'parse_mode': 'HTML'
+            })
+            return
+            
+        # Kirim update progress
+        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+            'chat_id': chat_id,
+            'text': f"🧠 <b>[2/3] Analisis Interferensi...</b>\nMenganalisis kekuatan sinyal & tumpang tindih channel tetangga...",
+            'parse_mode': 'HTML'
+        })
+        
+        # 3. Analisis
+        analysis = analyze_wifi_neighbors(scan_res['device'])
+        
+        # 4. Susun Balasan
+        reply = (
+            f"📶 <b>Hasil Analisis Wi-Fi:</b>\n"
+            f"• Pelanggan: <code>{username}</code>\n"
+            f"• Wi-Fi 2.4 GHz saat ini: Channel <b>{analysis['current_2g_channel']}</b>\n"
+            f"• Wi-Fi 5 GHz saat ini: Channel <b>{analysis['current_5g_channel']}</b>\n\n"
+        )
+        
+        # Tampilkan rekomendasi 2.4 GHz
+        scores_2g = analysis['scores_2g']
+        reply += (
+            f"💡 <b>Rekomendasi 2.4 GHz (Non-overlapping):</b>\n"
+            f"• Channel 1 : Interferensi Score <b>{scores_2g[1]:.1f}</b>\n"
+            f"• Channel 6 : Interferensi Score <b>{scores_2g[6]:.1f}</b>\n"
+            f"• Channel 11: Interferensi Score <b>{scores_2g[11]:.1f}</b>\n"
+            f"👉 <b>Rekomendasi Terbaik: Channel {analysis['best_2g_channel']}</b>\n\n"
+        )
+        
+        # Tampilkan rekomendasi 5 GHz
+        scores_5g = analysis['scores_5g']
+        reply += (
+            f"💡 <b>Rekomendasi 5 GHz (Non-DFS):</b>\n"
+            f"👉 <b>Rekomendasi Terbaik: Channel {analysis['best_5g_channel']}</b>\n"
+            f"  (Interferensi terendah pada channel {analysis['best_5g_channel']} dengan score {scores_5g[analysis['best_5g_channel']]:.1f})\n\n"
+        )
+        
+        # Tampilkan list Neighbor terkuat (jika ada)
+        neighbors_2g = analysis['neighbors_2g']
+        if neighbors_2g:
+            reply += "📡 <b>Sinyal Tetangga 2.4 GHz Terkuat:</b>\n"
+            for n in neighbors_2g[:5]:
+                reply += f"• <code>{n['ssid']}</code> (Ch {n['channel']}, {n['rssi']} dBm)\n"
+            reply += "\n"
+            
+        neighbors_5g = analysis['neighbors_5g']
+        if neighbors_5g:
+            reply += "📡 <b>Sinyal Tetangga 5 GHz Terkuat:</b>\n"
+            for n in neighbors_5g[:5]:
+                reply += f"• <code>{n['ssid']}</code> (Ch {n['channel']}, {n['rssi']} dBm)\n"
+            reply += "\n"
+            
+        reply += "⚙️ <b>Terapkan Channel Rekomendasi Secara Instan:</b>"
+        
+        # Tombol interaktif untuk menerapkan channel
+        inline_keyboard = []
+        row_apply = [
+            {"text": f"📡 Terapkan Ch {analysis['best_2g_channel']} (2.4G)", "callback_data": f"set_channel:{username}:1:{analysis['best_2g_channel']}"}
+        ]
+        # check if 5G exists on device
+        wlan_conf = scan_res['device'].get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
+        if "5" in wlan_conf:
+            row_apply.append({"text": f"📡 Terapkan Ch {analysis['best_5g_channel']} (5G)", "callback_data": f"set_channel:{username}:5:{analysis['best_5g_channel']}"})
+        inline_keyboard.append(row_apply)
+        
+        # Tambahkan baris tombol kembali / re-scan
+        inline_keyboard.append([
+            {"text": "🔄 Scan Ulang", "callback_data": f"scan_wifi:{username}"},
+            {"text": "🔙 Menu Cek", "callback_data": f"cek_back:{username}"}
+        ])
+        
+        import json as _json
+        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+            'chat_id': chat_id,
+            'text': reply,
+            'parse_mode': 'HTML',
+            'reply_markup': {"inline_keyboard": inline_keyboard}
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+            'chat_id': chat_id,
+            'text': f"❌ <b>Error dalam Wi-Fi Analyzer:</b> {e}",
+            'parse_mode': 'HTML'
+        })
+
 def background_telegram_bot():
     """Mendengar pesan Telegram masuk (bot polling) untuk melayani perintah teknisi secara interaktif."""
     print("[telegram-bot] Thread initialized, sleeping 20s for stability...")
@@ -951,6 +1355,77 @@ def background_telegram_bot():
                                 'text': f"⚡ <b>Hasil Ping Ulang:</b>\nIP: <code>{nas_ip}</code>\nStatus: <b>{status_emoji}</b>",
                                 'parse_mode': 'HTML'
                             }, timeout=5)
+                            
+                        elif cb_data.startswith('scan_wifi:'):
+                            username = cb_data.split(':', 1)[1]
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': cb_chat_id,
+                                'text': f"📡 <b>Memulai Wi-Fi Analyzer untuk pelanggan:</b> <code>{username}</code>...\nProses ini memerlukan komunikasi langsung dengan ONT dan memakan waktu sekitar 10-15 detik. Mohon tunggu...",
+                                'parse_mode': 'HTML'
+                            }, timeout=5)
+                            
+                            # Jalankan scan Wi-Fi di thread terpisah agar tidak memblokir polling loop
+                            threading.Thread(target=_wifi_scan_worker, args=(cb_chat_id, username, token), daemon=True).start()
+                            
+                        elif cb_data.startswith('set_channel:'):
+                            parts = cb_data.split(':')
+                            username = parts[1]
+                            wlan_instance = parts[2]
+                            channel = parts[3]
+                            
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': cb_chat_id,
+                                'text': f"⏳ Sedang menerapkan Channel <code>{channel}</code> ke ONT WLAN {wlan_instance} via CWMP...",
+                                'parse_mode': 'HTML'
+                            }, timeout=5)
+                            
+                            # Jalankan set channel di thread terpisah agar tidak memblokir
+                            def _set_channel_worker(chat_id, username, instance, ch, token):
+                                try:
+                                    # Cari device info
+                                    from services.genieacs import get_genieacs_device_info, set_wifi_channel
+                                    acs_data = get_genieacs_device_info(username)
+                                    if not acs_data.get('found'):
+                                        # Fallback DB
+                                        from database import execute_query
+                                        mapping_res = execute_query("SELECT serial_number FROM ont_serial_mapping WHERE username = %s LIMIT 1", (username,))
+                                        if mapping_res:
+                                            db_serial = mapping_res[0]['serial_number'].strip()
+                                            acs_data = get_genieacs_device_info(db_serial)
+                                            
+                                    if not acs_data.get('found'):
+                                        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                            'chat_id': chat_id,
+                                            'text': "❌ <b>Gagal:</b> ONT tidak ditemukan di GenieACS.",
+                                            'parse_mode': 'HTML'
+                                        })
+                                        return
+                                        
+                                    device_id = acs_data.get('id')
+                                    success, msg = set_wifi_channel(device_id, instance, ch)
+                                    status_str = "✅ <b>Penerapan Channel Sukses!</b>" if success else "❌ <b>Penerapan Channel Gagal!</b>"
+                                    
+                                    # Tombol kembali ke cek menu
+                                    import json as _json
+                                    buttons = [[{"text": "🔙 Kembali", "callback_data": f"cek_back:{username}"}]]
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+                                        'chat_id': chat_id,
+                                        'text': f"{status_str}\n\n• Detail: {msg}",
+                                        'parse_mode': 'HTML',
+                                        'reply_markup': {"inline_keyboard": buttons}
+                                    })
+                                except Exception as err:
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': chat_id,
+                                        'text': f"❌ <b>Error:</b> {err}",
+                                        'parse_mode': 'HTML'
+                                    })
+                                    
+                            threading.Thread(target=_set_channel_worker, args=(cb_chat_id, username, wlan_instance, channel, token), daemon=True).start()
+                            
+                        elif cb_data.startswith('cek_back:'):
+                            username = cb_data.split(':', 1)[1]
+                            handle_cek_command(cb_chat_id, username, token)
                             
                         elif cb_data.startswith('kick_session:'):
                             username = cb_data.split(':', 1)[1]
@@ -1882,125 +2357,7 @@ def background_telegram_bot():
                         continue
                         
                     username = arg.strip()
-                    
-                    # 1. Query PostgreSQL untuk status sesi RADIUS
-                    session_res = execute_query("""
-                        SELECT * FROM radacct 
-                        WHERE username = %s 
-                        ORDER BY acctstarttime DESC LIMIT 1
-                    """, (username,))
-                    
-                    is_online = False
-                    nas_ip = "N/A"
-                    nas_name = "N/A"
-                    framed_ip = "N/A"
-                    mac_address = "N/A"
-                    uptime_str = "N/A"
-                    session_days = 0
-                    
-                    if session_res:
-                        s = session_res[0]
-                        if s.get('acctstoptime') is None:
-                            is_online = True
-                            start_time = s.get('acctstarttime')
-                            if start_time:
-                                now = datetime.now(start_time.tzinfo) if start_time.tzinfo else datetime.now()
-                                diff = now - start_time
-                                hours, remainder = divmod(diff.seconds, 3600)
-                                minutes, seconds = divmod(remainder, 60)
-                                uptime_str = f"{diff.days}d {hours}h {minutes}m"
-                                session_days = diff.days
-                        
-                        nas_ip = s.get('nasipaddress', 'N/A')
-                        framed_ip = s.get('framedipaddress', 'N/A')
-                        mac_address = s.get('callingstationid', 'N/A')
-                        
-                        # Dapatkan nama NAS
-                        nas_info = execute_query("SELECT shortname FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
-                        if nas_info:
-                            nas_name = nas_info[0]['shortname'] or nas_ip
-                    
-                    # 2. Query GenieACS service dengan cache Redis
-                    acs_data = get_genieacs_device_info(username)
-                    acs_found = acs_data.get('found', False)
-                    
-                    # 3. Formulasikan Balasan HTML & Smart Diagnostics
-                    status_str = "🟢 <b>ONLINE</b>" if is_online else "🔴 <b>OFFLINE</b>"
-                    
-                    reply = (
-                        f"👤 <b>Informasi Pelanggan:</b>\n"
-                        f"• Username: <code>{username}</code>\n"
-                        f"• Status Sesi: {status_str}\n"
-                    )
-                    
-                    if session_res:
-                        reply += (
-                            f"• Router NAS: <b>{nas_name}</b> (<code>{nas_ip}</code>)\n"
-                            f"• IP Address: <code>{framed_ip}</code>\n"
-                            f"• MAC Address: <code>{mac_address}</code>\n"
-                            f"• Sesi Aktif Uptime: <code>{uptime_str}</code>\n"
-                        )
-                    else:
-                        reply += "• <i>Log Sesi RADIUS tidak ditemukan.</i>\n"
-                        
-                    reply += "\n📌 <b>Informasi ONT (GenieACS):</b>\n"
-                    if acs_found:
-                        reply += (
-                            f"• SN / Model: <code>{acs_data.get('serial','N/A')}</code> ({acs_data.get('manufacturer','N/A')} {acs_data.get('model','N/A')})\n"
-                            f"• Redaman (RxPower): <b>{acs_data.get('rx_power','N/A')} dBm</b> ({acs_data.get('rx_status_emoji','⚪ Unknown')})\n"
-                            f"• Uptime Perangkat: <code>{acs_data.get('ont_uptime_str','N/A')}</code>\n"
-                            f"• Temperatur: <code>{acs_data.get('temperature','N/A')} °C</code>\n"
-                            f"• Mode PON: <code>{acs_data.get('pon_mode','N/A')}</code>\n"
-                        )
-                    else:
-                        reply += f"• <i>ONT Detail: {acs_data.get('message', 'Data tidak ditemukan')}</i>\n"
-                        
-                    # === NOC SMART DIAGNOSTICS & RECOMMENDATIONS ===
-                    recommendations = []
-                    
-                    if acs_found:
-                        try:
-                            rx_float = float(acs_data.get('rx_power', 'N/A'))
-                            if rx_float < -27.0:
-                                recommendations.append(f"⚠️ <b>Redaman Buruk ({rx_float} dBm):</b> Sinyal berada di bawah batas normal (-27 dBm). Disarankan pengecekan sambungan fisik atau redrop kabel optik.")
-                        except:
-                            pass
-                            
-                        if acs_data.get('ont_uptime_days', 0) > 60:
-                            recommendations.append(f"💡 <b>ONT Uptime Tinggi ({acs_data.get('ont_uptime_days', 0)} hari):</b> Perangkat ONT aktif terlalu lama tanpa reboot. Disarankan me-reboot ONT untuk optimalisasi kinerja memori.")
-                            
-                    if is_online and session_days > 60:
-                        recommendations.append(f"🔌 <b>Sesi RADIUS Tinggi ({session_days} hari):</b> Sesi dial-up aktif terlalu lama tanpa refresh. Disarankan 'Kick Session' agar mendapat alokasi IP & rute segar.")
-                        
-                    if recommendations:
-                        reply += "\n🧠 <b>Rekomendasi Pintar (NOC Diagnostic):</b>\n"
-                        for rec in recommendations:
-                            reply += f"• {rec}\n"
-                            
-                    # Tambahkan Tombol Interaktif
-                    inline_keyboard = []
-                    row = []
-                    if is_online:
-                        row.append({"text": "⚡ Kick Session", "callback_data": f"kick_session:{username}"})
-                    if acs_found:
-                        row.append({"text": "🔄 Reboot ONT", "callback_data": f"reboot_ont:{username}"})
-                    if row:
-                        inline_keyboard.append(row)
-                        
-                    if acs_found:
-                        inline_keyboard.append([{"text": "🛠️ Provisioning Wizard", "callback_data": f"prov_menu:{username}"}])
-                        
-                    payload = {
-                        'chat_id': chat_id,
-                        'text': reply,
-                        'parse_mode': 'HTML'
-                    }
-                    
-                    if inline_keyboard:
-                        import json as _json
-                        payload['reply_markup'] = _json.dumps({"inline_keyboard": inline_keyboard})
-                        
-                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data=payload)
+                    handle_cek_command(chat_id, username, token)
                     continue
                     
                 # Perintah /provision [username]

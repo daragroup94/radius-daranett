@@ -70,7 +70,7 @@ def get_genieacs_device_info(username):
                 {"VirtualParameters.getSerialNumber._value": username}
             ]
         })
-        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime'
+        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime,InternetGatewayDevice.WANDevice.1.WANConnectionDevice'
         
         resp = requests.get(
             f'{GENIEACS_NBI}/devices',
@@ -147,6 +147,38 @@ def get_genieacs_device_info(username):
             except:
                 pass
                 
+        # Extract WAN MAC Address
+        mac_addr = 'N/A'
+        try:
+            wcd = d.get('InternetGatewayDevice', {}).get('WANDevice', {}).get('1', {}).get('WANConnectionDevice', {})
+            for wcd_idx, wcd_val in wcd.items():
+                if not wcd_idx.isdigit():
+                    continue
+                # check IP connection
+                ip_conn = wcd_val.get('WANIPConnection', {})
+                for i_idx, i_val in ip_conn.items():
+                    if not i_idx.isdigit():
+                        continue
+                    val_mac = i_val.get('MACAddress', {})
+                    if isinstance(val_mac, dict) and '_value' in val_mac and val_mac['_value']:
+                        mac_addr = val_mac['_value']
+                        break
+                if mac_addr != 'N/A':
+                    break
+                # check PPP connection
+                ppp_conn = wcd_val.get('WANPPPConnection', {})
+                for p_idx, p_val in ppp_conn.items():
+                    if not p_idx.isdigit():
+                        continue
+                    val_mac = p_val.get('MACAddress', {})
+                    if isinstance(val_mac, dict) and '_value' in val_mac and val_mac['_value']:
+                        mac_addr = val_mac['_value']
+                        break
+                if mac_addr != 'N/A':
+                    break
+        except Exception as mac_err:
+            print(f"Error parsing MAC address from document: {mac_err}")
+                
         res_data = {
             'found': True,
             'serial': val(vp.get('getSerialNumber', {})) or dev_id.get('_SerialNumber', 'N/A'),
@@ -157,13 +189,16 @@ def get_genieacs_device_info(username):
             'rx_status': rx_status,
             'rx_status_emoji': rx_status_emoji,
             'pppoe_ip': val(vp.get('pppoeIP', {})),
+            'pppoe_username': val(vp.get('pppoeUsername', {})),
             'device_uptime': val(vp.get('getdeviceuptime', {})),
             'ppp_uptime': val(vp.get('getpppuptime', {})),
             'temperature': val(vp.get('gettemp', {})),
             'pon_mode': val(vp.get('getponmode', {})),
             'last_inform': d.get('_lastInform', 'N/A'),
             'ont_uptime_str': ont_uptime_str,
-            'ont_uptime_days': ont_uptime_days
+            'ont_uptime_days': ont_uptime_days,
+            'mac_address': mac_addr,
+            'id': d.get('_id')
         }
         
         # Cache hasil selama 30 detik
@@ -179,3 +214,306 @@ def get_genieacs_device_info(username):
         return {'found': False, 'message': 'GenieACS tidak dapat dihubungi'}
     except Exception as e:
         return {'found': False, 'message': str(e)}
+
+def run_wifi_scan(device_id):
+    """
+    Memerintahkan ONT melakukan scanning jaringan Wi-Fi tetangga via GenieACS.
+    """
+    import urllib.parse
+    import time
+    
+    config = get_genieacs_config()
+    url = config['url']
+    auth = config['auth']
+    
+    # 1. Hapus task pending untuk menghindari antrean bertumpuk
+    try:
+        resp = requests.get(f"{url}/tasks", params={"query": _json.dumps({"device": device_id})}, auth=auth, timeout=5)
+        if resp.status_code == 200:
+            for t in resp.json():
+                requests.delete(f"{url}/tasks/{t['_id']}", auth=auth, timeout=5)
+    except Exception as e:
+        print(f"Error clearing tasks: {e}")
+
+    # Cek WLAN mana saja yang aktif
+    wlan1_path = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1"
+    wlan5_path = "InternetGatewayDevice.LANDevice.1.WLANConfiguration.5"
+    
+    # Ambil document device terlebih dahulu untuk memastikan path WLAN ada
+    has_wlan1 = False
+    has_wlan5 = False
+    cr_url = None
+    try:
+        dev_resp = requests.get(f"{url}/devices", params={"query": _json.dumps({"_id": device_id})}, auth=auth, timeout=5)
+        if dev_resp.status_code == 200 and dev_resp.json():
+            dev_doc = dev_resp.json()[0]
+            wlan_conf = dev_doc.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
+            if "1" in wlan_conf:
+                has_wlan1 = True
+            if "5" in wlan_conf:
+                has_wlan5 = True
+                
+            for p in ["InternetGatewayDevice", "Device"]:
+                cr_obj = dev_doc.get(p, {}).get("ManagementServer", {}).get("ConnectionRequestURL", {})
+                if isinstance(cr_obj, dict) and cr_obj.get('_value'):
+                    cr_url = cr_obj['_value']
+                    break
+    except Exception as e:
+        print(f"Error checking WLAN existence: {e}")
+        has_wlan1 = True # default fallback
+        
+    tasks_queued = []
+    task_url = f"{url}/devices/{urllib.parse.quote(device_id)}/tasks"
+    
+    # Kita buat setParameterValues untuk WLAN yang ada
+    param_values = []
+    if has_wlan1:
+        param_values.append([f"{wlan1_path}.DiagnosticsState", "Requested"])
+    if has_wlan5:
+        param_values.append([f"{wlan5_path}.DiagnosticsState", "Requested"])
+        
+    if not param_values:
+        return {'success': False, 'message': 'Tidak ada interface WLAN yang ditemukan.'}
+        
+    payload = {
+        "name": "setParameterValues",
+        "parameterValues": param_values
+    }
+    
+    task_id = None
+    try:
+        resp = requests.post(task_url, json=payload, auth=auth, timeout=10)
+        if resp.status_code in (200, 201, 202):
+            task_id = resp.json().get('_id')
+    except requests.exceptions.ReadTimeout:
+        # Timeout bisa terjadi tapi task tetap masuk
+        time.sleep(2)
+        try:
+            t_resp = requests.get(f"{url}/tasks", params={"query": _json.dumps({"device": device_id})}, auth=auth, timeout=5)
+            if t_resp.status_code == 200 and t_resp.json():
+                task_id = t_resp.json()[0]['_id']
+        except:
+            pass
+    except Exception as e:
+        return {'success': False, 'message': f'Gagal mengirim perintah scan: {e}'}
+        
+    # Trigger Connection Request
+    try:
+        if cr_url:
+            requests.get(cr_url, auth=requests.auth.HTTPDigestAuth('msn', 'msn'), timeout=8)
+    except Exception as cr_err:
+        print(f"Connection Request trigger error: {cr_err}")
+        
+    # Tunggu task setParameterValues selesai (maksimal 15 detik)
+    task_done = False
+    if task_id:
+        for _ in range(10):
+            time.sleep(1.5)
+            try:
+                chk = requests.get(f"{url}/tasks", params={"query": _json.dumps({"_id": task_id})}, auth=auth, timeout=5)
+                if chk.status_code == 200:
+                    if not chk.json():
+                        task_done = True
+                        break
+                    else:
+                        task_data = chk.json()[0]
+                        if 'fault' in task_data:
+                            print(f"Task scan error: {task_data['fault']}")
+                            break
+            except Exception as chk_err:
+                print(f"Error checking task status: {chk_err}")
+                
+    # Tunggu 3 detik tambahan agar ONT memproses scan internal
+    time.sleep(3)
+    
+    # Sekarang kita queue getParameterValues untuk table Neighbor
+    gp_params = []
+    if has_wlan1:
+        gp_params.append(f"{wlan1_path}.Neighbor.")
+    if has_wlan5:
+        gp_params.append(f"{wlan5_path}.Neighbor.")
+        
+    gp_payload = {
+        "name": "getParameterValues",
+        "parameterNames": gp_params
+    }
+    
+    gp_task_id = None
+    try:
+        resp = requests.post(task_url, json=gp_payload, auth=auth, timeout=10)
+        if resp.status_code in (200, 201, 202):
+            gp_task_id = resp.json().get('_id')
+    except Exception as e:
+        print(f"Error queuing getParameterValues: {e}")
+        
+    # Trigger Connection Request lagi
+    try:
+        if cr_url:
+            requests.get(cr_url, auth=requests.auth.HTTPDigestAuth('msn', 'msn'), timeout=8)
+    except:
+        pass
+        
+    # Tunggu getParameterValues selesai (maksimal 15 detik)
+    if gp_task_id:
+        for _ in range(10):
+            time.sleep(1.5)
+            try:
+                chk = requests.get(f"{url}/tasks", params={"query": _json.dumps({"_id": gp_task_id})}, auth=auth, timeout=5)
+                if chk.status_code == 200 and not chk.json():
+                    break
+            except:
+                pass
+                
+    # Ambil data terbaru dari device document
+    try:
+        dev_resp = requests.get(f"{url}/devices", params={"query": _json.dumps({"_id": device_id})}, auth=auth, timeout=5)
+        if dev_resp.status_code == 200 and dev_resp.json():
+            return {'success': True, 'device': dev_resp.json()[0]}
+    except Exception as e:
+        return {'success': False, 'message': f'Gagal mengunduh hasil scan: {e}'}
+        
+    return {'success': False, 'message': 'Tidak dapat mengambil hasil scan dari ONT.'}
+
+def analyze_wifi_neighbors(device_doc):
+    """
+    Menganalisis data Neighbor untuk frekuensi 2.4 GHz dan 5 GHz,
+    menghitung tingkat interferensi, dan merekomendasikan channel terbaik.
+    """
+    neighbors_2g = []
+    neighbors_5g = []
+    
+    # Ambil current channel untuk 2.4G dan 5G
+    wlan_conf = device_doc.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
+    
+    current_2g_channel = "Auto"
+    current_5g_channel = "Auto"
+    
+    # Ambil channel 2.4G (WLAN 1)
+    if "1" in wlan_conf:
+        ch = wlan_conf["1"].get("Channel", {}).get("_value", "0")
+        auto_ch = wlan_conf["1"].get("AutoChannelEnable", {}).get("_value", False)
+        current_2g_channel = "Auto" if auto_ch == True or auto_ch == "true" or ch == "0" or ch == 0 else str(ch)
+        
+    # Ambil channel 5G (WLAN 5)
+    if "5" in wlan_conf:
+        ch = wlan_conf["5"].get("Channel", {}).get("_value", "0")
+        auto_ch = wlan_conf["5"].get("AutoChannelEnable", {}).get("_value", False)
+        current_5g_channel = "Auto" if auto_ch == True or auto_ch == "true" or ch == "0" or ch == 0 else str(ch)
+
+    # Iterasi semua WLANConfiguration untuk mencari Neighbor
+    for wlan_idx, wlan_val in wlan_conf.items():
+        if not wlan_idx.isdigit():
+            continue
+        neighbor_table = wlan_val.get("Neighbor", {})
+        for n_idx, n_val in neighbor_table.items():
+            if not n_idx.isdigit():
+                continue
+                
+            def val(obj):
+                return obj.get('_value') if isinstance(obj, dict) else obj
+                
+            ssid = val(n_val.get("SSID")) or "Hidden SSID"
+            bssid = val(n_val.get("BSSID")) or "N/A"
+            
+            try:
+                channel = int(val(n_val.get("Channel")) or 0)
+            except:
+                channel = 0
+                
+            rssi = -95
+            for rssi_key in ("SignalStrength", "RSSI", "Signal", "SignalStrengthScore"):
+                if rssi_key in n_val:
+                    try:
+                        rssi = int(val(n_val[rssi_key]))
+                        break
+                    except:
+                        pass
+            
+            if channel == 0:
+                continue
+                
+            neighbor_info = {
+                'ssid': ssid,
+                'bssid': bssid,
+                'channel': channel,
+                'rssi': rssi
+            }
+            
+            if channel <= 14:
+                neighbors_2g.append(neighbor_info)
+            else:
+                neighbors_5g.append(neighbor_info)
+                
+    # ANALISIS 2.4 GHz
+    # Channel target yang disarankan untuk 2.4G: 1, 6, 11 (Non-overlapping)
+    # Kita hitung skor interferensi untuk masing-masing
+    interf_2g = {1: 0, 6: 0, 11: 0}
+    for target in [1, 6, 11]:
+        for n in neighbors_2g:
+            ch = n['channel']
+            rssi = n['rssi']
+            diff = abs(ch - target)
+            if diff < 5:
+                overlap_factor = (5 - diff) / 5
+                weight = max(0, rssi + 100)
+                interf_2g[target] += weight * overlap_factor
+                
+    # Rekomendasi 2.4 GHz: cari dengan score terkecil
+    best_2g_channel = min(interf_2g, key=interf_2g.get)
+    
+    # ANALISIS 5 GHz
+    # Channel target yang disarankan untuk 5G: 36, 40, 44, 48, 149, 153, 157, 161
+    targets_5g = [36, 40, 44, 48, 149, 153, 157, 161]
+    interf_5g = {t: 0 for t in targets_5g}
+    for target in targets_5g:
+        for n in neighbors_5g:
+            ch = n['channel']
+            rssi = n['rssi']
+            if ch == target:
+                interf_5g[target] += max(0, rssi + 100)
+            elif abs(ch - target) <= 4:
+                interf_5g[target] += max(0, rssi + 100) * 0.5
+                
+    best_5g_channel = min(interf_5g, key=interf_5g.get)
+    
+    return {
+        'neighbors_2g_count': len(neighbors_2g),
+        'neighbors_5g_count': len(neighbors_5g),
+        'neighbors_2g': sorted(neighbors_2g, key=lambda x: x['rssi'], reverse=True)[:10], # 10 terkuat
+        'neighbors_5g': sorted(neighbors_5g, key=lambda x: x['rssi'], reverse=True)[:10],
+        'current_2g_channel': current_2g_channel,
+        'current_5g_channel': current_5g_channel,
+        'best_2g_channel': best_2g_channel,
+        'best_5g_channel': best_5g_channel,
+        'scores_2g': interf_2g,
+        'scores_5g': interf_5g
+    }
+
+def set_wifi_channel(device_id, wlan_instance, channel):
+    """
+    Menerapkan channel Wi-Fi tertentu ke ONT.
+    """
+    import urllib.parse
+    config = get_genieacs_config()
+    url = config['url']
+    auth = config['auth']
+    
+    task_url = f"{url}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
+    
+    # Standard: AutoChannelEnable = False, Channel = channel
+    payload = {
+        "name": "setParameterValues",
+        "parameterValues": [
+            [f"InternetGatewayDevice.LANDevice.1.WLANConfiguration.{wlan_instance}.AutoChannelEnable", False],
+            [f"InternetGatewayDevice.LANDevice.1.WLANConfiguration.{wlan_instance}.Channel", int(channel)]
+        ]
+    }
+    
+    try:
+        resp = requests.post(task_url, json=payload, auth=auth, timeout=15)
+        if resp.status_code in (200, 201, 202):
+            return True, f"Channel {channel} berhasil dikirim ke antrean ONT."
+        else:
+            return False, f"Respon API GenieACS: {resp.status_code}"
+    except Exception as e:
+        return False, str(e)
