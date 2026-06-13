@@ -617,38 +617,103 @@ def get_wlan_clients_realtime(device_id):
         dev_resp = requests.get(f"{url}/devices", params={"query": _json.dumps({"_id": device_id})}, auth=auth, timeout=5)
         if dev_resp.status_code == 200 and dev_resp.json():
             dev_doc = dev_resp.json()[0]
+            
+            # Deteksi ModelName untuk penanganan khusus
+            model_name = ""
+            for p in ["InternetGatewayDevice", "Device"]:
+                if p in dev_doc and "DeviceInfo" in dev_doc[p] and "ModelName" in dev_doc[p]["DeviceInfo"]:
+                    model_name = dev_doc[p]["DeviceInfo"]["ModelName"].get("_value", "")
+                    break
+
             if "InternetGatewayDevice" in dev_doc:
                 wlan_conf = dev_doc.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
                 for k in wlan_conf.keys():
                     if k.isdigit():
-                        wlan_instances.append(k)
+                        ssid_data = wlan_conf.get(k, {})
+                        
+                        # Only query if WLAN instance is active/enabled
+                        is_enabled = ssid_data.get("Enable", {}).get("_value")
+                        is_disabled = False
+                        if is_enabled is False:
+                            is_disabled = True
+                        elif isinstance(is_enabled, str) and is_enabled.lower() in ('false', '0'):
+                            is_disabled = True
+                        
+                        if is_disabled:
+                            print(f"[wlan-clients] Skipping WLANConfiguration.{k}: disabled")
+                            continue
+
+                        # Validasi: hanya masukkan index yang benar-benar memiliki sub-parameter valid
+                        # (TotalAssociations atau AssociatedDevice) di dokumen perangkat.
+                        # Ini mencegah error "Invalid parameter path" pada perangkat yang tidak
+                        # mendukung semua 8 slot SSID (contoh: HG6145D2 hanya 4 slot).
+                        has_total = isinstance(ssid_data.get("TotalAssociations"), dict)
+                        has_assoc = isinstance(ssid_data.get("AssociatedDevice"), dict)
+                        has_ssid = isinstance(ssid_data.get("SSID"), dict)
+                        if has_total or has_assoc or has_ssid:
+                            wlan_instances.append(k)
+                        else:
+                            print(f"[wlan-clients] Skipping WLANConfiguration.{k}: no valid sub-parameters found in device document")
             elif "Device" in dev_doc:
                 wlan_conf = dev_doc.get("Device", {}).get("WiFi", {}).get("AccessPoint", {})
                 for k in wlan_conf.keys():
                     if k.isdigit():
-                        wlan_instances.append(k)
+                        ap_data = wlan_conf.get(k, {})
+                        
+                        # Only query if AccessPoint is active/enabled
+                        is_enabled = ap_data.get("Enable", {}).get("_value")
+                        is_disabled = False
+                        if is_enabled is False:
+                            is_disabled = True
+                        elif isinstance(is_enabled, str) and is_enabled.lower() in ('false', '0'):
+                            is_disabled = True
+                        
+                        if is_disabled:
+                            print(f"[wlan-clients] Skipping AccessPoint.{k}: disabled")
+                            continue
+
+                        has_entries = isinstance(ap_data.get("AssociatedDeviceNumberOfEntries"), dict)
+                        has_assoc = isinstance(ap_data.get("AssociatedDevice"), dict)
+                        if has_entries or has_assoc:
+                            wlan_instances.append(k)
+                        else:
+                            print(f"[wlan-clients] Skipping AccessPoint.{k}: no valid sub-parameters found in device document")
                 is_tr181 = True
                 
             for p in ["InternetGatewayDevice", "Device"]:
                 cr_obj = dev_doc.get(p, {}).get("ManagementServer", {}).get("ConnectionRequestURL", {})
                 if isinstance(cr_obj, dict) and cr_obj.get('_value'):
-                    cr_url = cr_obj['_value']
-                    break
+                     cr_url = cr_obj['_value']
+                     break
+                     
+            if wlan_instances:
+                print(f"[wlan-clients] Valid WLAN instances for {device_id}: {wlan_instances}")
+            else:
+                # Fallback konservatif: hanya slot utama 2.4G dan 5G
+                wlan_instances = ["1"]
+                print(f"[wlan-clients] No valid WLAN instances detected for {device_id}, falling back to {wlan_instances}")
     except Exception as e:
         print(f"Error checking WLAN existence for clients: {e}")
         
     if not wlan_instances:
-        wlan_instances = ["1", "5"]
+        wlan_instances = ["1"]
+        print(f"[wlan-clients] Using last-resort fallback WLAN instances: {wlan_instances}")
         
     # 2. Queue getParameterValues untuk AssociatedDevice dan TotalAssociations
     gp_params = []
     for k in wlan_instances:
         if is_tr181:
             gp_params.append(f"Device.WiFi.AccessPoint.{k}.AssociatedDeviceNumberOfEntries")
-            gp_params.append(f"Device.WiFi.AccessPoint.{k}.AssociatedDevice.")
+            gp_params.append(f"Device.WiFi.AccessPoint.{k}.AssociatedDevice")
         else:
             gp_params.append(f"InternetGatewayDevice.LANDevice.1.WLANConfiguration.{k}.TotalAssociations")
-            gp_params.append(f"InternetGatewayDevice.LANDevice.1.WLANConfiguration.{k}.AssociatedDevice.")
+            gp_params.append(f"InternetGatewayDevice.LANDevice.1.WLANConfiguration.{k}.AssociatedDevice")
+            
+    # Tambahkan Hosts.Host untuk real-time status port LAN belakang ONT
+    if is_tr181:
+        gp_params.append("Device.Hosts.Host")
+    else:
+        gp_params.append("InternetGatewayDevice.LANDevice.1.Hosts.Host")
         
     if gp_params:
         task_url = f"{url}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
@@ -836,6 +901,56 @@ def get_wlan_clients_realtime(device_id):
                             'device_name': device_name or "N/A"
                         })
             
+            # Ambil data LAN devices dari table Hosts
+            lan_devices = []
+            if is_tr181:
+                hosts_conf = dev_doc.get("Device", {}).get("Hosts", {}).get("Host", {})
+            else:
+                hosts_conf = dev_doc.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("Hosts", {}).get("Host", {})
+                
+            if isinstance(hosts_conf, dict):
+                # Buat set MAC address Wi-Fi client yang aktif untuk pencocokan cepat
+                wifi_macs = {c['mac'].lower().strip() for c in clients if c.get('mac')}
+                
+                for host_idx, host_val in hosts_conf.items():
+                    if not host_idx.isdigit() or not isinstance(host_val, dict):
+                        continue
+                    active = host_val.get("Active", {}).get("_value")
+                    is_active = False
+                    if active is True:
+                        is_active = True
+                    elif isinstance(active, str) and active.lower() in ('true', '1'):
+                        is_active = True
+                        
+                    if not is_active:
+                        continue
+                        
+                    mac = host_val.get("MACAddress", {}).get("_value", "")
+                    if not mac:
+                        mac = host_val.get("PhysAddress", {}).get("_value", "")
+                        
+                    mac_clean = mac.lower().strip() if mac else ""
+                    if not mac_clean:
+                        continue
+                        
+                    # Jika MAC address TIDAK ada di list Wi-Fi client yang aktif, maka ini adalah perangkat LAN
+                    if mac_clean not in wifi_macs:
+                        ip = host_val.get("IPAddress", {}).get("_value", "")
+                        name = host_val.get("HostName", {}).get("_value", "N/A")
+                        itype = host_val.get("InterfaceType", {}).get("_value", "Ethernet")
+                        
+                        # Jika InterfaceType adalah 802.11 / WiFi tapi dia terdeteksi LAN (karena stale cache di ONT), 
+                        # kita labeli sebagai LAN/Ethernet agar tidak membingungkan.
+                        if itype and ("802.11" in str(itype) or "WiFi" in str(itype) or "Wireless" in str(itype)):
+                            itype = "Ethernet"
+                            
+                        lan_devices.append({
+                            'mac': mac,
+                            'ip': ip or "N/A",
+                            'interface_type': itype or "Ethernet",
+                            'device_name': name or "N/A"
+                        })
+            
             is_stale = False
             if task_id and not task_completed:
                 is_stale = True
@@ -843,6 +958,7 @@ def get_wlan_clients_realtime(device_id):
             return {
                 'success': True,
                 'clients': clients,
+                'lan_devices': lan_devices,
                 'total_active_wifi': total_active_wifi,
                 'stale': is_stale,
                 'last_inform': last_inform_str

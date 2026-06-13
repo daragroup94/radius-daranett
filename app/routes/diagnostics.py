@@ -69,7 +69,7 @@ def optical_health_page():
 @login_required
 def api_acs_reboot_user(username):
     try:
-        from services.genieacs import get_genieacs_config
+        from services.genieacs import get_genieacs_config, trigger_connection_request_by_device_id
         config = get_genieacs_config()
         GENIEACS_NBI = config['url']
         auth = config['auth']
@@ -100,10 +100,13 @@ def api_acs_reboot_user(username):
         try:
             resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, auth=auth, timeout=10)
             if resp_reboot.status_code in (200, 201, 202):
+                trigger_connection_request_by_device_id(device_id)
                 return jsonify({'success': True, 'message': 'Perintah reboot berhasil terkirim!'})
             else:
                 return jsonify({'success': False, 'error': f'ACS API error: {resp_reboot.status_code}'}), 500
         except requests.exceptions.Timeout:
+            # Tetap coba trigger CR meskipun NBI timeout (siapa tahu task sebenarnya sudah masuk)
+            trigger_connection_request_by_device_id(device_id)
             return jsonify({'success': True, 'message': 'Koneksi lambat, namun perintah reboot telah masuk antrean di GenieACS.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

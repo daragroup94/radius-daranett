@@ -1,5 +1,5 @@
 import os
-import requests
+import requests as _real_requests
 import threading
 from datetime import datetime
 from flask import current_app
@@ -8,6 +8,89 @@ from database import execute_query
 from helpers import ping_nas
 from services.genieacs import get_genieacs_device_info, get_genieacs_config, run_wifi_scan, analyze_wifi_neighbors, set_wifi_channel, get_wlan_clients_realtime
 from services.mikrotik_coa import send_coa_disconnect
+
+class _SafeTelegramRequests:
+    def __getattr__(self, name):
+        return getattr(_real_requests, name)
+
+    def post(self, url, *args, **kwargs):
+        if "api.telegram.org" in url:
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    resp = _real_requests.post(url, *args, **kwargs)
+                    if resp.status_code == 429:
+                        try:
+                            retry_after = resp.json().get('parameters', {}).get('retry_after', 5)
+                        except Exception:
+                            retry_after = 5
+                        print(f"[Telegram API] Terkena rate limit (HTTP 429). Menunggu {retry_after} detik...")
+                        socketio.sleep(retry_after)
+                        continue
+                    return resp
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        raise e
+                    print(f"[Telegram API] Error koneksi: {e}. Mengulangi dalam 2 detik...")
+                    socketio.sleep(2)
+        return _real_requests.post(url, *args, **kwargs)
+
+    def get(self, url, *args, **kwargs):
+        if "api.telegram.org" in url:
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    resp = _real_requests.get(url, *args, **kwargs)
+                    if resp.status_code == 429:
+                        try:
+                            retry_after = resp.json().get('parameters', {}).get('retry_after', 5)
+                        except Exception:
+                            retry_after = 5
+                        print(f"[Telegram API] Terkena rate limit (HTTP 429). Menunggu {retry_after} detik...")
+                        socketio.sleep(retry_after)
+                        continue
+                    return resp
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        raise e
+                    print(f"[Telegram API] Error koneksi: {e}. Mengulangi dalam 2 detik...")
+                    socketio.sleep(2)
+        return _real_requests.get(url, *args, **kwargs)
+
+requests = _SafeTelegramRequests()
+
+TELEGRAM_TOKEN = None
+TELEGRAM_CHAT_ID = None
+
+# Check various potential env file paths once
+_env_paths = ['/app/.telegram.env', 'app/.telegram.env', '.telegram.env', '/home/my-project/project-radius/app/.telegram.env']
+for _path in _env_paths:
+    if os.path.exists(_path):
+        try:
+            with open(_path) as _f:
+                for _line in _f:
+                    if '=' in _line:
+                        _k, _v = _line.split('=', 1)
+                        _k = _k.strip()
+                        _v = _v.strip()
+                        if _k == 'TELEGRAM_BOT_TOKEN':
+                            TELEGRAM_TOKEN = _v
+                        elif _k == 'TELEGRAM_CHAT_ID':
+                            TELEGRAM_CHAT_ID = _v
+            if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+                break
+        except Exception as _e:
+            print(f"[telegram-bot] Error reading {_path}: {_e}")
+
+if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    try:
+        from config import Config
+        if not TELEGRAM_TOKEN:
+            TELEGRAM_TOKEN = Config.TELEGRAM_BOT_TOKEN
+        if not TELEGRAM_CHAT_ID:
+            TELEGRAM_CHAT_ID = Config.TELEGRAM_CHAT_ID
+    except:
+        pass
 
 _prov_states = {}
 
@@ -70,16 +153,18 @@ def show_prov_confirm(chat_id, token):
     username = state_data['username']
     wtype = state_data['wan_type']
     
-    msg = f"📝 <b>Konfirmasi Provisioning ONT</b>:\n\n" \
-          f"• Pelanggan: <code>{username}</code>\n"
+    msg = f"━━━━━━━━━━━━━━━━━━━━━━\n" \
+          f"📝 <b>KONFIRMASI PROVISIONING ONT</b>\n" \
+          f"━━━━━━━━━━━━━━━━━━━━━━\n" \
+          f"• Pelanggan: <a href=\"https://radius.go.daragroup.cloud/users?search={username}\">{username}</a>\n"
           
     if wtype == 'wifi':
-        msg += f"• Tipe: <b>Wi-Fi Config</b>\n" \
+        msg += f"• Tipe Config: <b>Wi-Fi Config</b>\n" \
                f"• Slot SSID: <b>SSID {state_data['wifi_slot']}</b>\n" \
                f"• Nama SSID: <code>{state_data['wifi_ssid']}</code>\n" \
                f"• Keamanan: <b>{state_data['wifi_sec']}</b>\n"
         if state_data['wifi_sec'] != 'None':
-            msg += f"• Password Wi-Fi: <code>{state_data['wifi_key']}</code>\n"
+            msg += f"• Password: <code>{state_data['wifi_key']}</code>\n"
     else:
         modes_map = {
             'ppp_routed': 'IP_Routed (PPPoE)',
@@ -92,27 +177,28 @@ def show_prov_confirm(chat_id, token):
                f"• Service List: <code>{state_data['service_list']}</code>\n"
                
         if wtype == 'ppp_routed':
-            msg += f"• PPPoE Username: <code>{state_data['pppoe_user']}</code>\n" \
-                   f"• PPPoE Password: <code>{state_data['pppoe_pass']}</code>\n"
+            msg += f"• PPPoE User: <code>{state_data['pppoe_user']}</code>\n" \
+                   f"• PPPoE Pass: <code>{state_data['pppoe_pass']}</code>\n"
         elif wtype == 'ip_routed':
             msg += f"• Mode IP: <b>{state_data['ipoe_addr']}</b>\n"
             if state_data['ipoe_addr'] == 'Static':
                 msg += f"  - IP Address: <code>{state_data['static_ip']}</code>\n" \
                        f"  - Subnet Mask: <code>{state_data['static_mask']}</code>\n" \
                        f"  - Gateway: <code>{state_data['static_gw']}</code>\n" \
-                       f"  - DNS: <code>{state_data['static_dns']}</code>\n"
+                       f"  - DNS Server: <code>{state_data['static_dns']}</code>\n"
                        
         if wtype in ('ppp_routed', 'ip_routed'):
-            msg += f"• NAT: <b>{'Enabled' if state_data.get('nat_enabled') else 'Disabled'}</b>\n"
+            msg += f"• NAT Enable: <b>{'Enabled' if state_data.get('nat_enabled') else 'Disabled'}</b>\n"
             
         msg += f"• VLAN Tag: <b>{'Enabled (' + str(state_data.get('vlan_id')) + ')' if state_data.get('vlan_enabled') else 'Disabled'}</b>\n"
-        msg += f"• Priority WAN: <b>{state_data.get('priority', 0)}</b>\n"
+        msg += f"• Priority: <b>{state_data.get('priority', 0)}</b>\n"
         
         bind_list = state_data.get('selected_binds', [])
-        msg += f"• Port Binding: <code>{', '.join(bind_list) if bind_list else 'Tanpa Bind'}</code>\n" \
+        msg += f"• Port Bind: <code>{', '.join(bind_list) if bind_list else 'Tanpa Bind'}</code>\n" \
                f"• ZTE F670L: <b>{'Ya' if state_data.get('is_f670l') else 'Tidak'}</b>\n"
                
-    msg += "\nApakah Anda ingin mengirimkan konfigurasi ini?"
+    msg += f"━━━━━━━━━━━━━━━━━━━━━━\n" \
+           f"Apakah Anda ingin mengirimkan konfigurasi ini?"
         
     buttons = [
         [
@@ -654,36 +740,16 @@ def execute_prov_push(state_data):
         return False, f"Exception: {str(e)}"
 
 def _send_telegram_worker(message, reply_markup=None):
-    token, chat_id = '', ''
-    # Fallback to env file
-    env_path = '/app/.telegram.env'
-    if os.path.exists(env_path):
-        try:
-            with open(env_path) as f:
-                for line in f:
-                    if line.startswith('TELEGRAM_BOT_TOKEN='):
-                        token = line.strip().split('=', 1)[1]
-                    elif line.startswith('TELEGRAM_CHAT_ID='):
-                        chat_id = line.strip().split('=', 1)[1]
-        except Exception as e:
-            print(f"Error reading .telegram.env: {e}")
-            
-    # Try current_app config if active
+    token = TELEGRAM_TOKEN
+    chat_id = TELEGRAM_CHAT_ID
+    
+    # Try current_app config if active (dynamic override if needed)
     try:
         if current_app:
             token = current_app.config.get('TELEGRAM_BOT_TOKEN', token) or token
             chat_id = current_app.config.get('TELEGRAM_CHAT_ID', chat_id) or chat_id
     except:
         pass
-        
-    # Fallback to Config class if not set
-    if not token or not chat_id:
-        try:
-            from config import Config
-            token = token or Config.TELEGRAM_BOT_TOKEN
-            chat_id = chat_id or Config.TELEGRAM_CHAT_ID
-        except:
-            pass
             
     if not token or not chat_id:
         return
@@ -1033,17 +1099,6 @@ def handle_cek_command(chat_id, username, token):
             mapping_res = execute_query("SELECT username FROM ont_serial_mapping WHERE serial_number = %s LIMIT 1", (username,))
             if mapping_res:
                 radius_username = mapping_res[0]['username'].strip()
-                # Push tag ke GenieACS NBI agar muncul di GenieACS Dashboard
-                try:
-                    config_acs = get_genieacs_config()
-                    url_acs = config_acs['url']
-                    auth_acs = config_acs['auth']
-                    import urllib.parse
-                    device_id_acs = acs_data.get('id') or f"{acs_data.get('manufacturer','000AC2')}-{acs_data.get('model','HG6145D2')}-{username}"
-                    tag_url = f"{url_acs}/devices/{urllib.parse.quote(device_id_acs)}/tags/{urllib.parse.quote(radius_username)}"
-                    requests.post(tag_url, auth=auth_acs, timeout=3)
-                except Exception as tag_err:
-                    print(f"[telegram-bot] Error pushing tag in fallback 1: {tag_err}")
             elif acs_found and acs_data.get('mac_address') and acs_data.get('mac_address') != 'N/A':
                 # Fallback 2 (Otomatis & Cerdas): Cari kecocokan MAC address prefix di radacct
                 mac_base = acs_data.get('mac_address').strip()
@@ -1055,17 +1110,6 @@ def handle_cek_command(chat_id, username, token):
                         # Simpan otomatis ke ont_serial_mapping agar pencarian berikutnya instan
                         try:
                             execute_query("INSERT INTO ont_serial_mapping (username, serial_number) VALUES (%s, %s) ON CONFLICT (username) DO UPDATE SET serial_number = EXCLUDED.serial_number", (radius_username, username), fetch=False)
-                            # Push tag ke GenieACS NBI
-                            try:
-                                config_acs = get_genieacs_config()
-                                url_acs = config_acs['url']
-                                auth_acs = config_acs['auth']
-                                import urllib.parse
-                                device_id_acs = acs_data.get('id') or f"{acs_data.get('manufacturer','000AC2')}-{acs_data.get('model','HG6145D2')}-{username}"
-                                tag_url = f"{url_acs}/devices/{urllib.parse.quote(device_id_acs)}/tags/{urllib.parse.quote(radius_username)}"
-                                requests.post(tag_url, auth=auth_acs, timeout=3)
-                            except Exception as tag_err:
-                                print(f"[telegram-bot] Error pushing tag in fallback 2: {tag_err}")
                         except Exception as db_err:
                             print(f"[telegram-bot] Error inserting auto-mapping: {db_err}")
         except Exception as e:
@@ -1120,7 +1164,9 @@ def handle_cek_command(chat_id, username, token):
     status_str = "🟢 <b>ONLINE</b>" if is_online else "🔴 <b>OFFLINE</b>"
     
     reply = (
-        f"👤 <b>Informasi Pelanggan:</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>INFORMASI PELANGGAN</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"• Username: <code>{username}</code>\n"
     )
     if radius_username != username:
@@ -1138,7 +1184,11 @@ def handle_cek_command(chat_id, username, token):
     else:
         reply += "• <i>Log Sesi RADIUS tidak ditemukan.</i>\n"
         
-    reply += "\n📌 <b>Informasi ONT (GenieACS):</b>\n"
+    reply += (
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 <b>INFORMASI ONT (GENIEACS)</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+    )
     if acs_found:
         reply += (
             f"• SN / Model: <code>{acs_data.get('serial','N/A')}</code> ({acs_data.get('manufacturer','N/A')} {acs_data.get('model','N/A')})\n"
@@ -1150,6 +1200,7 @@ def handle_cek_command(chat_id, username, token):
         )
     else:
         reply += f"• <i>ONT Detail: {acs_data.get('message', 'Data tidak ditemukan')}</i>\n"
+    reply += "━━━━━━━━━━━━━━━━━━━━━━\n"
         
     # === NOC SMART DIAGNOSTICS & RECOMMENDATIONS ===
     recommendations = []
@@ -1268,46 +1319,51 @@ def _wifi_scan_worker(chat_id, username, token):
         
         # 4. Susun Balasan
         reply = (
-            f"📶 <b>Hasil Analisis Wi-Fi:</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📶 <b>ANALISIS WI-FI NEIGHBORS</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"• Pelanggan: <code>{username}</code>\n"
             f"• Wi-Fi 2.4 GHz saat ini: Channel <b>{analysis['current_2g_channel']}</b>\n"
-            f"• Wi-Fi 5 GHz saat ini: Channel <b>{analysis['current_5g_channel']}</b>\n\n"
+            f"• Wi-Fi 5 GHz saat ini: Channel <b>{analysis['current_5g_channel']}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
         )
         
         # Tampilkan rekomendasi 2.4 GHz
         scores_2g = analysis['scores_2g']
         reply += (
-            f"💡 <b>Rekomendasi 2.4 GHz (Non-overlapping):</b>\n"
-            f"• Channel 1 : Interferensi Score <b>{scores_2g[1]:.1f}</b>\n"
-            f"• Channel 6 : Interferensi Score <b>{scores_2g[6]:.1f}</b>\n"
-            f"• Channel 11: Interferensi Score <b>{scores_2g[11]:.1f}</b>\n"
-            f"👉 <b>Rekomendasi Terbaik: Channel {analysis['best_2g_channel']}</b>\n\n"
+            f"💡 <b>REKOMENDASI 2.4 GHz (Non-overlapping):</b>\n"
+            f"• Channel 1 : Skor Interferensi <b>{scores_2g[1]:.1f}</b>\n"
+            f"• Channel 6 : Skor Interferensi <b>{scores_2g[6]:.1f}</b>\n"
+            f"• Channel 11: Skor Interferensi <b>{scores_2g[11]:.1f}</b>\n"
+            f"👉 <b>Terbaik: Channel {analysis['best_2g_channel']}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
         )
         
         # Tampilkan rekomendasi 5 GHz
         scores_5g = analysis['scores_5g']
         reply += (
-            f"💡 <b>Rekomendasi 5 GHz (Non-DFS):</b>\n"
-            f"👉 <b>Rekomendasi Terbaik: Channel {analysis['best_5g_channel']}</b>\n"
-            f"  (Interferensi terendah pada channel {analysis['best_5g_channel']} dengan score {scores_5g[analysis['best_5g_channel']]:.1f})\n\n"
+            f"💡 <b>REKOMENDASI 5 GHz (Non-DFS):</b>\n"
+            f"👉 <b>Terbaik: Channel {analysis['best_5g_channel']}</b>\n"
+            f"   (Skor interferensi terendah: {scores_5g[analysis['best_5g_channel']]:.1f})\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
         )
         
         # Tampilkan list Neighbor terkuat (jika ada)
         neighbors_2g = analysis['neighbors_2g']
         if neighbors_2g:
-            reply += "📡 <b>Sinyal Tetangga 2.4 GHz Terkuat:</b>\n"
+            reply += "📡 <b>SSID Tetangga 2.4 GHz Terkuat:</b>\n"
             for n in neighbors_2g[:5]:
                 reply += f"• <code>{n['ssid']}</code> (Ch {n['channel']}, {n['rssi']} dBm)\n"
-            reply += "\n"
+            reply += "━━━━━━━━━━━━━━━━━━━━━━\n"
             
         neighbors_5g = analysis['neighbors_5g']
         if neighbors_5g:
-            reply += "📡 <b>Sinyal Tetangga 5 GHz Terkuat:</b>\n"
+            reply += "📡 <b>SSID Tetangga 5 GHz Terkuat:</b>\n"
             for n in neighbors_5g[:5]:
                 reply += f"• <code>{n['ssid']}</code> (Ch {n['channel']}, {n['rssi']} dBm)\n"
-            reply += "\n"
+            reply += "━━━━━━━━━━━━━━━━━━━━━━\n"
             
-        reply += "⚙️ <b>Terapkan Channel Rekomendasi Secara Instan:</b>"
+        reply += "⚙️ <b>Terapkan Rekomendasi Channel Instan:</b>"
         
         # Tombol interaktif untuk menerapkan channel
         inline_keyboard = []
@@ -1385,7 +1441,10 @@ def _wlan_clients_worker(chat_id, username, token):
             return
             
         clients = res.get('clients', [])
+        lan_devices = res.get('lan_devices', [])
         total_active_wifi = res.get('total_active_wifi', 0)
+        if len(clients) > total_active_wifi:
+            total_active_wifi = len(clients)
         is_stale = res.get('stale', False)
         last_inform = res.get('last_inform', 'N/A')
         
@@ -1399,11 +1458,11 @@ def _wlan_clients_worker(chat_id, username, token):
         if is_stale:
             reply += f"⚠️ <b>PERINGATAN:</b> Gagal menghubungi ONT secara langsung (Connection Request terhambat).\nData di bawah ini adalah data terakhir terekam (Cache) pada: <code>{last_inform}</code>\n\n"
         else:
-            if clients or total_active_wifi > 0:
+            if clients or total_active_wifi > 0 or lan_devices:
                 reply += f"✅ <b>Data Real-time Berhasil Diambil!</b>\n\n"
             
-        if total_active_wifi == 0 and not clients:
-            reply += f"⚠️ <b>Tidak ada perangkat (Wi-Fi Client) yang terhubung aktif</b> pada ONT pelanggan <code>{username}</code> saat ini."
+        if total_active_wifi == 0 and not clients and not lan_devices:
+            reply += f"⚠️ <b>Tidak ada perangkat (Wi-Fi/LAN) yang terhubung aktif</b> pada ONT pelanggan <code>{username}</code> saat ini."
             
             requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
                 'chat_id': chat_id,
@@ -1414,49 +1473,104 @@ def _wlan_clients_worker(chat_id, username, token):
             return
             
         reply += (
-            f"👥 <b>Daftar Perangkat Terkoneksi Wi-Fi:</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔌 <b>MONITORING PERANGKAT PELANGGAN</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"• Pelanggan: <code>{username}</code>\n"
-            f"• Total Aktif: <b>{total_active_wifi} perangkat</b>\n\n"
+            f"• Total Wi-Fi: <b>{total_active_wifi} perangkat</b>\n"
+            f"• Total LAN: <b>{len(lan_devices)} perangkat</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
         )
         
-        if not clients:
-            reply += "ℹ️ <i>Detail perangkat (IP/MAC) sedang diperbarui atau belum dilaporkan oleh ONT.</i>"
-            
-            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
-                'chat_id': chat_id,
-                'text': reply,
-                'parse_mode': 'HTML',
-                'reply_markup': {"inline_keyboard": inline_keyboard}
-            })
-            return
-            
         # 3. Susun balasan list client secara terorganisasi berdasarkan SSID
-        by_ssid = {}
-        for c in clients:
-            ssid = c['ssid_name']
-            if ssid not in by_ssid:
-                by_ssid[ssid] = []
-            by_ssid[ssid].append(c)
-            
-        for ssid_name, dev_list in by_ssid.items():
-            reply += f"📶 <b>SSID: {ssid_name}</b>\n"
-            for idx, dev in enumerate(dev_list, 1):
-                reply += f"  {idx}. IP: <code>{dev['ip']}</code>\n"
-                if dev.get('device_name') and dev['device_name'] != "N/A":
-                    reply += f"     Nama/Merk: <b>{dev['device_name']}</b>\n"
-                reply += f"     MAC: <code>{dev['mac']}</code>\n"
-                if dev.get('rssi'):
-                    reply += f"     Signal: <code>{dev['rssi']} dBm</code>\n"
-                if dev.get('uptime'):
+        if clients:
+            by_ssid = {}
+            for c in clients:
+                ssid = c['ssid_name']
+                if ssid not in by_ssid:
+                    by_ssid[ssid] = []
+                by_ssid[ssid].append(c)
+                
+            for ssid_name, dev_list in by_ssid.items():
+                # Tentukan band frekuensi berdasarkan ssid_idx (1-4: 2.4 GHz, 5-10: 5 GHz)
+                band_str = ""
+                if dev_list:
                     try:
-                        ut = int(dev['uptime'])
-                        hours, remainder = divmod(ut, 3600)
-                        minutes, _ = divmod(remainder, 60)
-                        ut_str = f"{hours}j {minutes}m" if hours > 0 else f"{minutes}m"
-                        reply += f"     Uptime: <code>{ut_str}</code>\n"
+                        idx_val = int(dev_list[0]['ssid_idx'])
+                        if idx_val in (5, 6, 7, 8, 9, 10):
+                            band_str = " (5 GHz)"
+                        else:
+                            band_str = " (2.4 GHz)"
                     except:
                         pass
-                reply += "\n"
+                reply += f"📶 <b>SSID: {ssid_name}{band_str}</b>\n"
+                for idx, dev in enumerate(dev_list, 1):
+                    # Tentukan emoji signal
+                    sig_emoji = "⚪"
+                    rssi_val = dev.get('rssi')
+                    if rssi_val is not None:
+                        try:
+                            rssi_int = int(rssi_val)
+                            if rssi_int >= -60:
+                                sig_emoji = "🟢"
+                            elif rssi_int >= -75:
+                                sig_emoji = "🟡"
+                            else:
+                                sig_emoji = "🔴"
+                        except:
+                            pass
+                            
+                    dev_name = dev.get('device_name')
+                    if not dev_name or dev_name == "N/A":
+                        dev_name = "Perangkat Wi-Fi"
+                        
+                    reply += f" ├─ {idx}. 📱 <b>{dev_name}</b>\n"
+                    reply += f" │   ├─ IP: <code>{dev['ip']}</code>\n"
+                    reply += f" │   ├─ MAC: <code>{dev['mac']}</code>\n"
+                    
+                    # Sinyal
+                    sig_str = f"<code>{rssi_val} dBm</code>" if rssi_val is not None else "N/A"
+                    reply += f" │   ├─ Sinyal: {sig_emoji} {sig_str}\n"
+                    
+                    # Uptime
+                    ut_str = None
+                    if dev.get('uptime'):
+                        try:
+                            ut = int(dev['uptime'])
+                            hours, remainder = divmod(ut, 3600)
+                            minutes, _ = divmod(remainder, 60)
+                            ut_str = f"{hours}j {minutes}m" if hours > 0 else f"{minutes}m"
+                        except:
+                            ut_str = str(dev['uptime'])
+                            
+                    if ut_str:
+                        reply += f" │   └─ Uptime: <code>{ut_str}</code>\n"
+                    else:
+                        reply += f" │   └─ Uptime: <code>N/A</code>\n"
+                    reply += " │\n"
+                # Hapus trailing " │\n" yang menggantung
+                if reply.endswith(" │\n"):
+                    reply = reply[:-4] + "\n"
+        elif total_active_wifi > 0:
+            reply += "ℹ️ <i>Detail perangkat Wi-Fi sedang diperbarui atau belum dilaporkan oleh ONT.</i>\n\n"
+            
+        # 4. Susun balasan perangkat LAN
+        if lan_devices:
+            reply += "🔌 <b>Perangkat via Port LAN (Ethernet):</b>\n"
+            for idx, dev in enumerate(lan_devices, 1):
+                dev_name = dev.get('device_name')
+                if not dev_name or dev_name == "N/A":
+                    dev_name = "Perangkat LAN"
+                    
+                reply += f" ├─ {idx}. 💻 <b>{dev_name}</b>\n"
+                reply += f" │   ├─ IP: <code>{dev['ip']}</code>\n"
+                reply += f" │   ├─ MAC: <code>{dev['mac']}</code>\n"
+                reply += f" │   └─ Interface: <code>{dev['interface_type']}</code>\n"
+                reply += " │\n"
+            # Hapus trailing " │\n" yang menggantung
+            if reply.endswith(" │\n"):
+                reply = reply[:-4] + "\n"
+        reply += "━━━━━━━━━━━━━━━━━━━━━━\n"
                 
         requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
             'chat_id': chat_id,
@@ -1479,46 +1593,19 @@ def background_telegram_bot():
     print("[telegram-bot] Thread starting active polling...")
     offset = 0
     
+    token = TELEGRAM_TOKEN
+    admin_chat_id = TELEGRAM_CHAT_ID
+    
     while True:
         try:
-            token = None
-            admin_chat_id = None
-            
-            # Check various potential env file paths
-            env_paths = ['/app/.telegram.env', 'app/.telegram.env', '.telegram.env', '/home/my-project/project-radius/app/.telegram.env']
-            for env_path in env_paths:
-                if os.path.exists(env_path):
-                    try:
-                        with open(env_path) as f:
-                            for line in f:
-                                if '=' in line:
-                                    k, v = line.split('=', 1)
-                                    k = k.strip()
-                                    v = v.strip()
-                                    if k == 'TELEGRAM_BOT_TOKEN':
-                                        token = v
-                                    elif k == 'TELEGRAM_CHAT_ID':
-                                        admin_chat_id = v
-                        if token and admin_chat_id:
-                            break
-                    except Exception as e:
-                        print(f"[telegram-bot] Error reading {env_path}: {e}")
-            
-            # Fallback to Config class if not set
-            if not token or not admin_chat_id:
-                try:
-                    from config import Config
-                    if not token:
-                        token = Config.TELEGRAM_BOT_TOKEN
-                    if not admin_chat_id:
-                        admin_chat_id = Config.TELEGRAM_CHAT_ID
-                except:
-                    pass
-
             if not token:
-                print("[telegram-bot] Warning: TELEGRAM_BOT_TOKEN not found!")
-                socketio.sleep(10)
-                continue
+                # Reload from module level if not loaded successfully initially
+                token = TELEGRAM_TOKEN
+                admin_chat_id = TELEGRAM_CHAT_ID
+                if not token:
+                    print("[telegram-bot] Warning: TELEGRAM_BOT_TOKEN not found!")
+                    socketio.sleep(10)
+                    continue
                 
             # Long polling updates dari Telegram API
             url = f"https://api.telegram.org/bot{token}/getUpdates"
@@ -1795,7 +1882,15 @@ def background_telegram_bot():
                             import json as _json
                             requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                 'chat_id': cb_chat_id,
-                                'text': f"🛠️ <b>Menu Provisioning untuk pelanggan:</b> <code>{username}</code>\n\nSilakan pilih tipe konfigurasi:",
+                                'text': (
+                                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                    f"🛠️ <b>PROVISIONING WIZARD ONT</b>\n"
+                                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                                    f"• Pelanggan: <code>{username}</code>\n"
+                                    f"• Status: Siap Konfigurasi\n"
+                                    f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                                    f"Silakan pilih jenis provisioning yang ingin dijalankan di bawah ini:"
+                                ),
                                 'parse_mode': 'HTML',
                                 'reply_markup': _json.dumps({"inline_keyboard": buttons})
                             }, timeout=5)
@@ -2668,7 +2763,15 @@ def background_telegram_bot():
                     import json as _json
                     requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                         'chat_id': chat_id,
-                        'text': f"🛠️ <b>Menu Provisioning untuk pelanggan:</b> <code>{username}</code>\n\nSilakan pilih tipe konfigurasi:",
+                        'text': (
+                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"🛠️ <b>PROVISIONING WIZARD ONT</b>\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"• Pelanggan: <code>{username}</code>\n"
+                            f"• Status: Siap Konfigurasi\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                            f"Silakan pilih jenis provisioning yang ingin dijalankan di bawah ini:"
+                        ),
                         'parse_mode': 'HTML',
                         'reply_markup': _json.dumps({"inline_keyboard": buttons})
                     })
