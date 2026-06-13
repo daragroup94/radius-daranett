@@ -28,6 +28,55 @@ def get_genieacs_config():
     url = os.getenv('GENIEACS_NBI_URL', 'http://10.204.0.22:7557')
     return {'url': url, 'auth': None}
 
+def trigger_connection_request_by_device_id(device_id):
+    """
+    Mengambil dokumen device dari GenieACS dan memicu Connection Request secara langsung
+    dari server lokal ini (karena server GenieACS berada di cloud/remote dan tidak dapat
+    menjangkau IP private/lokal ONT).
+    """
+    try:
+        config = get_genieacs_config()
+        url = config['url']
+        auth = config['auth']
+        
+        # Ambil document device untuk mencari ConnectionRequestURL dan kredensialnya
+        dev_resp = requests.get(f"{url}/devices", params={"query": _json.dumps({"_id": device_id})}, auth=auth, timeout=5)
+        if dev_resp.status_code != 200 or not dev_resp.json():
+            print(f"Device {device_id} not found in GenieACS to trigger connection request")
+            return False, "Device not found"
+            
+        dev_doc = dev_resp.json()[0]
+        
+        mgt = None
+        for p in ["InternetGatewayDevice", "Device"]:
+            if p in dev_doc and "ManagementServer" in dev_doc[p]:
+                mgt = dev_doc[p]["ManagementServer"]
+                break
+                
+        if not mgt:
+            return False, "ManagementServer not found"
+            
+        cr_url = mgt.get("ConnectionRequestURL", {}).get("_value")
+        username = mgt.get("ConnectionRequestUsername", {}).get("_value", "msn")
+        password = mgt.get("ConnectionRequestPassword", {}).get("_value", "msn")
+        
+        if not cr_url:
+            return False, "ConnectionRequestURL is empty"
+            
+        print(f"Direct Connection Request to {cr_url} using auth {username}:{password}")
+        
+        from requests.auth import HTTPDigestAuth
+        resp = requests.get(cr_url, auth=HTTPDigestAuth(username, password), timeout=5)
+        if resp.status_code == 200:
+            print("Direct Connection Request succeeded!")
+            return True, "Success"
+        else:
+            print(f"Direct Connection Request returned status: {resp.status_code}")
+            return False, f"HTTP Status {resp.status_code}"
+    except Exception as e:
+        print(f"Direct Connection Request error: {e}")
+        return False, str(e)
+
 def get_genieacs_device_info(username):
     """
     Query GenieACS NBI untuk info device berdasarkan pppoeUsername dengan caching Redis (30 detik).
@@ -70,7 +119,7 @@ def get_genieacs_device_info(username):
                 {"VirtualParameters.getSerialNumber._value": username}
             ]
         })
-        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime,InternetGatewayDevice.WANDevice.1.WANConnectionDevice'
+        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime,InternetGatewayDevice.WANDevice.1.WANConnectionDevice,InternetGatewayDevice.LANDevice.1.WLANConfiguration,Device.WiFi.AccessPoint'
         
         resp = requests.get(
             f'{GENIEACS_NBI}/devices',
@@ -179,6 +228,41 @@ def get_genieacs_device_info(username):
         except Exception as mac_err:
             print(f"Error parsing MAC address from document: {mac_err}")
                 
+        # Calculate wifi_active_count from WLANConfiguration / AccessPoint TotalAssociations
+        wifi_active_count = 0
+        has_wifi_associations = False
+        
+        try:
+            # Check TR-098
+            wlan_conf = d.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
+            if wlan_conf:
+                for ssid_idx, ssid_val in wlan_conf.items():
+                    if ssid_idx.isdigit() and isinstance(ssid_val, dict):
+                        ta_val = ssid_val.get("TotalAssociations", {}).get("_value", None)
+                        if ta_val is not None:
+                            try:
+                                wifi_active_count += int(ta_val)
+                                has_wifi_associations = True
+                            except:
+                                pass
+            
+            # Check TR-181
+            ap_conf = d.get("Device", {}).get("WiFi", {}).get("AccessPoint", {})
+            if ap_conf:
+                for ssid_idx, ssid_val in ap_conf.items():
+                    if ssid_idx.isdigit() and isinstance(ssid_val, dict):
+                        ta_val = ssid_val.get("AssociatedDeviceNumberOfEntries", {}).get("_value", None)
+                        if ta_val is None:
+                            ta_val = ssid_val.get("TotalAssociations", {}).get("_value", None)
+                        if ta_val is not None:
+                            try:
+                                wifi_active_count += int(ta_val)
+                                has_wifi_associations = True
+                            except:
+                                pass
+        except Exception as wifi_err:
+            print(f"Error parsing TotalAssociations in device info: {wifi_err}")
+                
         res_data = {
             'found': True,
             'serial': val(vp.get('getSerialNumber', {})) or dev_id.get('_SerialNumber', 'N/A'),
@@ -198,6 +282,7 @@ def get_genieacs_device_info(username):
             'ont_uptime_str': ont_uptime_str,
             'ont_uptime_days': ont_uptime_days,
             'mac_address': mac_addr,
+            'wifi_active_count': wifi_active_count if has_wifi_associations else 'N/A',
             'id': d.get('_id')
         }
         
@@ -263,7 +348,7 @@ def run_wifi_scan(device_id):
         has_wlan1 = True # default fallback
         
     tasks_queued = []
-    task_url = f"{url}/devices/{urllib.parse.quote(device_id)}/tasks"
+    task_url = f"{url}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
     
     # Kita buat setParameterValues untuk WLAN yang ada
     param_values = []
@@ -285,6 +370,7 @@ def run_wifi_scan(device_id):
         resp = requests.post(task_url, json=payload, auth=auth, timeout=10)
         if resp.status_code in (200, 201, 202):
             task_id = resp.json().get('_id')
+            trigger_connection_request_by_device_id(device_id)
     except requests.exceptions.ReadTimeout:
         # Timeout bisa terjadi tapi task tetap masuk
         time.sleep(2)
@@ -292,17 +378,13 @@ def run_wifi_scan(device_id):
             t_resp = requests.get(f"{url}/tasks", params={"query": _json.dumps({"device": device_id})}, auth=auth, timeout=5)
             if t_resp.status_code == 200 and t_resp.json():
                 task_id = t_resp.json()[0]['_id']
+                trigger_connection_request_by_device_id(device_id)
         except:
             pass
     except Exception as e:
         return {'success': False, 'message': f'Gagal mengirim perintah scan: {e}'}
         
-    # Trigger Connection Request
-    try:
-        if cr_url:
-            requests.get(cr_url, auth=requests.auth.HTTPDigestAuth('msn', 'msn'), timeout=8)
-    except Exception as cr_err:
-        print(f"Connection Request trigger error: {cr_err}")
+    # Connection Request is handled by GenieACS NBI using the ?connection_request query parameter
         
     # Tunggu task setParameterValues selesai (maksimal 15 detik)
     task_done = False
@@ -343,15 +425,11 @@ def run_wifi_scan(device_id):
         resp = requests.post(task_url, json=gp_payload, auth=auth, timeout=10)
         if resp.status_code in (200, 201, 202):
             gp_task_id = resp.json().get('_id')
+            trigger_connection_request_by_device_id(device_id)
     except Exception as e:
         print(f"Error queuing getParameterValues: {e}")
         
-    # Trigger Connection Request lagi
-    try:
-        if cr_url:
-            requests.get(cr_url, auth=requests.auth.HTTPDigestAuth('msn', 'msn'), timeout=8)
-    except:
-        pass
+    # Connection Request is handled by GenieACS NBI using the ?connection_request query parameter
         
     # Tunggu getParameterValues selesai (maksimal 15 detik)
     if gp_task_id:
@@ -512,8 +590,264 @@ def set_wifi_channel(device_id, wlan_instance, channel):
     try:
         resp = requests.post(task_url, json=payload, auth=auth, timeout=15)
         if resp.status_code in (200, 201, 202):
+            trigger_connection_request_by_device_id(device_id)
             return True, f"Channel {channel} berhasil dikirim ke antrean ONT."
         else:
             return False, f"Respon API GenieACS: {resp.status_code}"
     except Exception as e:
         return False, str(e)
+
+def get_wlan_clients_realtime(device_id):
+    """
+    Pemicuan getParameterValues untuk mendapatkan daftar AssociatedDevice dan TotalAssociations terupdate dari ONT,
+    kemudian mengembalikan daftar perangkat yang terkoneksi dan jumlah total asosiasi Wi-Fi aktif.
+    """
+    import urllib.parse
+    import time
+    
+    config = get_genieacs_config()
+    url = config['url']
+    auth = config['auth']
+    
+    # 1. Ambil dokumen device untuk mengetahui WLANConfiguration / AccessPoint mana saja yang ada
+    wlan_instances = []
+    is_tr181 = False
+    cr_url = None
+    try:
+        dev_resp = requests.get(f"{url}/devices", params={"query": _json.dumps({"_id": device_id})}, auth=auth, timeout=5)
+        if dev_resp.status_code == 200 and dev_resp.json():
+            dev_doc = dev_resp.json()[0]
+            if "InternetGatewayDevice" in dev_doc:
+                wlan_conf = dev_doc.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
+                for k in wlan_conf.keys():
+                    if k.isdigit():
+                        wlan_instances.append(k)
+            elif "Device" in dev_doc:
+                wlan_conf = dev_doc.get("Device", {}).get("WiFi", {}).get("AccessPoint", {})
+                for k in wlan_conf.keys():
+                    if k.isdigit():
+                        wlan_instances.append(k)
+                is_tr181 = True
+                
+            for p in ["InternetGatewayDevice", "Device"]:
+                cr_obj = dev_doc.get(p, {}).get("ManagementServer", {}).get("ConnectionRequestURL", {})
+                if isinstance(cr_obj, dict) and cr_obj.get('_value'):
+                    cr_url = cr_obj['_value']
+                    break
+    except Exception as e:
+        print(f"Error checking WLAN existence for clients: {e}")
+        
+    if not wlan_instances:
+        wlan_instances = ["1", "5"]
+        
+    # 2. Queue getParameterValues untuk AssociatedDevice dan TotalAssociations
+    gp_params = []
+    for k in wlan_instances:
+        if is_tr181:
+            gp_params.append(f"Device.WiFi.AccessPoint.{k}.AssociatedDeviceNumberOfEntries")
+            gp_params.append(f"Device.WiFi.AccessPoint.{k}.AssociatedDevice.")
+        else:
+            gp_params.append(f"InternetGatewayDevice.LANDevice.1.WLANConfiguration.{k}.TotalAssociations")
+            gp_params.append(f"InternetGatewayDevice.LANDevice.1.WLANConfiguration.{k}.AssociatedDevice.")
+        
+    if gp_params:
+        task_url = f"{url}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
+        payload = {
+            "name": "getParameterValues",
+            "parameterNames": gp_params
+        }
+        task_id = None
+        try:
+            resp = requests.post(task_url, json=payload, auth=auth, timeout=10)
+            if resp.status_code in (200, 201, 202):
+                task_id = resp.json().get('_id')
+                trigger_connection_request_by_device_id(device_id)
+        except Exception as e:
+            print(f"Error queuing AssociatedDevice refresh: {e}")
+            
+        # Tunggu task selesai (maksimal 10 detik)
+        task_completed = False
+        if task_id:
+            for _ in range(8):
+                time.sleep(1.2)
+                try:
+                    chk = requests.get(f"{url}/tasks", params={"query": _json.dumps({"_id": task_id})}, auth=auth, timeout=5)
+                    if chk.status_code == 200:
+                        if not chk.json():
+                            task_completed = True
+                            break
+                        else:
+                            # Cek apakah task tersebut gagal (fault)
+                            task_data = chk.json()[0]
+                            if 'fault' in task_data:
+                                print(f"Task AssociatedDevice failed: {task_data['fault']}")
+                                break
+                except:
+                    pass
+                    
+    # 3. Ambil data terbaru dari GenieACS
+    try:
+        dev_resp = requests.get(f"{url}/devices", params={"query": _json.dumps({"_id": device_id})}, auth=auth, timeout=5)
+        if dev_resp.status_code == 200 and dev_resp.json():
+            dev_doc = dev_resp.json()[0]
+            
+            # Ambil last inform time
+            from datetime import datetime
+            last_inform = dev_doc.get("_lastInform", "")
+            last_inform_str = "N/A"
+            if last_inform:
+                try:
+                    # format: "2026-06-12T03:06:00.325Z"
+                    dt = datetime.strptime(last_inform.split(".")[0], "%Y-%m-%dT%H:%M:%S")
+                    last_inform_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    last_inform_str = last_inform
+            
+            clients = []
+            total_active_wifi = 0
+            if is_tr181:
+                wlan_conf = dev_doc.get("Device", {}).get("WiFi", {}).get("AccessPoint", {})
+            else:
+                wlan_conf = dev_doc.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
+                
+            for ssid_idx, ssid_val in wlan_conf.items():
+                if not ssid_idx.isdigit() or not isinstance(ssid_val, dict):
+                    continue
+                
+                # Baca TotalAssociations / AssociatedDeviceNumberOfEntries real-time
+                if is_tr181:
+                    ta_val = ssid_val.get("AssociatedDeviceNumberOfEntries", {}).get("_value", 0)
+                    if ta_val == 0:
+                        ta_val = ssid_val.get("TotalAssociations", {}).get("_value", 0)
+                else:
+                    ta_val = ssid_val.get("TotalAssociations", {}).get("_value", 0)
+                    
+                try:
+                    total_active_wifi += int(ta_val)
+                except:
+                    pass
+                    
+                ssid_name = ssid_val.get("SSID", {}).get("_value", f"SSID {ssid_idx}")
+                if is_tr181:
+                    if not ssid_name or ssid_name.startswith("Device.WiFi.SSID."):
+                        ssid_ref_idx = ssid_name.split(".")[-1] if ssid_name else None
+                        if ssid_ref_idx and ssid_ref_idx.isdigit():
+                            ssid_name = dev_doc.get("Device", {}).get("WiFi", {}).get("SSID", {}).get(ssid_ref_idx, {}).get("SSID", {}).get("_value", f"SSID {ssid_idx}")
+                        else:
+                            ssid_name = f"AccessPoint {ssid_idx}"
+                            
+                assoc_devs = ssid_val.get("AssociatedDevice", {})
+                for client_idx, client_val in assoc_devs.items():
+                    if not client_idx.isdigit() or not isinstance(client_val, dict):
+                        continue
+                    mac = client_val.get("AssociatedDeviceMACAddress", {}).get("_value", "")
+                    if not mac:
+                        mac = client_val.get("MACAddress", {}).get("_value", "")
+                    ip = client_val.get("AssociatedDeviceIPAddress", {}).get("_value", "")
+                    if not ip:
+                        ip = client_val.get("IPAddress", {}).get("_value", "")
+                    
+                    # Extract RSSI/Signal strength with fallback keys to support all vendors
+                    rssi_val = None
+                    for k in ["X_FH_WLAN_ClientSignalStrength", "X_FH_WLAN_RSSI", "X_FH_RSSI", "X_HW_RSSI", "X_ZTE-COM_RSSI", "AssociatedDeviceRSSI"]:
+                        val_obj = client_val.get(k)
+                        if isinstance(val_obj, dict) and "_value" in val_obj:
+                            val = val_obj["_value"]
+                            if val is not None and val != "":
+                                try:
+                                    rssi_val = int(val)
+                                    break
+                                except ValueError:
+                                    pass
+                    if rssi_val is None:
+                        for key, val_obj in client_val.items():
+                            if key.upper().endswith("RSSI") or key.upper().endswith("SIGNALSTRENGTH") or key.upper().endswith("SIGNAL"):
+                                if isinstance(val_obj, dict) and "_value" in val_obj:
+                                    val = val_obj["_value"]
+                                    if val is not None and val != "":
+                                        try:
+                                            rssi_val = int(val)
+                                            break
+                                        except ValueError:
+                                            pass
+
+                    # Extract Uptime with fallback keys to support all vendors
+                    uptime_val = None
+                    for k in ["X_FH_WLAN_UpTime", "X_FH_UpTime", "X_HW_Uptime", "X_ZTE-COM_UpTime", "AssociatedDeviceUptime", "AssociatedDeviceUpTime"]:
+                        val_obj = client_val.get(k)
+                        if isinstance(val_obj, dict) and "_value" in val_obj:
+                            val = val_obj["_value"]
+                            if val is not None and val != "":
+                                try:
+                                    uptime_val = int(val)
+                                    break
+                                except ValueError:
+                                    pass
+                    if uptime_val is None:
+                        for key, val_obj in client_val.items():
+                            if key.upper().endswith("UPTIME"):
+                                if isinstance(val_obj, dict) and "_value" in val_obj:
+                                    val = val_obj["_value"]
+                                    if val is not None and val != "":
+                                        try:
+                                            uptime_val = int(val)
+                                            break
+                                        except ValueError:
+                                            pass
+                                            
+                    # Filter ghost device: Signal = 0 dBm AND Uptime = 0
+                    if rssi_val == 0 and uptime_val == 0:
+                        continue
+                        
+                    # Handle display adjustment for 0 or invalid RSSI
+                    display_rssi = rssi_val
+                    if display_rssi in (0, -256, ""):
+                        display_rssi = None
+                    display_uptime = uptime_val
+                    if display_uptime == 0:
+                        display_uptime = None
+                        
+                    # Extract Device Name / Brand / Description
+                    device_name = None
+                    for k in ["X_FH_DeviceName", "X_HW_AssociatedDevicedescriptions", "X_ZTE-COM_DeviceName", "HostName"]:
+                        val_obj = client_val.get(k)
+                        if isinstance(val_obj, dict) and "_value" in val_obj:
+                            val = val_obj["_value"]
+                            if val is not None and val != "":
+                                device_name = val
+                                break
+                    if not device_name:
+                        for key, val_obj in client_val.items():
+                            if key.upper().endswith("DEVICENAME") or key.upper().endswith("DEVICEDESCRIPTIONS") or key.upper().endswith("HOSTNAME"):
+                                if isinstance(val_obj, dict) and "_value" in val_obj:
+                                    val = val_obj["_value"]
+                                    if val is not None and val != "":
+                                        device_name = val
+                                        break
+
+                    if mac:
+                        clients.append({
+                            'ssid_idx': ssid_idx,
+                            'ssid_name': ssid_name,
+                            'mac': mac,
+                            'ip': ip or "N/A",
+                            'rssi': display_rssi,
+                            'uptime': display_uptime,
+                            'device_name': device_name or "N/A"
+                        })
+            
+            is_stale = False
+            if task_id and not task_completed:
+                is_stale = True
+                
+            return {
+                'success': True,
+                'clients': clients,
+                'total_active_wifi': total_active_wifi,
+                'stale': is_stale,
+                'last_inform': last_inform_str
+            }
+    except Exception as e:
+        return {'success': False, 'message': str(e)}
+        
+    return {'success': False, 'message': 'Gagal mengambil dokumen perangkat setelah refresh'}

@@ -6,7 +6,7 @@ from flask import current_app
 from extensions import socketio
 from database import execute_query
 from helpers import ping_nas
-from services.genieacs import get_genieacs_device_info, get_genieacs_config, run_wifi_scan, analyze_wifi_neighbors, set_wifi_channel
+from services.genieacs import get_genieacs_device_info, get_genieacs_config, run_wifi_scan, analyze_wifi_neighbors, set_wifi_channel, get_wlan_clients_realtime
 from services.mikrotik_coa import send_coa_disconnect
 
 _prov_states = {}
@@ -106,6 +106,7 @@ def show_prov_confirm(chat_id, token):
             msg += f"• NAT: <b>{'Enabled' if state_data.get('nat_enabled') else 'Disabled'}</b>\n"
             
         msg += f"• VLAN Tag: <b>{'Enabled (' + str(state_data.get('vlan_id')) + ')' if state_data.get('vlan_enabled') else 'Disabled'}</b>\n"
+        msg += f"• Priority WAN: <b>{state_data.get('priority', 0)}</b>\n"
         
         bind_list = state_data.get('selected_binds', [])
         msg += f"• Port Binding: <code>{', '.join(bind_list) if bind_list else 'Tanpa Bind'}</code>\n" \
@@ -176,6 +177,11 @@ def _detect_fiberhome_conn_type(device_doc):
     HG6245N uses 'PPPoE_Routed' for PPPoE Routed connections.
     We auto-detect by examining existing WAN PPP connections on the device.
     """
+    manufacturer = device_doc.get("_deviceId", {}).get("_Manufacturer", "").upper()
+    # Non-FiberHome devices (ZTE, Huawei, C-Data, Zyxel, etc.) all use standard PPPoE_Routed
+    if "FIBERHOME" not in manufacturer and "FHTT" not in manufacturer:
+        return "HG6245N_STYLE"
+
     wcd = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {})
     for wcd_idx, wcd_val in wcd.items():
         if not wcd_idx.isdigit():
@@ -201,7 +207,7 @@ def _detect_fiberhome_conn_type(device_doc):
         if model in product_class:
             return "HG6245N_STYLE"
     # Known FiberHome models that use IP_Routed naming convention
-    HG6243C_STYLE_MODELS = ["HG6243C", "HG6145F"]
+    HG6243C_STYLE_MODELS = ["HG6243C", "HG6145F", "HG6145D2"]
     for model in HG6243C_STYLE_MODELS:
         if model in product_class:
             return "HG6243C_STYLE"
@@ -262,7 +268,13 @@ def execute_prov_push(state_data):
                 "name": task_name,
                 **payload_data
             }
-            return requests.post(task_url, json=payload, auth=auth, timeout=10)
+            resp = requests.post(task_url, json=payload, auth=auth, timeout=10)
+            try:
+                from services.genieacs import trigger_connection_request_by_device_id
+                trigger_connection_request_by_device_id(device_id)
+            except Exception as e:
+                print(f"Error triggering direct connection request in queue_task: {e}")
+            return resp
 
         parameter_values = []
         
@@ -281,33 +293,45 @@ def execute_prov_push(state_data):
                 # Scheme B: WANConnectionDevice.1.[conn_type].{slot}
                 use_scheme_b = False
                 wan_conn_1 = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {}).get("1", {})
-                if isinstance(wan_conn_1, dict):
-                    for c_type in ["WANPPPConnection", "WANIPConnection"]:
-                        c_instances = wan_conn_1.get(c_type, {})
-                        if isinstance(c_instances, dict):
-                            for k in c_instances.keys():
-                                try:
-                                    if int(k) > 1:
-                                        use_scheme_b = True
-                                        break
-                                except ValueError:
-                                    pass
-                        if use_scheme_b:
-                            break
+                
+                # Check based on manufacturer first (ZTE & Huawei/HWTC always use Scheme B)
+                manufacturer = device_doc.get("_deviceId", {}).get("_Manufacturer", "").upper()
+                if "ZTE" in manufacturer or "HUAWEI" in manufacturer or "HWTC" in manufacturer:
+                    use_scheme_b = True
+                else:
+                    if isinstance(wan_conn_1, dict):
+                        for c_type in ["WANPPPConnection", "WANIPConnection"]:
+                            c_instances = wan_conn_1.get(c_type, {})
+                            if isinstance(c_instances, dict):
+                                for k in c_instances.keys():
+                                    try:
+                                        if int(k) > 1:
+                                            use_scheme_b = True
+                                            break
+                                    except ValueError:
+                                        pass
+                            if use_scheme_b:
+                                break
                 
                 if use_scheme_b:
-                    base_path = f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.{conn_type}.{slot}"
                     conn_instances = wan_conn_1.get(conn_type, {})
+                    max_existing = 0
+                    if isinstance(conn_instances, dict):
+                        for k in conn_instances.keys():
+                            try:
+                                max_existing = max(max_existing, int(k))
+                            except ValueError:
+                                pass
+                    
+                    # Auto-correct slot: gunakan max_existing+1 agar hanya 1 addObject
+                    # yang dibuat. Ini mencegah WAN hantu dari gap-filling.
+                    if str(slot) not in (conn_instances if isinstance(conn_instances, dict) else {}):
+                        slot = max_existing + 1
+                        state_data['slot'] = slot  # Update state agar UI konsisten
+                    
+                    base_path = f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.{conn_type}.{slot}"
                     if not isinstance(conn_instances, dict) or str(slot) not in conn_instances:
-                        max_existing = 0
-                        if isinstance(conn_instances, dict):
-                            for k in conn_instances.keys():
-                                try:
-                                    max_existing = max(max_existing, int(k))
-                                except ValueError:
-                                    pass
-                        for _ in range(max_existing, slot):
-                            queue_task("addObject", {"objectName": f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.{conn_type}"})
+                        queue_task("addObject", {"objectName": f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.{conn_type}"})
                 else:
                     wan_devs = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {})
                     existing_slots = []
@@ -359,8 +383,9 @@ def execute_prov_push(state_data):
                     gpon_path = f"{wcd_path}.{gpon_cfg_key}"
                     parameter_values.append([f"{gpon_path}.Enable", True])
                     parameter_values.append([f"{gpon_path}.Mode", 2])  # Mode 2 = Tagged VLAN
-                    # 802.1p priority mark (1 = normal priority, diperlukan FiberHome)
-                    parameter_values.append([f"{gpon_path}.802-1pMark", 1])
+                    # 802.1p priority mark
+                    priority_val = int(state_data.get('priority', 0))
+                    parameter_values.append([f"{gpon_path}.802-1pMark", priority_val])
                     if state_data.get('vlan_enabled') and state_data.get('vlan_id'):
                         vlan_val = int(state_data['vlan_id'])
                         parameter_values.append([f"{gpon_path}.VLANID", vlan_val])
@@ -383,7 +408,7 @@ def execute_prov_push(state_data):
                 parameter_values.append([f"{base_path}.{ip_mode_leaf}", 1])
             
             svc_leaf = None
-            for leaf in ["ServiceList", "X_FH_ServiceList", "X_HW_ServiceList", "X_ZTE_ServiceList"]:
+            for leaf in ["ServiceList", "X_FH_ServiceList", "X_HW_ServiceList", "X_ZTE_ServiceList", "X_CMCC_ServiceList"]:
                 found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                 if found_path:
                     svc_leaf = found_path.split(".")[-1]
@@ -504,7 +529,7 @@ def execute_prov_push(state_data):
             # Jangan set VLANEnable=True di level WAN connection karena menyebabkan double-tagging.
             if state_data.get('vlan_enabled'):
                 vlan_enable_path = None
-                for leaf in ["VLANEnabled", "VLANEnable", "VLANMark", "X_HW_VLAN_Enable", "X_ZTE_VLAN_Enable"]:
+                for leaf in ["VLANEnabled", "VLANEnable", "VLANMark", "X_HW_VLAN_Enable", "X_ZTE_VLAN_Enable", "X_CMCC_VLAN_Enable"]:
                     found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                     if found_path:
                         vlan_enable_path = found_path
@@ -513,7 +538,7 @@ def execute_prov_push(state_data):
                     vlan_enable_path = f"{base_path}.VLANEnabled"
                     
                 vlan_id_path = None
-                for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN"]:
+                for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN", "X_CMCC_VLANIDMark", "X_CMCC_VLANID"]:
                     found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                     if found_path:
                         vlan_id_path = found_path
@@ -523,6 +548,16 @@ def execute_prov_push(state_data):
                     
                 parameter_values.append([vlan_enable_path, True])
                 parameter_values.append([vlan_id_path, int(state_data['vlan_id'])])
+                
+                # Set VLAN Priority if supported by device
+                prio_path = None
+                for leaf in ["VLANPriorityMark", "VLANPriority", "802-1pMark", "X_FH_802-1pMark", "X_HW_VLANPriority", "X_ZTE_VLANPriority", "X_CMCC_802-1pMark"]:
+                    found_path = check_param_exists_on_device(device_doc, base_path, leaf)
+                    if found_path:
+                        prio_path = found_path
+                        break
+                if prio_path:
+                    parameter_values.append([prio_path, int(state_data.get('priority', 0))])
             else:
                 vlan_enable_path = None
                 for leaf in ["VLANEnabled", "VLANEnable", "VLANMark"]:
@@ -541,7 +576,7 @@ def execute_prov_push(state_data):
             binding_str = ",".join(full_binds)
             
             binding_leaf = None
-            for leaf in ["BindLANPort", "WANBindLANPort", "X_BROADCOM_COM_BindLans", "X_ZTE_BindLan", "X_HW_LANInterface", "X_FH_LanInterface", "X_FH_LanInterfaceBind"]:
+            for leaf in ["BindLANPort", "WANBindLANPort", "X_BROADCOM_COM_BindLans", "X_ZTE_BindLan", "X_HW_LANInterface", "X_FH_LanInterface", "X_FH_LanInterfaceBind", "X_CMCC_LanInterface"]:
                 found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                 if found_path:
                     binding_leaf = found_path.split(".")[-1]
@@ -550,16 +585,16 @@ def execute_prov_push(state_data):
                 binding_leaf = "BindLANPort"
             parameter_values.append([f"{base_path}.{binding_leaf}", binding_str])
                 
-            # ZTE F670L WanInterface binding
-            if state_data.get('is_f670l'):
-                wan_leaf = None
-                for leaf in ["WanInterface", "WANInterface", "X_ZTE_WANInterface", "WanInterfaceBind"]:
-                    found_path = check_param_exists_on_device(device_doc, base_path, leaf)
-                    if found_path:
-                        wan_leaf = found_path.split(".")[-1]
-                        break
-                if not wan_leaf:
-                    wan_leaf = "WanInterface"
+            # ZTE (and other models) WanInterface binding auto-detection
+            wan_leaf = None
+            for leaf in ["WanInterface", "WANInterface", "X_ZTE_WANInterface", "WanInterfaceBind"]:
+                found_path = check_param_exists_on_device(device_doc, base_path, leaf)
+                if found_path:
+                    wan_leaf = found_path.split(".")[-1]
+                    break
+            if not wan_leaf and state_data.get('is_f670l'):
+                wan_leaf = "WanInterface"
+            if wan_leaf:
                 parameter_values.append([f"{base_path}.{wan_leaf}", base_path])
                 
         elif wtype == 'wifi':
@@ -606,6 +641,11 @@ def execute_prov_push(state_data):
         
         resp_push = requests.post(task_url, json=payload, auth=auth, timeout=25)
         if resp_push.status_code in (200, 201, 202):
+            try:
+                from services.genieacs import trigger_connection_request_by_device_id
+                trigger_connection_request_by_device_id(device_id)
+            except Exception as e:
+                print(f"Error triggering direct connection request in execute_prov_push: {e}")
             return True, "Antrean task CWMP (setParameterValues) berhasil dibuat."
         else:
             return False, f"GenieACS NBI Error: {resp_push.status_code} - {resp_push.text}"
@@ -691,7 +731,7 @@ def populate_state_from_wan(state_data, device_doc, wcd_idx, conn_type, conn_idx
         state_data['wan_type'] = 'ip_routed' if conn_type_val == 'IP_Routed' else 'ip_bridged'
         
     svc_val = "INTERNET"
-    for leaf in ["ServiceList", "X_FH_ServiceList", "X_HW_ServiceList", "X_ZTE_ServiceList"]:
+    for leaf in ["ServiceList", "X_FH_ServiceList", "X_HW_ServiceList", "X_ZTE_ServiceList", "X_CMCC_ServiceList"]:
         if leaf in conn:
             svc_val = conn[leaf].get("_value", "INTERNET")
             break
@@ -711,7 +751,7 @@ def populate_state_from_wan(state_data, device_doc, wcd_idx, conn_type, conn_idx
     parent_path = f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{wcd_idx}"
     vlan_id = 0
     # 1. Check WAN connection level for VLAN
-    for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN"]:
+    for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN", "X_CMCC_VLANIDMark", "X_CMCC_VLANID"]:
         if leaf in conn:
             try:
                 vlan_id = int(conn[leaf].get("_value", 0))
@@ -754,8 +794,32 @@ def populate_state_from_wan(state_data, device_doc, wcd_idx, conn_type, conn_idx
     state_data['vlan_id'] = vlan_id
     state_data['vlan_enabled'] = (vlan_id > 0)
     
+    priority = 0
+    for key in wcd:
+        if 'GponLinkConfig' in key or 'GPONLinkConfig' in key or 'WANGponLink' in key:
+            gpon_cfg = wcd.get(key, {})
+            for prio_leaf in ["802-1pMark", "X_FH_802-1pMark", "PriorityMark", "Priority"]:
+                if prio_leaf in gpon_cfg:
+                    try:
+                        priority = int(gpon_cfg[prio_leaf].get("_value", 0))
+                        break
+                    except:
+                        pass
+            if priority > 0:
+                break
+ 
+    if priority == 0:
+        for leaf in ["VLANPriorityMark", "VLANPriority", "802-1pMark", "X_FH_802-1pMark", "X_HW_VLANPriority", "X_ZTE_VLANPriority", "X_CMCC_802-1pMark"]:
+            if leaf in conn:
+                try:
+                    priority = int(conn[leaf].get("_value", 0))
+                    break
+                except:
+                    pass
+    state_data['priority'] = priority
+    
     binding_str = ""
-    for leaf in ["BindLANPort", "WANBindLANPort", "X_BROADCOM_COM_BindLans", "X_ZTE_BindLan", "X_HW_LANInterface", "X_FH_LanInterface", "X_FH_LanInterfaceBind"]:
+    for leaf in ["BindLANPort", "WANBindLANPort", "X_BROADCOM_COM_BindLans", "X_ZTE_BindLan", "X_HW_LANInterface", "X_FH_LanInterface", "X_FH_LanInterfaceBind", "X_CMCC_LanInterface"]:
         if leaf in conn:
             binding_str = conn[leaf].get("_value", "")
             break
@@ -803,6 +867,7 @@ def show_edit_menu(chat_id, token):
         msg += f"• NAT: <b>{'Enabled' if state_data.get('nat_enabled') else 'Disabled'}</b>\n"
         
     msg += f"• VLAN Tag: <b>{'Enabled (' + str(state_data.get('vlan_id')) + ')' if state_data.get('vlan_enabled') else 'Disabled'}</b>\n"
+    msg += f"• Priority WAN: <b>{state_data.get('priority', 0)}</b>\n"
     
     bind_list = state_data.get('selected_binds', [])
     msg += f"• Port Binding: <code>{', '.join(bind_list) if bind_list else 'Tanpa Bind'}</code>\n" \
@@ -817,6 +882,7 @@ def show_edit_menu(chat_id, token):
         
     buttons.append([
         {"text": "✏️ VLAN Tag", "callback_data": "edit_field:vlan"},
+        {"text": "✏️ Priority WAN", "callback_data": "edit_field:priority"},
         {"text": "✏️ Port Binding", "callback_data": "edit_field:bind"}
     ])
     
@@ -855,6 +921,11 @@ def execute_delete_wan(device_id, wcd_idx, conn_type, conn_idx):
         
         resp = requests.post(task_url, json=payload, auth=auth, timeout=10)
         if resp.status_code in (200, 201, 202):
+            try:
+                from services.genieacs import trigger_connection_request_by_device_id
+                trigger_connection_request_by_device_id(device_id)
+            except Exception as e:
+                print(f"Error triggering direct connection request in execute_delete_wan: {e}")
             return True, f"Antrean task CWMP (deleteObject untuk {obj_name}) berhasil dibuat."
         else:
             return False, f"GenieACS NBI Error: {resp.status_code} - {resp.text}"
@@ -1075,6 +1146,7 @@ def handle_cek_command(chat_id, username, token):
             f"• Uptime Perangkat: <code>{acs_data.get('ont_uptime_str','N/A')}</code>\n"
             f"• Temperatur: <code>{acs_data.get('temperature','N/A')} °C</code>\n"
             f"• Mode PON: <code>{acs_data.get('pon_mode','N/A')}</code>\n"
+            f"• Perangkat Wi-Fi Aktif: <b>{acs_data.get('wifi_active_count','N/A')} perangkat</b>\n"
         )
     else:
         reply += f"• <i>ONT Detail: {acs_data.get('message', 'Data tidak ditemukan')}</i>\n"
@@ -1113,10 +1185,16 @@ def handle_cek_command(chat_id, username, token):
         
     row2 = []
     if acs_found:
+        row2.append({"text": "👥 List Device Wi-Fi", "callback_data": f"list_wifi_clients:{username}"})
         row2.append({"text": "📡 Scan Wi-Fi Sekitar", "callback_data": f"scan_wifi:{username}"})
-        row2.append({"text": "🛠️ Provisioning Wizard", "callback_data": f"prov_menu:{username}"})
     if row2:
         inline_keyboard.append(row2)
+        
+    row3 = []
+    if acs_found:
+        row3.append({"text": "🛠️ Provisioning Wizard", "callback_data": f"prov_menu:{username}"})
+    if row3:
+        inline_keyboard.append(row3)
         
     payload = {
         'chat_id': chat_id,
@@ -1265,6 +1343,135 @@ def _wifi_scan_worker(chat_id, username, token):
             'parse_mode': 'HTML'
         })
 
+def _wlan_clients_worker(chat_id, username, token):
+    try:
+        # 1. Cari device info (agar dapat device_id)
+        acs_data = get_genieacs_device_info(username)
+        if not acs_data.get('found'):
+            # Fallback DB
+            try:
+                mapping_res = execute_query("SELECT serial_number FROM ont_serial_mapping WHERE username = %s LIMIT 1", (username,))
+                if mapping_res:
+                    db_serial = mapping_res[0]['serial_number'].strip()
+                    acs_data = get_genieacs_device_info(db_serial)
+            except Exception as db_err:
+                print(f"Error mapping username in clients worker: {db_err}")
+                
+        if not acs_data.get('found'):
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                'chat_id': chat_id,
+                'text': f"❌ <b>Gagal:</b> ONT untuk user <code>{username}</code> tidak ditemukan di GenieACS.",
+                'parse_mode': 'HTML'
+            })
+            return
+            
+        device_id = acs_data.get('id')
+        if not device_id:
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                'chat_id': chat_id,
+                'text': f"❌ <b>Gagal:</b> ID Perangkat tidak valid.",
+                'parse_mode': 'HTML'
+            })
+            return
+            
+        # 2. Panggil get_wlan_clients_realtime untuk pemicuan refresh & pengambilan data
+        res = get_wlan_clients_realtime(device_id)
+        if not res.get('success'):
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                'chat_id': chat_id,
+                'text': f"❌ <b>Gagal mendapatkan list Wi-Fi client:</b> {res.get('message', 'Unknown error')}",
+                'parse_mode': 'HTML'
+            })
+            return
+            
+        clients = res.get('clients', [])
+        total_active_wifi = res.get('total_active_wifi', 0)
+        is_stale = res.get('stale', False)
+        last_inform = res.get('last_inform', 'N/A')
+        
+        # Tombol kembali
+        inline_keyboard = [[
+            {"text": "🔄 Refresh", "callback_data": f"list_wifi_clients:{username}"},
+            {"text": "🔙 Menu Cek", "callback_data": f"cek_back:{username}"}
+        ]]
+        
+        reply = ""
+        if is_stale:
+            reply += f"⚠️ <b>PERINGATAN:</b> Gagal menghubungi ONT secara langsung (Connection Request terhambat).\nData di bawah ini adalah data terakhir terekam (Cache) pada: <code>{last_inform}</code>\n\n"
+        else:
+            if clients or total_active_wifi > 0:
+                reply += f"✅ <b>Data Real-time Berhasil Diambil!</b>\n\n"
+            
+        if total_active_wifi == 0 and not clients:
+            reply += f"⚠️ <b>Tidak ada perangkat (Wi-Fi Client) yang terhubung aktif</b> pada ONT pelanggan <code>{username}</code> saat ini."
+            
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+                'chat_id': chat_id,
+                'text': reply,
+                'parse_mode': 'HTML',
+                'reply_markup': {"inline_keyboard": inline_keyboard}
+            })
+            return
+            
+        reply += (
+            f"👥 <b>Daftar Perangkat Terkoneksi Wi-Fi:</b>\n"
+            f"• Pelanggan: <code>{username}</code>\n"
+            f"• Total Aktif: <b>{total_active_wifi} perangkat</b>\n\n"
+        )
+        
+        if not clients:
+            reply += "ℹ️ <i>Detail perangkat (IP/MAC) sedang diperbarui atau belum dilaporkan oleh ONT.</i>"
+            
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+                'chat_id': chat_id,
+                'text': reply,
+                'parse_mode': 'HTML',
+                'reply_markup': {"inline_keyboard": inline_keyboard}
+            })
+            return
+            
+        # 3. Susun balasan list client secara terorganisasi berdasarkan SSID
+        by_ssid = {}
+        for c in clients:
+            ssid = c['ssid_name']
+            if ssid not in by_ssid:
+                by_ssid[ssid] = []
+            by_ssid[ssid].append(c)
+            
+        for ssid_name, dev_list in by_ssid.items():
+            reply += f"📶 <b>SSID: {ssid_name}</b>\n"
+            for idx, dev in enumerate(dev_list, 1):
+                reply += f"  {idx}. IP: <code>{dev['ip']}</code>\n"
+                if dev.get('device_name') and dev['device_name'] != "N/A":
+                    reply += f"     Nama/Merk: <b>{dev['device_name']}</b>\n"
+                reply += f"     MAC: <code>{dev['mac']}</code>\n"
+                if dev.get('rssi'):
+                    reply += f"     Signal: <code>{dev['rssi']} dBm</code>\n"
+                if dev.get('uptime'):
+                    try:
+                        ut = int(dev['uptime'])
+                        hours, remainder = divmod(ut, 3600)
+                        minutes, _ = divmod(remainder, 60)
+                        ut_str = f"{hours}j {minutes}m" if hours > 0 else f"{minutes}m"
+                        reply += f"     Uptime: <code>{ut_str}</code>\n"
+                    except:
+                        pass
+                reply += "\n"
+                
+        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+            'chat_id': chat_id,
+            'text': reply,
+            'parse_mode': 'HTML',
+            'reply_markup': {"inline_keyboard": inline_keyboard}
+        })
+        
+    except Exception as e:
+        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+            'chat_id': chat_id,
+            'text': f"❌ <b>Error dalam mendapatkan list Wi-Fi:</b> {e}",
+            'parse_mode': 'HTML'
+        })
+
 def background_telegram_bot():
     """Mendengar pesan Telegram masuk (bot polling) untuk melayani perintah teknisi secara interaktif."""
     print("[telegram-bot] Thread initialized, sleeping 20s for stability...")
@@ -1355,6 +1562,17 @@ def background_telegram_bot():
                                 'text': f"⚡ <b>Hasil Ping Ulang:</b>\nIP: <code>{nas_ip}</code>\nStatus: <b>{status_emoji}</b>",
                                 'parse_mode': 'HTML'
                             }, timeout=5)
+                            
+                        elif cb_data.startswith('list_wifi_clients:'):
+                            username = cb_data.split(':', 1)[1]
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': cb_chat_id,
+                                'text': f"⏳ <b>Menghubungi ONT untuk mengambil daftar perangkat Wi-Fi terbaru...</b>\nMohon tunggu beberapa detik...",
+                                'parse_mode': 'HTML'
+                            }, timeout=5)
+                            
+                            # Jalankan list client di thread terpisah agar tidak memblokir polling loop
+                            threading.Thread(target=_wlan_clients_worker, args=(cb_chat_id, username, token), daemon=True).start()
                             
                         elif cb_data.startswith('scan_wifi:'):
                             username = cb_data.split(':', 1)[1]
@@ -1521,6 +1739,11 @@ def background_telegram_bot():
                                         try:
                                             resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, auth=auth, timeout=15)
                                             if resp_reboot.status_code in (200, 201, 202):
+                                                try:
+                                                    from services.genieacs import trigger_connection_request_by_device_id
+                                                    trigger_connection_request_by_device_id(device_id)
+                                                except:
+                                                    pass
                                                 requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                                     'chat_id': cb_chat_id,
                                                     'text': f"🚀 <b>Perintah Reboot Terkirim!</b>\nONT untuk user <code>{username}</code> berhasil di-reboot via CWMP.",
@@ -1533,6 +1756,11 @@ def background_telegram_bot():
                                                     'parse_mode': 'HTML'
                                                 }, timeout=5)
                                         except requests.exceptions.Timeout:
+                                            try:
+                                                from services.genieacs import trigger_connection_request_by_device_id
+                                                trigger_connection_request_by_device_id(device_id)
+                                            except:
+                                                pass
                                             requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                                 'chat_id': cb_chat_id,
                                                 'text': f"⏳ <b>Koneksi Lambat:</b> Hubungan langsung ke ONT <code>{username}</code> melampaui batas waktu, namun <b>perintah reboot telah masuk antrean</b> di GenieACS dan akan dijalankan otomatis saat ONT terhubung.",
@@ -1550,7 +1778,8 @@ def background_telegram_bot():
                             _prov_states[cb_chat_id] = {
                                 'state': 'CHOOSE_TYPE',
                                 'username': username,
-                                'selected_binds': []
+                                'selected_binds': [],
+                                'priority': 0
                             }
                             
                             buttons = [
@@ -1736,6 +1965,8 @@ def background_telegram_bot():
                                     }, timeout=5)
                                 else:
                                     state_data['vlan_enabled'] = False
+                                    state_data['vlan_id'] = 0
+                                    state_data['priority'] = 0
                                     state_data['state'] = 'CHOOSE_BINDING'
                                     state_data['selected_binds'] = []
                                     import json as _json
@@ -1745,6 +1976,21 @@ def background_telegram_bot():
                                         'parse_mode': 'HTML',
                                         'reply_markup': _json.dumps({"inline_keyboard": make_binding_keyboard([])})
                                     }, timeout=5)
+
+                        elif cb_data.startswith('prov_priority:'):
+                            val = cb_data.split(':', 1)[1]
+                            state_data = _prov_states.get(cb_chat_id)
+                            if state_data:
+                                state_data['priority'] = int(val)
+                                state_data['state'] = 'CHOOSE_BINDING'
+                                state_data['selected_binds'] = []
+                                import json as _json
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': cb_chat_id,
+                                    'text': "🔗 <b>Pilih Binding LAN/WLAN Interface (Bisa multi-select):</b>",
+                                    'parse_mode': 'HTML',
+                                    'reply_markup': _json.dumps({"inline_keyboard": make_binding_keyboard([])})
+                                }, timeout=5)
 
                         elif cb_data.startswith('prov_toggle_bind:'):
                             iface = cb_data.split(':', 1)[1]
@@ -2008,6 +2254,22 @@ def background_telegram_bot():
                                         'parse_mode': 'HTML',
                                         'reply_markup': _json.dumps({"inline_keyboard": buttons})
                                     })
+                                elif field == 'priority':
+                                    state_data['state'] = 'EDIT_CHOOSE_PRIORITY'
+                                    buttons = [
+                                        [{"text": "0", "callback_data": "edit_priority:0"}, {"text": "1", "callback_data": "edit_priority:1"}],
+                                        [{"text": "2", "callback_data": "edit_priority:2"}, {"text": "3", "callback_data": "edit_priority:3"}],
+                                        [{"text": "4", "callback_data": "edit_priority:4"}, {"text": "5", "callback_data": "edit_priority:5"}],
+                                        [{"text": "6", "callback_data": "edit_priority:6"}, {"text": "7", "callback_data": "edit_priority:7"}],
+                                        [{"text": "🔙 Kembali", "callback_data": "edit_back_to_menu"}]
+                                    ]
+                                    import json as _json
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': cb_chat_id,
+                                        'text': "⚙️ <b>Pilih Priority WAN Baru (0 - 7):</b>",
+                                        'parse_mode': 'HTML',
+                                        'reply_markup': _json.dumps({"inline_keyboard": buttons})
+                                    })
                                 elif field == 'bind':
                                     state_data['state'] = 'EDIT_CHOOSE_BINDING'
                                     import json as _json
@@ -2025,6 +2287,7 @@ def background_telegram_bot():
                                 if val == 'disable':
                                     state_data['vlan_enabled'] = False
                                     state_data['vlan_id'] = 0
+                                    state_data['priority'] = 0
                                     show_edit_menu(cb_chat_id, token)
                                 else:
                                     state_data['state'] = 'EDIT_ASK_VLAN_ID'
@@ -2033,6 +2296,13 @@ def background_telegram_bot():
                                         'text': "✍️ <b>Ketik/Kirim VLAN ID baru (1-4094):</b>",
                                         'parse_mode': 'HTML'
                                     })
+
+                        elif cb_data.startswith('edit_priority:'):
+                            val = cb_data.split(':', 1)[1]
+                            state_data = _prov_states.get(cb_chat_id)
+                            if state_data:
+                                state_data['priority'] = int(val)
+                                show_edit_menu(cb_chat_id, token)
 
                         elif cb_data == 'edit_back_to_menu':
                             show_edit_menu(cb_chat_id, token)
@@ -2250,14 +2520,20 @@ def background_telegram_bot():
                             vlan_id = int(text)
                             if 1 <= vlan_id <= 4094:
                                 state_data['vlan_id'] = vlan_id
-                                state_data['state'] = 'CHOOSE_BINDING'
-                                state_data['selected_binds'] = []
+                                state_data['state'] = 'CHOOSE_PRIORITY'
+                                buttons = [
+                                    [{"text": "0", "callback_data": "prov_priority:0"}, {"text": "1", "callback_data": "prov_priority:1"}],
+                                    [{"text": "2", "callback_data": "prov_priority:2"}, {"text": "3", "callback_data": "prov_priority:3"}],
+                                    [{"text": "4", "callback_data": "prov_priority:4"}, {"text": "5", "callback_data": "prov_priority:5"}],
+                                    [{"text": "6", "callback_data": "prov_priority:6"}, {"text": "7", "callback_data": "prov_priority:7"}],
+                                    [{"text": "❌ Batal", "callback_data": "prov_cancel"}]
+                                ]
                                 import json as _json
                                 requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                     'chat_id': chat_id,
-                                    'text': "🔗 <b>Pilih Binding LAN/WLAN Interface (Bisa multi-select):</b>",
+                                    'text': "⚙️ <b>Pilih Priority WAN (0 - 7):</b>\n(Default: 0 atau 1)",
                                     'parse_mode': 'HTML',
-                                    'reply_markup': _json.dumps({"inline_keyboard": make_binding_keyboard([])})
+                                    'reply_markup': _json.dumps({"inline_keyboard": buttons})
                                 })
                             else:
                                 raise ValueError()
@@ -2375,7 +2651,8 @@ def background_telegram_bot():
                     _prov_states[chat_id] = {
                         'state': 'CHOOSE_TYPE',
                         'username': username,
-                        'selected_binds': []
+                        'selected_binds': [],
+                        'priority': 0
                     }
                     
                     buttons = [
@@ -2456,6 +2733,11 @@ def background_telegram_bot():
                         try:
                             resp_reboot = requests.post(reboot_url, json={"name": "reboot"}, auth=auth, timeout=15)
                             if resp_reboot.status_code in (200, 201, 202):
+                                try:
+                                    from services.genieacs import trigger_connection_request_by_device_id
+                                    trigger_connection_request_by_device_id(device_id)
+                                except:
+                                    pass
                                 requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                     'chat_id': chat_id,
                                     'text': f"🚀 <b>Perintah Reboot Terkirim!</b>\nONT untuk user <code>{username}</code> berhasil di-reboot via CWMP (GenieACS).",
@@ -2468,6 +2750,11 @@ def background_telegram_bot():
                                     'parse_mode': 'HTML'
                                 })
                         except requests.exceptions.Timeout:
+                            try:
+                                from services.genieacs import trigger_connection_request_by_device_id
+                                trigger_connection_request_by_device_id(device_id)
+                            except:
+                                pass
                             requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                 'chat_id': chat_id,
                                 'text': f"⏳ <b>Koneksi Lambat:</b> Hubungan langsung ke ONT <code>{username}</code> melampaui batas waktu, namun <b>perintah reboot telah masuk antrean</b> di GenieACS dan akan dijalankan otomatis saat ONT terhubung.",
