@@ -153,11 +153,12 @@ def show_prov_confirm(chat_id, token):
     username = state_data['username']
     wtype = state_data['wan_type']
     
-    msg = f"━━━━━━━━━━━━━━━━━━━━━━\n" \
-          f"📝 <b>KONFIRMASI PROVISIONING ONT</b>\n" \
-          f"━━━━━━━━━━━━━━━━━━━━━━\n" \
-          f"• Pelanggan: <a href=\"https://radius.go.daragroup.cloud/users?search={username}\">{username}</a>\n"
-          
+    msg = (
+        f"📋 <b>Konfirmasi Provisioning ONT</b>\n"
+        f"<i>Periksa kembali sebelum push config</i>\n\n"
+        f"👤 Pelanggan: <a href=\"https://radius.go.daragroup.cloud/users?search={username}\">"
+        f"<b>{username}</b></a>\n"
+    )
     if wtype == 'wifi':
         msg += f"• Tipe Config: <b>Wi-Fi Config</b>\n" \
                f"• Slot SSID: <b>SSID {state_data['wifi_slot']}</b>\n" \
@@ -189,6 +190,7 @@ def show_prov_confirm(chat_id, token):
                        
         if wtype in ('ppp_routed', 'ip_routed'):
             msg += f"• NAT Enable: <b>{'Enabled' if state_data.get('nat_enabled') else 'Disabled'}</b>\n"
+            msg += f"• Max MTU: <b>{state_data.get('mtu', 1500)}</b>\n"
             
         msg += f"• VLAN Tag: <b>{'Enabled (' + str(state_data.get('vlan_id')) + ')' if state_data.get('vlan_enabled') else 'Disabled'}</b>\n"
         msg += f"• Priority: <b>{state_data.get('priority', 0)}</b>\n"
@@ -197,13 +199,12 @@ def show_prov_confirm(chat_id, token):
         msg += f"• Port Bind: <code>{', '.join(bind_list) if bind_list else 'Tanpa Bind'}</code>\n" \
                f"• ZTE F670L: <b>{'Ya' if state_data.get('is_f670l') else 'Tidak'}</b>\n"
                
-    msg += f"━━━━━━━━━━━━━━━━━━━━━━\n" \
-           f"Apakah Anda ingin mengirimkan konfigurasi ini?"
+    msg += "\n<i>Kirimkan konfigurasi ini ke perangkat ONT?</i>"
         
     buttons = [
         [
-            {"text": "🚀 PUSH CONFIG", "callback_data": "prov_push"},
-            {"text": "❌ Batal", "callback_data": "prov_cancel"}
+            {"text": "🚀 Push Config ke ONT", "callback_data": "prov_push"},
+            {"text": "✕ Batal", "callback_data": "prov_cancel"}
         ]
     ]
     import json as _json
@@ -349,17 +350,12 @@ def execute_prov_push(state_data):
             return True
 
         def queue_task(task_name, payload_data):
-            task_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"
+            task_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks"
             payload = {
                 "name": task_name,
                 **payload_data
             }
             resp = requests.post(task_url, json=payload, auth=auth, timeout=10)
-            try:
-                from services.genieacs import trigger_connection_request_by_device_id
-                trigger_connection_request_by_device_id(device_id)
-            except Exception as e:
-                print(f"Error triggering direct connection request in queue_task: {e}")
             return resp
 
         parameter_values = []
@@ -374,15 +370,39 @@ def execute_prov_push(state_data):
                 conn_idx = state_data['conn_idx']
                 base_path = f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{wcd_idx}.{conn_type}.{conn_idx}"
             else:
+                # 1. Cari GPON Link Config key terlebih dahulu untuk mendeteksi skema vendor secara cerdas
+                gpon_cfg_key = None
+                template_path = find_existing_wan_path(device_doc)
+                if template_path:
+                    template_wcd_idx = template_path.split(".")[4]  # WANConnectionDevice.X
+                    template_wcd = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {}).get(template_wcd_idx, {})
+                    for key in template_wcd:
+                        if 'GponLinkConfig' in key or 'GPONLinkConfig' in key or 'WANGponLink' in key:
+                            gpon_cfg_key = key
+                            break
+                
+                if not gpon_cfg_key:
+                    # Fallback: cek di WCD mana saja yang ada
+                    wcd_conns = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {})
+                    for wcd_idx, wcd_val in wcd_conns.items():
+                        if wcd_idx.isdigit() and isinstance(wcd_val, dict):
+                            for key in wcd_val.keys():
+                                if 'GponLinkConfig' in key or 'GPONLinkConfig' in key or 'WANGponLink' in key:
+                                    gpon_cfg_key = key
+                                    break
+                        if gpon_cfg_key:
+                            break
+
                 # Determine connection scheme (Scheme A vs Scheme B)
                 # Scheme A: WANConnectionDevice.{slot}.[conn_type].1
                 # Scheme B: WANConnectionDevice.1.[conn_type].{slot}
                 use_scheme_b = False
                 wan_conn_1 = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {}).get("1", {})
                 
-                # Check based on manufacturer first (ZTE & Huawei/HWTC always use Scheme B)
+                # Check based on manufacturer (ZTE, Huawei, HWTC menggunakan Scheme B,
+                # KECUALI jika terdeteksi memiliki GPON Link Config, yang mengindikasikan OEM/Scheme A)
                 manufacturer = device_doc.get("_deviceId", {}).get("_Manufacturer", "").upper()
-                if "ZTE" in manufacturer or "HUAWEI" in manufacturer or "HWTC" in manufacturer:
+                if ("ZTE" in manufacturer or "HUAWEI" in manufacturer or "HWTC" in manufacturer) and not gpon_cfg_key:
                     use_scheme_b = True
                 else:
                     if isinstance(wan_conn_1, dict):
@@ -429,6 +449,11 @@ def execute_prov_push(state_data):
                                 pass
                     max_slot = max(existing_slots) if existing_slots else 0
                     
+                    # Auto-correct slot untuk Scheme A: gunakan slot baru yang belum terpakai (max_slot + 1)
+                    # Ini mencegah penumpukan/overwriting pada slot TR-069 atau slot lain yang sudah aktif
+                    slot = max_slot + 1
+                    state_data['slot'] = slot  # Update state agar UI/konfirmasi konsisten
+                    
                     if slot > max_slot:
                         for _ in range(max_slot, slot):
                             queue_task("addObject", {"objectName": "InternetGatewayDevice.WANDevice.1.WANConnectionDevice"})
@@ -438,49 +463,47 @@ def execute_prov_push(state_data):
                         queue_task("addObject", {"objectName": f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{slot}.{conn_type}"})
             
             parameter_values.append([f"{base_path}.Enable", True])
-            has_gpon_link_config = False  # Flag: apakah GPON Link Config menangani VLAN
+            has_gpon_link_config = gpon_cfg_key is not None
 
             # --- FiberHome GPON Link Config (X_FH_WANGponLinkConfig) ---
             # Pada perangkat FiberHome, layer 2 GPON link wajib dikonfigurasi agar
             # koneksi WAN bisa terhubung ke jaringan. Tanpa ini, PPPoE tidak akan dial.
-            if not state_data.get('is_edit') and not use_scheme_b:
+            if not state_data.get('is_edit') and gpon_cfg_key:
                 wcd_path = f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{slot}"
-                gpon_cfg_key = None
-                # Cari nama sub-object GPON link config dari template WAN yang sudah ada
-                template_path = find_existing_wan_path(device_doc)
-                if template_path:
-                    template_wcd_idx = template_path.split(".")[4]  # WANConnectionDevice.X
-                    template_wcd = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {}).get(template_wcd_idx, {})
-                    for key in template_wcd:
-                        if 'GponLinkConfig' in key or 'GPONLinkConfig' in key or 'WANGponLink' in key:
-                            gpon_cfg_key = key
-                            break
+                gpon_path = f"{wcd_path}.{gpon_cfg_key}"
+                parameter_values.append([f"{gpon_path}.Enable", True])
+                parameter_values.append([f"{gpon_path}.Mode", 2])  # Mode 2 = Tagged VLAN
+                # 802.1p priority mark
+                priority_val = int(state_data.get('priority', 0))
+                parameter_values.append([f"{gpon_path}.802-1pMark", priority_val])
                 
-                if not gpon_cfg_key:
-                    # Fallback: cek langsung di WCD baru
-                    new_wcd = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {}).get(str(slot), {})
-                    for key in new_wcd:
-                        if 'GponLinkConfig' in key or 'GPONLinkConfig' in key or 'WANGponLink' in key:
-                            gpon_cfg_key = key
-                            break
-                
-                if gpon_cfg_key:
-                    has_gpon_link_config = True
-                    gpon_path = f"{wcd_path}.{gpon_cfg_key}"
-                    parameter_values.append([f"{gpon_path}.Enable", True])
-                    parameter_values.append([f"{gpon_path}.Mode", 2])  # Mode 2 = Tagged VLAN
-                    # 802.1p priority mark
-                    priority_val = int(state_data.get('priority', 0))
-                    parameter_values.append([f"{gpon_path}.802-1pMark", priority_val])
-                    if state_data.get('vlan_enabled') and state_data.get('vlan_id'):
-                        vlan_val = int(state_data['vlan_id'])
-                        parameter_values.append([f"{gpon_path}.VLANID", vlan_val])
-                        # Cek apakah ada VLANIDMark (FiberHome specific)
-                        if template_path:
-                            t_wcd_idx = template_path.split(".")[4]
-                            t_gpon = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {}).get(t_wcd_idx, {}).get(gpon_cfg_key, {})
+                if state_data.get('vlan_enabled') and state_data.get('vlan_id'):
+                    vlan_val = int(state_data['vlan_id'])
+                    
+                    # Cari parameter apa saja yang ada di GPON Link Config
+                    has_vlan_id = False
+                    has_vlan_id_mark = False
+                    
+                    wcd_conns = device_doc.get("InternetGatewayDevice", {}).get("WANDevice", {}).get("1", {}).get("WANConnectionDevice", {})
+                    for wcd_key, wcd_val in wcd_conns.items():
+                        if not wcd_key.isdigit():
+                            continue
+                        t_gpon = wcd_val.get(gpon_cfg_key, {})
+                        if isinstance(t_gpon, dict):
+                            if "VLANID" in t_gpon:
+                                has_vlan_id = True
                             if "VLANIDMark" in t_gpon:
-                                parameter_values.append([f"{gpon_path}.VLANIDMark", vlan_val])
+                                has_vlan_id_mark = True
+                            if has_vlan_id or has_vlan_id_mark:
+                                break
+                    
+                    if not has_vlan_id and not has_vlan_id_mark:
+                        has_vlan_id = True
+                        
+                    if has_vlan_id:
+                        parameter_values.append([f"{gpon_path}.VLANID", vlan_val])
+                    if has_vlan_id_mark:
+                        parameter_values.append([f"{gpon_path}.VLANIDMark", vlan_val])
 
             # --- FiberHome X_FH_IPMode ---
             # X_FH_IPMode = 1 (IPv4), diperlukan agar koneksi PPPoE/IPoE bisa dial
@@ -589,6 +612,18 @@ def execute_prov_push(state_data):
                     nat_leaf = "NATEnabled"
                 parameter_values.append([f"{base_path}.{nat_leaf}", state_data.get('nat_enabled', True)])
 
+            # Set MTU jika diaktifkan dan mode Routed
+            if wtype in ('ppp_routed', 'ip_routed') and state_data.get('mtu'):
+                mtu_leaf = None
+                for leaf in ["MaxMTUSize", "MTU", "MaxMTU"]:
+                    found_path = check_param_exists_on_device(device_doc, base_path, leaf)
+                    if found_path:
+                        mtu_leaf = found_path.split(".")[-1]
+                        break
+                if not mtu_leaf:
+                    mtu_leaf = "MaxMTUSize"
+                parameter_values.append([f"{base_path}.{mtu_leaf}", int(state_data['mtu'])])
+
             # Set ConnectionTrigger ke AlwaysOn agar PPPoE/IPoE auto-dial
             trigger_leaf = None
             for leaf in ["ConnectionTrigger"]:
@@ -611,8 +646,7 @@ def execute_prov_push(state_data):
                 parameter_values.append([f"{base_path}.{dns_enable_leaf}", True])
 
             # Set VLAN Tagging jika diaktifkan
-            # Pada FiberHome (has_gpon_link_config=True), VLAN sudah di-handle oleh GPON Link Config.
-            # Jangan set VLANEnable=True di level WAN connection karena menyebabkan double-tagging.
+            # Jangan set VLANEnable=True di level WAN connection pada device yang tidak memilikinya (misal ZICG).
             if state_data.get('vlan_enabled'):
                 vlan_enable_path = None
                 for leaf in ["VLANEnabled", "VLANEnable", "VLANMark", "X_HW_VLAN_Enable", "X_ZTE_VLAN_Enable", "X_CMCC_VLAN_Enable"]:
@@ -620,30 +654,33 @@ def execute_prov_push(state_data):
                     if found_path:
                         vlan_enable_path = found_path
                         break
-                if not vlan_enable_path:
-                    vlan_enable_path = f"{base_path}.VLANEnabled"
-                    
+                
                 vlan_id_path = None
                 for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN", "X_CMCC_VLANIDMark", "X_CMCC_VLANID"]:
                     found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                     if found_path:
                         vlan_id_path = found_path
                         break
-                if not vlan_id_path:
-                    vlan_id_path = f"{base_path}.VLANIDMark"
+
+                # Tulis jika ditemukan di device, atau jika ini bukan GPON link config device (ZTE/Huawei/dll)
+                if (vlan_enable_path and vlan_id_path) or not has_gpon_link_config:
+                    if not vlan_enable_path:
+                        vlan_enable_path = f"{base_path}.VLANEnabled"
+                    if not vlan_id_path:
+                        vlan_id_path = f"{base_path}.VLANIDMark"
+                        
+                    parameter_values.append([vlan_enable_path, True])
+                    parameter_values.append([vlan_id_path, int(state_data['vlan_id'])])
                     
-                parameter_values.append([vlan_enable_path, True])
-                parameter_values.append([vlan_id_path, int(state_data['vlan_id'])])
-                
-                # Set VLAN Priority if supported by device
-                prio_path = None
-                for leaf in ["VLANPriorityMark", "VLANPriority", "802-1pMark", "X_FH_802-1pMark", "X_HW_VLANPriority", "X_ZTE_VLANPriority", "X_CMCC_802-1pMark"]:
-                    found_path = check_param_exists_on_device(device_doc, base_path, leaf)
-                    if found_path:
-                        prio_path = found_path
-                        break
-                if prio_path:
-                    parameter_values.append([prio_path, int(state_data.get('priority', 0))])
+                    # Set VLAN Priority if supported by device
+                    prio_path = None
+                    for leaf in ["VLANPriorityMark", "VLANPriority", "802-1pMark", "X_FH_802-1pMark", "X_HW_VLANPriority", "X_ZTE_VLANPriority", "X_CMCC_802-1pMark"]:
+                        found_path = check_param_exists_on_device(device_doc, base_path, leaf)
+                        if found_path:
+                            prio_path = found_path
+                            break
+                    if prio_path:
+                        parameter_values.append([prio_path, int(state_data.get('priority', 0))])
             else:
                 vlan_enable_path = None
                 for leaf in ["VLANEnabled", "VLANEnable", "VLANMark"]:
@@ -651,7 +688,9 @@ def execute_prov_push(state_data):
                     if found_path:
                         vlan_enable_path = found_path
                         break
-                if vlan_enable_path:
+                if vlan_enable_path or not has_gpon_link_config:
+                    if not vlan_enable_path:
+                        vlan_enable_path = f"{base_path}.VLANEnabled"
                     parameter_values.append([vlan_enable_path, False])
 
             # Set Port Binding (LAN/SSID)
@@ -814,6 +853,11 @@ def populate_state_from_wan(state_data, device_doc, wcd_idx, conn_type, conn_idx
     
     state_data['nat_enabled'] = conn.get("NATEnabled", {}).get("_value", True)
     
+    try:
+        state_data['mtu'] = int(conn.get("MaxMTUSize", {}).get("_value", 1500))
+    except:
+        state_data['mtu'] = 1500
+        
     parent_path = f"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.{wcd_idx}"
     vlan_id = 0
     # 1. Check WAN connection level for VLAN
@@ -907,7 +951,10 @@ def show_edit_menu(chat_id, token):
     wtype = state_data['wan_type']
     slot = state_data['slot']
     
-    msg = f"📝 <b>Edit WAN [Wan {slot}] Pelanggan:</b> <code>{username}</code>\n\n"
+    msg = (
+        f"✏️ <b>Edit WAN</b> · Wan {slot}\n"
+        f"<code>{username}</code>\n\n"
+    )
     
     modes_map = {
         'ppp_routed': 'IP_Routed (PPPoE)',
@@ -931,6 +978,7 @@ def show_edit_menu(chat_id, token):
                    
     if wtype in ('ppp_routed', 'ip_routed'):
         msg += f"• NAT: <b>{'Enabled' if state_data.get('nat_enabled') else 'Disabled'}</b>\n"
+        msg += f"• MTU: <b>{state_data.get('mtu', 1500)}</b>\n"
         
     msg += f"• VLAN Tag: <b>{'Enabled (' + str(state_data.get('vlan_id')) + ')' if state_data.get('vlan_enabled') else 'Disabled'}</b>\n"
     msg += f"• Priority WAN: <b>{state_data.get('priority', 0)}</b>\n"
@@ -938,13 +986,20 @@ def show_edit_menu(chat_id, token):
     bind_list = state_data.get('selected_binds', [])
     msg += f"• Port Binding: <code>{', '.join(bind_list) if bind_list else 'Tanpa Bind'}</code>\n" \
            f"• ZTE F670L: <b>{'Ya' if state_data.get('is_f670l') else 'Tidak'}</b>\n\n" \
-           f"Silakan pilih parameter yang ingin diubah:"
+           f"<i>Pilih parameter yang ingin diubah:</i>"
            
     buttons = []
+    row1 = []
     if wtype == 'ppp_routed':
-        buttons.append([{"text": "✏️ PPPoE Credentials", "callback_data": "edit_field:pppoe"}])
+        row1.append({"text": "✏️ PPPoE Credentials", "callback_data": "edit_field:pppoe"})
     elif wtype == 'ip_routed' and state_data['ipoe_addr'] == 'Static':
-        buttons.append([{"text": "✏️ IP Address Static", "callback_data": "edit_field:static_ip"}])
+        row1.append({"text": "✏️ IP Address Static", "callback_data": "edit_field:static_ip"})
+        
+    if wtype in ('ppp_routed', 'ip_routed'):
+        row1.append({"text": "✏️ MTU", "callback_data": "edit_field:mtu"})
+        
+    if row1:
+        buttons.append(row1)
         
     buttons.append([
         {"text": "✏️ VLAN Tag", "callback_data": "edit_field:vlan"},
@@ -953,8 +1008,8 @@ def show_edit_menu(chat_id, token):
     ])
     
     buttons.append([
-        {"text": "🚀 PUSH CONFIG", "callback_data": "prov_push"},
-        {"text": "❌ Batal", "callback_data": "prov_cancel"}
+        {"text": "🚀 Push Config ke ONT", "callback_data": "prov_push"},
+        {"text": "✕ Batal", "callback_data": "prov_cancel"}
     ])
     
     import json as _json
@@ -1161,47 +1216,41 @@ def handle_cek_command(chat_id, username, token):
             nas_name = nas_info[0]['shortname'] or nas_ip
             
     # 3. Formulasikan Balasan HTML & Smart Diagnostics
-    status_str = "🟢 <b>ONLINE</b>" if is_online else "🔴 <b>OFFLINE</b>"
-    
+    status_str = "🟢 <b>Online</b>" if is_online else "🔴 <b>Offline</b>"
+
     reply = (
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 <b>INFORMASI PELANGGAN</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"• Username: <code>{username}</code>\n"
+        f"👤 <b>Info Pelanggan</b>\n"
+        f"<code>{username}</code>\n\n"
     )
     if radius_username != username:
-        reply += f"• PPPoE Account: <code>{radius_username}</code>\n"
-        
-    reply += f"• Status Sesi: {status_str}\n"
-    
+        reply += f"• PPPoE  <code>{radius_username}</code>\n"
+
+    reply += f"• Status  {status_str}\n"
+
     if session_res:
         reply += (
-            f"• Router NAS: <b>{nas_name}</b> (<code>{nas_ip}</code>)\n"
-            f"• IP Address: <code>{framed_ip}</code>\n"
-            f"• MAC Address: <code>{mac_address}</code>\n"
-            f"• Sesi Aktif Uptime: <code>{uptime_str}</code>\n"
+            f"┌ NAS  <b>{nas_name}</b> · <code>{nas_ip}</code>\n"
+            f"├ IP   <code>{framed_ip}</code>\n"
+            f"├ MAC  <code>{mac_address}</code>\n"
+            f"└ Uptime  <code>{uptime_str}</code>\n"
         )
     else:
-        reply += "• <i>Log Sesi RADIUS tidak ditemukan.</i>\n"
-        
-    reply += (
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📌 <b>INFORMASI ONT (GENIEACS)</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-    )
+        reply += "<i>Log sesi RADIUS tidak ditemukan.</i>\n"
+
+    reply += f"\n📡 <b>Info ONT</b> · GenieACS\n"
     if acs_found:
         reply += (
-            f"• SN / Model: <code>{acs_data.get('serial','N/A')}</code> ({acs_data.get('manufacturer','N/A')} {acs_data.get('model','N/A')})\n"
-            f"• Redaman (RxPower): <b>{acs_data.get('rx_power','N/A')} dBm</b> ({acs_data.get('rx_status_emoji','⚪ Unknown')})\n"
-            f"• Uptime Perangkat: <code>{acs_data.get('ont_uptime_str','N/A')}</code>\n"
-            f"• Temperatur: <code>{acs_data.get('temperature','N/A')} °C</code>\n"
-            f"• Mode PON: <code>{acs_data.get('pon_mode','N/A')}</code>\n"
-            f"• Perangkat Wi-Fi Aktif: <b>{acs_data.get('wifi_active_count','N/A')} perangkat</b>\n"
+            f"┌ SN      <code>{acs_data.get('serial','N/A')}</code>\n"
+            f"├ Model   {acs_data.get('manufacturer','N/A')} {acs_data.get('model','N/A')}\n"
+            f"├ RxPower <b>{acs_data.get('rx_power','N/A')} dBm</b>  {acs_data.get('rx_status_emoji','⚪')}\n"
+            f"├ Suhu    <code>{acs_data.get('temperature','N/A')} °C</code>\n"
+            f"├ PON     <code>{acs_data.get('pon_mode','N/A')}</code>\n"
+            f"├ Uptime  <code>{acs_data.get('ont_uptime_str','N/A')}</code>\n"
+            f"└ Wi-Fi   <b>{acs_data.get('wifi_active_count','N/A')} perangkat aktif</b>\n"
         )
     else:
-        reply += f"• <i>ONT Detail: {acs_data.get('message', 'Data tidak ditemukan')}</i>\n"
-    reply += "━━━━━━━━━━━━━━━━━━━━━━\n"
-        
+        reply += f"<i>{acs_data.get('message', 'Data ONT tidak ditemukan')}</i>\n"
+
     # === NOC SMART DIAGNOSTICS & RECOMMENDATIONS ===
     recommendations = []
     
@@ -1220,7 +1269,7 @@ def handle_cek_command(chat_id, username, token):
         recommendations.append(f"🔌 <b>Sesi RADIUS Tinggi ({session_days} hari):</b> Sesi dial-up aktif terlalu lama tanpa refresh. Disarankan 'Kick Session' agar mendapat alokasi IP & rute segar.")
         
     if recommendations:
-        reply += "\n🧠 <b>Rekomendasi Pintar (NOC Diagnostic):</b>\n"
+        reply += "\n💡 <b>Rekomendasi NOC:</b>\n"
         for rec in recommendations:
             reply += f"• {rec}\n"
             
@@ -1319,51 +1368,46 @@ def _wifi_scan_worker(chat_id, username, token):
         
         # 4. Susun Balasan
         reply = (
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📶 <b>ANALISIS WI-FI NEIGHBORS</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• Pelanggan: <code>{username}</code>\n"
-            f"• Wi-Fi 2.4 GHz saat ini: Channel <b>{analysis['current_2g_channel']}</b>\n"
-            f"• Wi-Fi 5 GHz saat ini: Channel <b>{analysis['current_5g_channel']}</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📶 <b>Analisis Wi-Fi Neighbors</b>\n"
+            f"<code>{username}</code>\n\n"
+            f"┌ 2.4 GHz  Channel <b>{analysis['current_2g_channel']}</b> (aktif)\n"
+            f"└ 5 GHz    Channel <b>{analysis['current_5g_channel']}</b> (aktif)\n\n"
         )
         
         # Tampilkan rekomendasi 2.4 GHz
         scores_2g = analysis['scores_2g']
         reply += (
-            f"💡 <b>REKOMENDASI 2.4 GHz (Non-overlapping):</b>\n"
-            f"• Channel 1 : Skor Interferensi <b>{scores_2g[1]:.1f}</b>\n"
-            f"• Channel 6 : Skor Interferensi <b>{scores_2g[6]:.1f}</b>\n"
-            f"• Channel 11: Skor Interferensi <b>{scores_2g[11]:.1f}</b>\n"
-            f"👉 <b>Terbaik: Channel {analysis['best_2g_channel']}</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 <b>Rekomendasi 2.4 GHz</b> (non-overlapping)\n"
+            f"  Ch 1   interferensi <b>{scores_2g[1]:.1f}</b>\n"
+            f"  Ch 6   interferensi <b>{scores_2g[6]:.1f}</b>\n"
+            f"  Ch 11  interferensi <b>{scores_2g[11]:.1f}</b>\n"
+            f"→ Terbaik: <b>Channel {analysis['best_2g_channel']}</b>\n\n"
         )
         
         # Tampilkan rekomendasi 5 GHz
         scores_5g = analysis['scores_5g']
         reply += (
-            f"💡 <b>REKOMENDASI 5 GHz (Non-DFS):</b>\n"
-            f"👉 <b>Terbaik: Channel {analysis['best_5g_channel']}</b>\n"
-            f"   (Skor interferensi terendah: {scores_5g[analysis['best_5g_channel']]:.1f})\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 <b>Rekomendasi 5 GHz</b> (non-DFS)\n"
+            f"→ Terbaik: <b>Channel {analysis['best_5g_channel']}</b>"
+            f"  skor {scores_5g[analysis['best_5g_channel']]:.1f}\n\n"
         )
         
         # Tampilkan list Neighbor terkuat (jika ada)
         neighbors_2g = analysis['neighbors_2g']
         if neighbors_2g:
-            reply += "📡 <b>SSID Tetangga 2.4 GHz Terkuat:</b>\n"
+            reply += "📡 <b>SSID Tetangga Terdekat 2.4 GHz:</b>\n"
             for n in neighbors_2g[:5]:
                 reply += f"• <code>{n['ssid']}</code> (Ch {n['channel']}, {n['rssi']} dBm)\n"
-            reply += "━━━━━━━━━━━━━━━━━━━━━━\n"
+            reply += "\n"
             
         neighbors_5g = analysis['neighbors_5g']
         if neighbors_5g:
-            reply += "📡 <b>SSID Tetangga 5 GHz Terkuat:</b>\n"
+            reply += "📡 <b>SSID Tetangga Terdekat 5 GHz:</b>\n"
             for n in neighbors_5g[:5]:
                 reply += f"• <code>{n['ssid']}</code> (Ch {n['channel']}, {n['rssi']} dBm)\n"
-            reply += "━━━━━━━━━━━━━━━━━━━━━━\n"
+            reply += "\n"
             
-        reply += "⚙️ <b>Terapkan Rekomendasi Channel Instan:</b>"
+        reply += "⚙️ <b>Terapkan channel rekomendasi:</b>"
         
         # Tombol interaktif untuk menerapkan channel
         inline_keyboard = []
@@ -1473,13 +1517,10 @@ def _wlan_clients_worker(chat_id, username, token):
             return
             
         reply += (
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🔌 <b>MONITORING PERANGKAT PELANGGAN</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"• Pelanggan: <code>{username}</code>\n"
-            f"• Total Wi-Fi: <b>{total_active_wifi} perangkat</b>\n"
-            f"• Total LAN: <b>{len(lan_devices)} perangkat</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🔌 <b>Perangkat Terhubung</b>\n"
+            f"<code>{username}</code>\n\n"
+            f"Wi-Fi  <b>{total_active_wifi}</b> perangkat\n"
+            f"LAN    <b>{len(lan_devices)}</b> perangkat\n\n"
         )
         
         # 3. Susun balasan list client secara terorganisasi berdasarkan SSID
@@ -1570,8 +1611,7 @@ def _wlan_clients_worker(chat_id, username, token):
             # Hapus trailing " │\n" yang menggantung
             if reply.endswith(" │\n"):
                 reply = reply[:-4] + "\n"
-        reply += "━━━━━━━━━━━━━━━━━━━━━━\n"
-                
+        
         requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
             'chat_id': chat_id,
             'text': reply,
@@ -1870,26 +1910,28 @@ def background_telegram_bot():
                             }
                             
                             buttons = [
-                                [{"text": "🌐 WAN PPPoE Route", "callback_data": "prov_type:ppp_routed"}],
-                                [{"text": "🔗 WAN PPPoE Bridge", "callback_data": "prov_type:ppp_bridged"}],
-                                [{"text": "🔌 WAN IP Bridge", "callback_data": "prov_type:ip_bridged"}],
-                                [{"text": "📡 WAN IPoE Route", "callback_data": "prov_type:ip_routed"}],
-                                [{"text": "📡 SSID / Wi-Fi Config", "callback_data": "prov_type:wifi"}],
-                                [{"text": "✏️ Edit WAN Terbentuk", "callback_data": "prov_wan_list:edit"}],
-                                [{"text": "🗑️ Hapus WAN Terbentuk", "callback_data": "prov_wan_list:delete"}],
-                                [{"text": "❌ Batal", "callback_data": "prov_cancel"}]
+                                [
+                                    {"text": "PPPoE Route", "callback_data": "prov_type:ppp_routed"},
+                                    {"text": "PPPoE Bridge", "callback_data": "prov_type:ppp_bridged"}
+                                ],
+                                [
+                                    {"text": "IP Bridge", "callback_data": "prov_type:ip_bridged"},
+                                    {"text": "IPoE Route", "callback_data": "prov_type:ip_routed"}
+                                ],
+                                [{"text": "📶 SSID / Wi-Fi Config", "callback_data": "prov_type:wifi"}],
+                                [
+                                    {"text": "✏️ Edit WAN", "callback_data": "prov_wan_list:edit"},
+                                    {"text": "🗑 Hapus WAN", "callback_data": "prov_wan_list:delete"}
+                                ],
+                                [{"text": "✕ Batal", "callback_data": "prov_cancel"}]
                             ]
                             import json as _json
                             requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                 'chat_id': cb_chat_id,
                                 'text': (
-                                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                                    f"🛠️ <b>PROVISIONING WIZARD ONT</b>\n"
-                                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                                    f"• Pelanggan: <code>{username}</code>\n"
-                                    f"• Status: Siap Konfigurasi\n"
-                                    f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                                    f"Silakan pilih jenis provisioning yang ingin dijalankan di bawah ini:"
+                                    f"🛠 <b>Provisioning Wizard ONT</b>\n"
+                                    f"<code>{username}</code> · Siap dikonfigurasi\n\n"
+                                    f"<i>Pilih jenis provisioning:</i>"
                                 ),
                                 'parse_mode': 'HTML',
                                 'reply_markup': _json.dumps({"inline_keyboard": buttons})
@@ -2130,7 +2172,40 @@ def background_telegram_bot():
                             state_data = _prov_states.get(cb_chat_id)
                             if state_data:
                                 state_data['is_f670l'] = (val_f670l == 'yes')
-                                show_prov_confirm(cb_chat_id, token)
+                                if state_data['wan_type'] in ('ppp_routed', 'ip_routed'):
+                                    state_data['state'] = 'CHOOSE_MTU'
+                                    buttons = [
+                                        [{"text": "1500 (Standard)", "callback_data": "prov_mtu:1500"}],
+                                        [{"text": "1492 (PPPoE)", "callback_data": "prov_mtu:1492"}],
+                                        [{"text": "1480", "callback_data": "prov_mtu:1480"}],
+                                        [{"text": "✍️ Kustom (Ketik)", "callback_data": "prov_mtu:custom"}],
+                                        [{"text": "❌ Batal", "callback_data": "prov_cancel"}]
+                                    ]
+                                    import json as _json
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': cb_chat_id,
+                                        'text': "📏 <b>Pilih Pengaturan MTU (Max MTU Size):</b>",
+                                        'parse_mode': 'HTML',
+                                        'reply_markup': _json.dumps({"inline_keyboard": buttons})
+                                    }, timeout=5)
+                                else:
+                                    state_data['mtu'] = 1500
+                                    show_prov_confirm(cb_chat_id, token)
+
+                        elif cb_data.startswith('prov_mtu:'):
+                            val = cb_data.split(':', 1)[1]
+                            state_data = _prov_states.get(cb_chat_id)
+                            if state_data:
+                                if val == 'custom':
+                                    state_data['state'] = 'ASK_CUSTOM_MTU'
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': cb_chat_id,
+                                        'text': "✍️ <b>Ketik/Kirim Nilai MTU (68 - 1500):</b>",
+                                        'parse_mode': 'HTML'
+                                    }, timeout=5)
+                                else:
+                                    state_data['mtu'] = int(val)
+                                    show_prov_confirm(cb_chat_id, token)
 
                         elif cb_data.startswith('prov_wifislot:'):
                             wifislot = int(cb_data.split(':', 1)[1])
@@ -2163,12 +2238,16 @@ def background_telegram_bot():
                             state_data = _prov_states.get(cb_chat_id)
                             if state_data:
                                 buttons = [
-                                    [{"text": "🌐 WAN PPPoE Route", "callback_data": "prov_type:ppp_routed"}],
-                                    [{"text": "🔗 WAN PPPoE Bridge", "callback_data": "prov_type:ppp_bridged"}],
-                                    [{"text": "🔌 WAN IP Bridge", "callback_data": "prov_type:ip_bridged"}],
-                                    [{"text": "📡 WAN IPoE Route", "callback_data": "prov_type:ip_routed"}],
-                                    [{"text": "📡 SSID / Wi-Fi Config", "callback_data": "prov_type:wifi"}],
-                                    [{"text": "❌ Batal", "callback_data": "prov_cancel"}]
+                                    [
+                                        {"text": "PPPoE Route", "callback_data": "prov_type:ppp_routed"},
+                                        {"text": "PPPoE Bridge", "callback_data": "prov_type:ppp_bridged"}
+                                    ],
+                                    [
+                                        {"text": "IP Bridge", "callback_data": "prov_type:ip_bridged"},
+                                        {"text": "IPoE Route", "callback_data": "prov_type:ip_routed"}
+                                    ],
+                                    [{"text": "📶 SSID / Wi-Fi Config", "callback_data": "prov_type:wifi"}],
+                                    [{"text": "✕ Batal", "callback_data": "prov_cancel"}]
                                 ]
                                 import json as _json
                                 requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
@@ -2374,6 +2453,37 @@ def background_telegram_bot():
                                         'parse_mode': 'HTML',
                                         'reply_markup': _json.dumps({"inline_keyboard": make_binding_keyboard(state_data.get('selected_binds', []), prefix='edit')})
                                     })
+                                elif field == 'mtu':
+                                    state_data['state'] = 'EDIT_CHOOSE_MTU'
+                                    buttons = [
+                                        [{"text": "1500 (Standard)", "callback_data": "edit_mtu:1500"}],
+                                        [{"text": "1492 (PPPoE)", "callback_data": "edit_mtu:1492"}],
+                                        [{"text": "1480", "callback_data": "edit_mtu:1480"}],
+                                        [{"text": "✍️ Kustom (Ketik)", "callback_data": "edit_mtu:custom"}],
+                                        [{"text": "🔙 Kembali", "callback_data": "edit_back_to_menu"}]
+                                    ]
+                                    import json as _json
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': cb_chat_id,
+                                        'text': "📏 <b>Pilih Pengaturan MTU Baru (Max MTU Size):</b>",
+                                        'parse_mode': 'HTML',
+                                        'reply_markup': _json.dumps({"inline_keyboard": buttons})
+                                    })
+
+                        elif cb_data.startswith('edit_mtu:'):
+                            val = cb_data.split(':', 1)[1]
+                            state_data = _prov_states.get(cb_chat_id)
+                            if state_data:
+                                if val == 'custom':
+                                    state_data['state'] = 'EDIT_ASK_CUSTOM_MTU'
+                                    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                        'chat_id': cb_chat_id,
+                                        'text': "✍️ <b>Ketik/Kirim Nilai MTU Baru (68 - 1500):</b>",
+                                        'parse_mode': 'HTML'
+                                    }, timeout=5)
+                                else:
+                                    state_data['mtu'] = int(val)
+                                    show_edit_menu(cb_chat_id, token)
 
                         elif cb_data.startswith('edit_vlan:'):
                             val = cb_data.split(':', 1)[1]
@@ -2430,7 +2540,7 @@ def background_telegram_bot():
                             _prov_states.pop(cb_chat_id, None)
                             requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                 'chat_id': cb_chat_id,
-                                'text': "❌ <b>Provisioning Dibatalkan!</b>",
+                                'text': "✕ Provisioning dibatalkan.",
                                 'parse_mode': 'HTML'
                             }, timeout=5)
 
@@ -2536,7 +2646,32 @@ def background_telegram_bot():
                     elif state == 'EDIT_ASK_VLAN_ID':
                         try:
                             vlan_id = int(text)
-                            if 1 <= vlan_id <= 4094:
+                            wtype = state_data.get('wan_type')
+                            if vlan_id == 100:
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': "⚠️ <b>VLAN ID Terproteksi!</b>\nVLAN 100 adalah khusus TR-069 (Management) dan tidak boleh digunakan untuk pelanggan.\n\nHarap masukkan VLAN ID yang sesuai:",
+                                    'parse_mode': 'HTML'
+                                })
+                            elif wtype == 'ppp_routed' and vlan_id not in (200, 1994):
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': "⚠️ <b>VLAN ID tidak sesuai!</b>\nUntuk koneksi <b>PPPoE Route</b>, VLAN harus berupa <b>200</b> atau <b>1994</b>.\n\nHarap masukkan VLAN ID yang sesuai:",
+                                    'parse_mode': 'HTML'
+                                })
+                            elif wtype in ('ppp_bridged', 'ip_bridged') and vlan_id not in (51, 55):
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': "⚠️ <b>VLAN ID tidak sesuai!</b>\nUntuk koneksi <b>Bridge Mode (PPPoE/IP)</b>, VLAN harus berupa <b>51</b> atau <b>55</b>.\n\nHarap masukkan VLAN ID yang sesuai:",
+                                    'parse_mode': 'HTML'
+                                })
+                            elif wtype == 'ip_routed' and vlan_id != 177:
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': "⚠️ <b>VLAN ID tidak sesuai!</b>\nUntuk koneksi <b>IPoE Route</b>, VLAN harus berupa <b>177</b>.\n\nHarap masukkan VLAN ID yang sesuai:",
+                                    'parse_mode': 'HTML'
+                                })
+                            elif 1 <= vlan_id <= 4094:
                                 state_data['vlan_id'] = vlan_id
                                 state_data['vlan_enabled'] = True
                                 show_edit_menu(chat_id, token)
@@ -2546,6 +2681,20 @@ def background_telegram_bot():
                             requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                 'chat_id': chat_id,
                                 'text': "⚠️ VLAN ID tidak valid. Harap masukkan angka antara 1 dan 4094:",
+                                'parse_mode': 'HTML'
+                            })
+                    elif state == 'EDIT_ASK_CUSTOM_MTU':
+                        try:
+                            mtu = int(text)
+                            if 68 <= mtu <= 1500:
+                                state_data['mtu'] = mtu
+                                show_edit_menu(chat_id, token)
+                            else:
+                                raise ValueError()
+                        except ValueError:
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': chat_id,
+                                'text': "⚠️ MTU tidak valid. Harap masukkan angka antara 68 dan 1500:",
                                 'parse_mode': 'HTML'
                             })
                     elif state == 'ASK_PPPOE_USER':
@@ -2613,7 +2762,32 @@ def background_telegram_bot():
                     elif state == 'ASK_VLAN_ID':
                         try:
                             vlan_id = int(text)
-                            if 1 <= vlan_id <= 4094:
+                            wtype = state_data.get('wan_type')
+                            if vlan_id == 100:
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': "⚠️ <b>VLAN ID Terproteksi!</b>\nVLAN 100 adalah khusus TR-069 (Management) dan tidak boleh digunakan untuk pelanggan.\n\nHarap masukkan VLAN ID yang sesuai:",
+                                    'parse_mode': 'HTML'
+                                })
+                            elif wtype == 'ppp_routed' and vlan_id not in (200, 1994):
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': "⚠️ <b>VLAN ID tidak sesuai!</b>\nUntuk koneksi <b>PPPoE Route</b>, VLAN harus berupa <b>200</b> atau <b>1994</b>.\n\nHarap masukkan VLAN ID yang sesuai:",
+                                    'parse_mode': 'HTML'
+                                })
+                            elif wtype in ('ppp_bridged', 'ip_bridged') and vlan_id not in (51, 55):
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': "⚠️ <b>VLAN ID tidak sesuai!</b>\nUntuk koneksi <b>Bridge Mode (PPPoE/IP)</b>, VLAN harus berupa <b>51</b> atau <b>55</b>.\n\nHarap masukkan VLAN ID yang sesuai:",
+                                    'parse_mode': 'HTML'
+                                })
+                            elif wtype == 'ip_routed' and vlan_id != 177:
+                                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                    'chat_id': chat_id,
+                                    'text': "⚠️ <b>VLAN ID tidak sesuai!</b>\nUntuk koneksi <b>IPoE Route</b>, VLAN harus berupa <b>177</b>.\n\nHarap masukkan VLAN ID yang sesuai:",
+                                    'parse_mode': 'HTML'
+                                })
+                            elif 1 <= vlan_id <= 4094:
                                 state_data['vlan_id'] = vlan_id
                                 state_data['state'] = 'CHOOSE_PRIORITY'
                                 buttons = [
@@ -2636,6 +2810,20 @@ def background_telegram_bot():
                             requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                                 'chat_id': chat_id,
                                 'text': "⚠️ VLAN ID tidak valid. Harap masukkan angka antara 1 dan 4094:",
+                                'parse_mode': 'HTML'
+                            })
+                    elif state == 'ASK_CUSTOM_MTU':
+                        try:
+                            mtu = int(text)
+                            if 68 <= mtu <= 1500:
+                                state_data['mtu'] = mtu
+                                show_prov_confirm(chat_id, token)
+                            else:
+                                raise ValueError()
+                        except ValueError:
+                            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
+                                'chat_id': chat_id,
+                                'text': "⚠️ MTU tidak valid. Harap masukkan angka antara 68 dan 1500:",
                                 'parse_mode': 'HTML'
                             })
                     elif state == 'ASK_WIFI_SSID':
@@ -2678,12 +2866,20 @@ def background_telegram_bot():
                 # Perintah /start atau /help
                 if cmd in ('/start', '/help'):
                     help_msg = (
-                        "🤖 <b>RADIUS & ACS Telegram Bot</b>\n"
-                        "Layanan interaktif untuk Teknisi / Admin:\n\n"
-                        "➡️ <b>/cek [username/SN]</b> : Cek status online, IP, MAC, dan Redaman ONT.\n"
-                        "➡️ <b>/reboot_ont [username/SN]</b> : Reboot ONT pelanggan secara remote via CWMP.\n"
-                        "➡️ <b>/provision [username/SN]</b> : Provisi konfigurasi WAN / Wi-Fi ONT pelanggan.\n"
-                        "➡️ <b>/nas</b> : Cek status kesehatan seluruh router NAS MikroTik."
+                        "🤖 <b>RADIUS &amp; GenieACS Bot</b>\n"
+                        "<i>Asisten NOC untuk Teknisi &amp; Admin</i>\n\n"
+                        "<b>Perintah tersedia:</b>\n"
+                        "┌ /cek <code>[username/SN]</code>\n"
+                        "│  Cek status sesi, IP, MAC, redaman ONT\n"
+                        "│\n"
+                        "├ /provision <code>[username/SN]</code>\n"
+                        "│  Wizard provisioning WAN &amp; Wi-Fi ONT\n"
+                        "│\n"
+                        "├ /reboot_ont <code>[username/SN]</code>\n"
+                        "│  Reboot ONT via CWMP (GenieACS)\n"
+                        "│\n"
+                        "└ /nas\n"
+                        "   Status kesehatan seluruh NAS Router"
                     )
                     requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                         'chat_id': chat_id,
@@ -2699,13 +2895,25 @@ def background_telegram_bot():
                         if not nas_list:
                             nas_msg = "🖥️ Tidak ada router NAS yang terdaftar."
                         else:
-                            nas_msg = "🖥️ <b>Status Kesehatan NAS Router:</b>\n\n"
+                            online_count = 0
+                            rows = []
                             for nas in nas_list:
                                 ip = nas['nasname']
                                 name = nas['shortname'] or ip
                                 is_online = (ping_nas(ip) == "online")
-                                status_emoji = "🟢 ONLINE" if is_online else "🔴 OFFLINE"
-                                nas_msg += f"• <b>{name}</b> ({ip}) : {status_emoji}\n"
+                                if is_online:
+                                    online_count += 1
+                                status_badge = "✅" if is_online else "❌"
+                                status_text = "Online " if is_online else "Offline"
+                                rows.append(
+                                    f"{status_badge} <b>{name}</b>\n"
+                                    f"    <code>{ip}</code> · <i>{status_text}</i>"
+                                )
+                            nas_msg = (
+                                f"🖥 <b>NAS Router</b> · Status Jaringan\n"
+                                f"<i>{online_count}/{len(nas_list)} node aktif</i>\n\n"
+                            )
+                            nas_msg += "\n".join(rows)
                         
                         requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                             'chat_id': chat_id,
@@ -2751,26 +2959,28 @@ def background_telegram_bot():
                     }
                     
                     buttons = [
-                        [{"text": "🌐 WAN PPPoE Route", "callback_data": "prov_type:ppp_routed"}],
-                        [{"text": "🔗 WAN PPPoE Bridge", "callback_data": "prov_type:ppp_bridged"}],
-                        [{"text": "🔌 WAN IP Bridge", "callback_data": "prov_type:ip_bridged"}],
-                        [{"text": "📡 WAN IPoE Route", "callback_data": "prov_type:ip_routed"}],
-                        [{"text": "📡 SSID / Wi-Fi Config", "callback_data": "prov_type:wifi"}],
-                        [{"text": "✏️ Edit WAN Terbentuk", "callback_data": "prov_wan_list:edit"}],
-                        [{"text": "🗑️ Hapus WAN Terbentuk", "callback_data": "prov_wan_list:delete"}],
-                        [{"text": "❌ Batal", "callback_data": "prov_cancel"}]
+                        [
+                            {"text": "PPPoE Route", "callback_data": "prov_type:ppp_routed"},
+                            {"text": "PPPoE Bridge", "callback_data": "prov_type:ppp_bridged"}
+                        ],
+                        [
+                            {"text": "IP Bridge", "callback_data": "prov_type:ip_bridged"},
+                            {"text": "IPoE Route", "callback_data": "prov_type:ip_routed"}
+                        ],
+                        [{"text": "📶 SSID / Wi-Fi Config", "callback_data": "prov_type:wifi"}],
+                        [
+                            {"text": "✏️ Edit WAN", "callback_data": "prov_wan_list:edit"},
+                            {"text": "🗑 Hapus WAN", "callback_data": "prov_wan_list:delete"}
+                        ],
+                        [{"text": "✕ Batal", "callback_data": "prov_cancel"}]
                     ]
                     import json as _json
                     requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={
                         'chat_id': chat_id,
                         'text': (
-                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"🛠️ <b>PROVISIONING WIZARD ONT</b>\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"• Pelanggan: <code>{username}</code>\n"
-                            f"• Status: Siap Konfigurasi\n"
-                            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                            f"Silakan pilih jenis provisioning yang ingin dijalankan di bawah ini:"
+                            f"🛠 <b>Provisioning Wizard ONT</b>\n"
+                            f"<code>{username}</code> · Siap dikonfigurasi\n\n"
+                            f"<i>Pilih jenis provisioning:</i>"
                         ),
                         'parse_mode': 'HTML',
                         'reply_markup': _json.dumps({"inline_keyboard": buttons})

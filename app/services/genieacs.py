@@ -33,14 +33,61 @@ def trigger_connection_request_by_device_id(device_id):
     Mengambil dokumen device dari GenieACS dan memicu Connection Request secara langsung
     dari server lokal ini (karena server GenieACS berada di cloud/remote dan tidak dapat
     menjangkau IP private/lokal ONT).
+    Menggunakan caching Redis untuk menyimpan Connection Request URL dan kredensial.
     """
+    redis_client = None
+    try:
+        redis_client = current_app.config.get('SESSION_REDIS')
+    except RuntimeError:
+        try:
+            from config import Config
+            redis_client = Config.SESSION_REDIS
+        except:
+            pass
+
+    cache_key = f"genieacs:cr_info:{device_id}"
+    cached_info = None
+
+    if redis_client:
+        try:
+            cached_data = redis_client.get(cache_key)
+            if cached_data:
+                cached_info = _json.loads(cached_data)
+        except Exception as e:
+            print(f"Redis cache GET error in trigger_connection_request: {e}")
+
+    # Jika ada di cache, coba hubungi langsung dahulu untuk mempercepat proses
+    if cached_info:
+        cr_url = cached_info.get('url')
+        username = cached_info.get('username', 'msn')
+        password = cached_info.get('password', 'msn')
+        if cr_url:
+            print(f"Attempting cached Connection Request to {cr_url} using auth {username}:{password}")
+            try:
+                from requests.auth import HTTPDigestAuth
+                resp = requests.get(cr_url, auth=HTTPDigestAuth(username, password), timeout=4)
+                if resp.status_code == 200:
+                    print("Cached Connection Request succeeded!")
+                    return True, "Success"
+                else:
+                    print(f"Cached Connection Request returned status: {resp.status_code}. Retrying by querying GenieACS...")
+            except Exception as e:
+                print(f"Cached Connection Request failed: {e}. Retrying by querying GenieACS...")
+
+    # Jika tidak di-cache atau tembakan pertama gagal (IP ONT mungkin berubah), query GenieACS NBI
     try:
         config = get_genieacs_config()
         url = config['url']
         auth = config['auth']
         
-        # Ambil document device untuk mencari ConnectionRequestURL dan kredensialnya
-        dev_resp = requests.get(f"{url}/devices", params={"query": _json.dumps({"_id": device_id})}, auth=auth, timeout=5)
+        # Ambil document device dengan projection agar payload sangat kecil dan cepat
+        projection = "InternetGatewayDevice.ManagementServer,Device.ManagementServer"
+        dev_resp = requests.get(
+            f"{url}/devices",
+            params={"query": _json.dumps({"_id": device_id}), "projection": projection},
+            auth=auth,
+            timeout=5
+        )
         if dev_resp.status_code != 200 or not dev_resp.json():
             print(f"Device {device_id} not found in GenieACS to trigger connection request")
             return False, "Device not found"
@@ -53,13 +100,36 @@ def trigger_connection_request_by_device_id(device_id):
                 mgt = dev_doc[p]["ManagementServer"]
                 break
                 
-        if not mgt:
-            return False, "ManagementServer not found"
-            
-        cr_url = mgt.get("ConnectionRequestURL", {}).get("_value")
-        username = mgt.get("ConnectionRequestUsername", {}).get("_value", "msn")
-        password = mgt.get("ConnectionRequestPassword", {}).get("_value", "msn")
+        cr_url = None
+        username = "msn"
+        password = "msn"
+
+        if mgt:
+            cr_url = mgt.get("ConnectionRequestURL", {}).get("_value") if isinstance(mgt.get("ConnectionRequestURL"), dict) else mgt.get("ConnectionRequestURL")
+            username = mgt.get("ConnectionRequestUsername", {}).get("_value") if isinstance(mgt.get("ConnectionRequestUsername"), dict) else mgt.get("ConnectionRequestUsername")
+            password = mgt.get("ConnectionRequestPassword", {}).get("_value") if isinstance(mgt.get("ConnectionRequestPassword"), dict) else mgt.get("ConnectionRequestPassword")
+        else:
+            # Fallback jika field dikembalikan dalam format flat keys (dot notation)
+            for p in ["InternetGatewayDevice", "Device"]:
+                url_key = f"{p}.ManagementServer.ConnectionRequestURL"
+                un_key = f"{p}.ManagementServer.ConnectionRequestUsername"
+                pw_key = f"{p}.ManagementServer.ConnectionRequestPassword"
+                if url_key in dev_doc:
+                    cr_url = dev_doc[url_key].get("_value") if isinstance(dev_doc[url_key], dict) else dev_doc[url_key]
+                    if un_key in dev_doc:
+                        username = dev_doc[un_key].get("_value") if isinstance(dev_doc[un_key], dict) else dev_doc[un_key]
+                    if pw_key in dev_doc:
+                        password = dev_doc[pw_key].get("_value") if isinstance(dev_doc[pw_key], dict) else dev_doc[pw_key]
+                    break
         
+        # Jika nilai still nested di dalam value field
+        if isinstance(cr_url, dict):
+            cr_url = cr_url.get("_value")
+        if isinstance(username, dict):
+            username = username.get("_value", "msn")
+        if isinstance(password, dict):
+            password = password.get("_value", "msn")
+
         if not cr_url:
             return False, "ConnectionRequestURL is empty"
             
@@ -69,6 +139,16 @@ def trigger_connection_request_by_device_id(device_id):
         resp = requests.get(cr_url, auth=HTTPDigestAuth(username, password), timeout=5)
         if resp.status_code == 200:
             print("Direct Connection Request succeeded!")
+            # Simpan data Connection Request ke cache selama 1 jam (3600 detik)
+            if redis_client:
+                try:
+                    redis_client.setex(cache_key, 3600, _json.dumps({
+                        'url': cr_url,
+                        'username': username,
+                        'password': password
+                    }))
+                except Exception as cache_err:
+                    print(f"Redis cache SET error in trigger_connection_request: {cache_err}")
             return True, "Success"
         else:
             print(f"Direct Connection Request returned status: {resp.status_code}")
