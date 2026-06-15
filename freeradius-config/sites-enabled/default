@@ -49,7 +49,7 @@ authorize {
     }
 
     # Reject jika user masuk grup non-PPPoE (Mencegah salah auth di port PPPoE)
-    if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname IN ('vpn', 'wireless', 'ipoe', '8021x') LIMIT 1}" != "") {
+    if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname IN ('vpn', 'wireless', 'ipoe', '8021x', 'mikrotik-full', 'mikrotik-write', 'mikrotik-read') LIMIT 1}" != "") {
         reject
     }
 

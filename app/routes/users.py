@@ -120,10 +120,10 @@ def api_users():
                    (SELECT COUNT(*) FROM radacct a WHERE LOWER(a.username) = LOWER(c.username) AND a.acctstoptime IS NULL) as active_sessions
             FROM radcheck c
             WHERE c.attribute = 'Cleartext-Password'
-            AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('ipoe', 'vpn', '8021x', 'hotspot', 'wireless'))
+            AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('ipoe', 'vpn', '8021x', 'hotspot', 'wireless', 'mikrotik-full', 'mikrotik-write', 'mikrotik-read'))
         """
         
-        count_query = "SELECT COUNT(*) as total FROM radcheck c WHERE c.attribute = 'Cleartext-Password' AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('ipoe', 'vpn', '8021x', 'hotspot', 'wireless'))"
+        count_query = "SELECT COUNT(*) as total FROM radcheck c WHERE c.attribute = 'Cleartext-Password' AND NOT EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('ipoe', 'vpn', '8021x', 'hotspot', 'wireless', 'mikrotik-full', 'mikrotik-write', 'mikrotik-read'))"
 
         params = []
         if search:
@@ -1380,6 +1380,185 @@ def api_wireless_user_detail(username):
             elif m > 0:
                 return f"{m} menit {s} detik"
             return f"{s} detik"
+
+        result = []
+        for s in (sessions or []):
+            result.append({
+                'acctsessionid': s['acctsessionid'],
+                'nasipaddress': str(s['nasipaddress']) if s['nasipaddress'] else '-',
+                'framedipaddress': str(s['framedipaddress']) if s['framedipaddress'] else '-',
+                'calledstationid': s['calledstationid'] or '-',
+                'callingstationid': s['callingstationid'] or '-',
+                'acctstarttime': s['acctstarttime'].strftime('%Y-%m-%d %H:%M:%S') if s['acctstarttime'] else '-',
+                'acctupdatetime': s['acctupdatetime'].strftime('%Y-%m-%d %H:%M:%S') if s['acctupdatetime'] else '-',
+                'duration': fmt_duration(s['acctsessiontime']),
+                'download': fmt_bytes(s['acctinputoctets']),
+                'upload': fmt_bytes(s['acctoutputoctets']),
+                'status': 'Online' if not s['acctstoptime'] else 'Offline',
+                'acctterminatecause': s['acctterminatecause'] or '-',
+            })
+
+        return jsonify({'success': True, 'username': username, 'sessions': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================
+# MIKROTIK ADMIN USER APIS
+# ============================================================
+def get_active_mikrotik_admins():
+    active_admins = {}
+    try:
+        routers = execute_query("SELECT host, username, password, port FROM integrations WHERE type='mikrotik' AND is_active=true")
+        if routers:
+            import librouteros
+            for r in routers:
+                try:
+                    api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=1.0)
+                    active_users = list(api('/user/active/print'))
+                    for au in active_users:
+                        uname = au.get('name', '').strip().lower()
+                        if uname:
+                            active_admins[uname] = active_admins.get(uname, 0) + 1
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return active_admins
+
+
+@users_bp.route('/api/mikrotik/users')
+@login_required
+def api_mikrotik_users():
+    try:
+        search = request.args.get('search', '')
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        offset = (page - 1) * limit
+
+        base_where = "c.attribute = 'Cleartext-Password' AND EXISTS (SELECT 1 FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read'))"
+        params = []
+        if search:
+            base_where += " AND c.username ILIKE %s"
+            params.append(f'%{search}%')
+
+        data_query = f"""
+            SELECT c.id, c.username, c.value as password,
+                   (SELECT g.groupname FROM radusergroup g WHERE g.username = c.username AND g.groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read') LIMIT 1) as groupname
+            FROM radcheck c WHERE {base_where}
+            ORDER BY c.id DESC LIMIT %s OFFSET %s
+        """
+        count_query = f"SELECT COUNT(*) as total FROM radcheck c WHERE {base_where}"
+
+        users = execute_query(data_query, tuple(params + [limit, offset]))
+        total = execute_query(count_query, tuple(params))[0]['total']
+
+        # Get active sessions live from RouterOS API
+        active_admins = get_active_mikrotik_admins()
+        for u in users:
+            u['active_sessions'] = active_admins.get(u['username'].lower(), 0)
+
+        return jsonify({'users': users, 'total': total, 'page': page, 'limit': limit,
+                        'total_pages': (total + limit - 1) // limit})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@users_bp.route('/api/mikrotik/users/add', methods=['POST'])
+@login_required
+def api_mikrotik_add_user():
+    try:
+        data = get_request_data()
+        username = data.get('username', '').strip().lower()
+        password = data.get('password', '').strip()
+        groupname = data.get('groupname', '').strip()
+
+        if not username or not password or not groupname:
+            return jsonify({'success': False, 'error': 'Username, Password, dan Group wajib diisi'}), 400
+
+        if groupname not in ('mikrotik-full', 'mikrotik-write', 'mikrotik-read'):
+            return jsonify({'success': False, 'error': 'Group tidak valid'}), 400
+
+        existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (username,))
+        if existing:
+            return jsonify({'success': False, 'error': 'Username sudah ada'}), 400
+
+        execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)", (username, password), fetch=False)
+        execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, %s, 1) ON CONFLICT DO NOTHING", (username, groupname), fetch=False)
+
+        return jsonify({'success': True, 'message': 'User MikroTik berhasil ditambahkan'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@users_bp.route('/api/mikrotik/users/update/<username>', methods=['PUT'])
+@login_required
+def api_mikrotik_update_user(username):
+    try:
+        data = get_request_data()
+        new_username = data.get('username', '').strip().lower()
+        new_password = data.get('password', '').strip()
+        groupname = data.get('groupname', '').strip()
+
+        if not new_username or not groupname:
+            return jsonify({'success': False, 'error': 'Username dan Group wajib diisi'}), 400
+
+        if groupname not in ('mikrotik-full', 'mikrotik-write', 'mikrotik-read'):
+            return jsonify({'success': False, 'error': 'Group tidak valid'}), 400
+
+        # Update username if changed
+        if new_username != username.lower():
+            existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (new_username,))
+            if existing:
+                return jsonify({'success': False, 'error': 'Username baru sudah terdaftar'}), 400
+
+            execute_query("UPDATE radcheck SET username = %s WHERE username = %s AND attribute = 'Cleartext-Password'", (new_username, username), fetch=False)
+            execute_query("UPDATE radreply SET username = %s WHERE username = %s", (new_username, username), fetch=False)
+            execute_query("UPDATE radusergroup SET username = %s WHERE username = %s AND groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read')", (new_username, username), fetch=False)
+            username = new_username
+
+        # Update password if provided
+        if new_password:
+            execute_query("UPDATE radcheck SET value = %s WHERE username = %s AND attribute = 'Cleartext-Password'", (new_password, username), fetch=False)
+
+        # Update group
+        execute_query("UPDATE radusergroup SET groupname = %s WHERE username = %s AND groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read')", (groupname, username), fetch=False)
+
+        return jsonify({'success': True, 'message': 'User MikroTik berhasil diupdate'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@users_bp.route('/api/mikrotik/users/delete/<username>', methods=['DELETE'])
+@login_required
+def api_mikrotik_delete_user(username):
+    try:
+        execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
+        execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read')", (username,), fetch=False)
+        return jsonify({'success': True, 'message': f'User MikroTik {username} berhasil dihapus'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@users_bp.route('/api/mikrotik/users/detail/<username>')
+@login_required
+def api_mikrotik_user_detail(username):
+    try:
+        sessions = execute_query("""
+            SELECT 
+                acctsessionid,
+                nasipaddress,
+                framedipaddress,
+                calledstationid,
+                callingstationid,
+                acctstarttime,
+                acctupdatetime,
+                acctstoptime,
+                acctsessiontime,
+                acctinputoctets,
+                acctoutputoctets,
+                acctterminatecause
+            FROM radacct
+            WHERE LOWER(username) = LOWER(%s)
+            ORDER BY acctstarttime DESC LIMIT 10
+        """, (username,))
 
         result = []
         for s in (sessions or []):

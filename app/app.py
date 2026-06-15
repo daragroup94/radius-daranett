@@ -44,6 +44,7 @@ from routes.diagnostics import diagnostics_bp
 from routes.backup import backup_bp
 from routes.integrations import integrations_bp
 from routes.users import users_bp
+from routes.network_map import network_map_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
@@ -54,6 +55,8 @@ app.register_blueprint(diagnostics_bp)
 app.register_blueprint(backup_bp)
 app.register_blueprint(integrations_bp)
 app.register_blueprint(users_bp)
+app.register_blueprint(network_map_bp)
+
 
 
 # Socket.IO connection events for logging

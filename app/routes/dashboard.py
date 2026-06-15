@@ -16,14 +16,14 @@ def dashboard_page():
 def api_stats():
     try:
 
-        # PPPoE Stats (Users not in ipoe, vpn, 8021x, wireless, or hotspot groups)
+        # PPPoE Stats (Users not in ipoe, vpn, 8021x, wireless, hotspot, or mikrotik groups)
         pppoe_users = execute_query("""
             SELECT COUNT(*) as count FROM radcheck c 
             WHERE c.attribute = 'Cleartext-Password' 
             AND NOT EXISTS (
                 SELECT 1 FROM radusergroup g 
                 WHERE LOWER(g.username) = LOWER(c.username) 
-                AND g.groupname IN ('ipoe', 'vpn', '8021x', 'wireless', 'hotspot')
+                AND g.groupname IN ('ipoe', 'vpn', '8021x', 'wireless', 'hotspot', 'mikrotik-full', 'mikrotik-write', 'mikrotik-read')
             )
         """)[0]['count']
         
@@ -33,7 +33,7 @@ def api_stats():
             AND NOT EXISTS (
                 SELECT 1 FROM radusergroup g 
                 WHERE (LOWER(g.username) = LOWER(a.username) OR REGEXP_REPLACE(LOWER(g.username), '[^a-z0-9]', '', 'g') = REGEXP_REPLACE(LOWER(a.username), '[^a-z0-9]', '', 'g'))
-                AND g.groupname IN ('ipoe', 'vpn', '8021x', 'wireless')
+                AND g.groupname IN ('ipoe', 'vpn', '8021x', 'wireless', 'mikrotik-full', 'mikrotik-write', 'mikrotik-read')
             ) 
             AND NOT EXISTS (
                 SELECT 1 FROM hotspot_vouchers h 
@@ -105,8 +105,31 @@ def api_stats():
         wireless_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname = 'wireless'")[0]['count']
         wireless_sessions = execute_query("SELECT COUNT(*) as count FROM radacct a INNER JOIN radusergroup g ON LOWER(g.username) = LOWER(a.username) AND g.groupname = 'wireless' WHERE a.acctstoptime IS NULL")[0]['count']
 
-        total_users = pppoe_users + ipoe_users + hotspot_users + vpn_users + x8021x_users + wireless_users
-        active_sessions = pppoe_sessions + ipoe_sessions + hotspot_sessions + vpn_sessions + x8021x_sessions + wireless_sessions
+        # MikroTik Stats
+        mikrotik_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read')")[0]['count']
+        
+        # Get active sessions live from RouterOS API
+        mikrotik_sessions = 0
+        try:
+            routers = execute_query("SELECT host, username, password, port FROM integrations WHERE type='mikrotik' AND is_active=true")
+            if routers:
+                import librouteros
+                valid_admins = {r['username'].lower() for r in execute_query("SELECT username FROM radusergroup WHERE groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read')")}
+                for r in routers:
+                    try:
+                        api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=1.0)
+                        active_users = list(api('/user/active/print'))
+                        for au in active_users:
+                            uname = au.get('name', '').strip().lower()
+                            if uname in valid_admins:
+                                mikrotik_sessions += 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        total_users = pppoe_users + ipoe_users + hotspot_users + vpn_users + x8021x_users + wireless_users + mikrotik_users
+        active_sessions = pppoe_sessions + ipoe_sessions + hotspot_sessions + vpn_sessions + x8021x_sessions + wireless_sessions + mikrotik_sessions
         online_users = execute_query("SELECT COUNT(DISTINCT username) as count FROM radacct WHERE acctstoptime IS NULL")[0]['count']
         online_users += openvpn_online_count
         today_auth = execute_query("SELECT COUNT(*) as count FROM radpostauth WHERE DATE(authdate AT TIME ZONE 'Asia/Jakarta') = CURRENT_DATE")[0]['count']
@@ -129,6 +152,8 @@ def api_stats():
             'x8021x_sessions': x8021x_sessions,
             'wireless_users': wireless_users,
             'wireless_sessions': wireless_sessions,
+            'mikrotik_users': mikrotik_users,
+            'mikrotik_sessions': mikrotik_sessions,
             'total_users': total_users,
             'active_sessions': active_sessions,
             'online_users': online_users,

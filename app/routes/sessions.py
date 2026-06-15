@@ -225,7 +225,7 @@ def api_disconnect_session(session_id):
 def api_disconnect_user_sessions(username):
     try:
         sessions = execute_query("""
-            SELECT acctsessionid, nasipaddress FROM radacct 
+            SELECT acctsessionid, nasipaddress, framedipaddress FROM radacct 
             WHERE username = %s AND acctstoptime IS NULL
         """, (username,))
 
@@ -233,7 +233,7 @@ def api_disconnect_user_sessions(username):
         for s in sessions:
             nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
             secret = nas[0]['secret'] if nas else 'radiussecret'
-            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret):
+            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret, framed_ip=s.get('framedipaddress')):
                 coa_success += 1
             execute_query("""
                 UPDATE radacct 
@@ -308,26 +308,24 @@ def api_disconnect_expired():
 @login_required
 def api_disconnect_duplicates():
     try:
-        # Hanya duplikasi PPPoE yang perlu di-disconnect.
-        # L2TP/IPoE boleh punya sesi lama di DB tanpa harus dimatikan.
+        # Menghapus semua session duplikat (menyisakan session terbaru) untuk semua tipe koneksi.
         dupes = execute_query("""
             WITH ranked AS (
-                SELECT acctsessionid, nasipaddress, username,
+                SELECT acctsessionid, nasipaddress, username, framedipaddress,
                        ROW_NUMBER() OVER (PARTITION BY username ORDER BY acctstarttime DESC) AS rn
                 FROM radacct 
                 WHERE acctstoptime IS NULL 
-                  AND POSITION('pppoe' IN LOWER(calledstationid)) > 0
             )
-            SELECT acctsessionid, nasipaddress, username FROM ranked WHERE rn > 1
+            SELECT acctsessionid, nasipaddress, username, framedipaddress FROM ranked WHERE rn > 1
         """)
         if not dupes:
-            return jsonify({'success': True, 'message': 'Tidak ada session PPPoE duplikat', 'count': 0})
+            return jsonify({'success': True, 'message': 'Tidak ada session duplikat', 'count': 0})
 
         coa_success = 0
         for s in dupes:
             nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
             secret = nas[0]['secret'] if nas else 'radiussecret'
-            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret):
+            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret, framed_ip=s.get('framedipaddress')):
                 coa_success += 1
             execute_query("""
                 UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
@@ -336,7 +334,7 @@ def api_disconnect_duplicates():
 
         return jsonify({
             'success': True,
-            'message': f'{len(dupes)} session PPPoE duplikat di-disconnect ({coa_success} CoA sent)',
+            'message': f'{len(dupes)} session duplikat di-disconnect ({coa_success} CoA sent)',
             'count': len(dupes)
         })
     except Exception as e:

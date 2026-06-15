@@ -179,6 +179,8 @@ services:
       - "31813:31813/udp"  # Accounting VPN
       - "41812:41812/udp"  # Authentication Wireless
       - "41813:41813/udp"  # Accounting Wireless
+      - "51812:51812/udp"  # Authentication Mikrotik Admin Login
+      - "51813:51813/udp"  # Accounting Mikrotik Admin Login
     # Volumes
     volumes:
       - ./clients.conf:/etc/freeradius/3.0/clients.conf:ro
@@ -191,6 +193,7 @@ services:
       - ./freeradius-config/sites-enabled/vpn:/etc/freeradius/3.0/sites-enabled/vpn:ro
       - ./freeradius-config/sites-enabled/wireless:/etc/freeradius/3.0/sites-enabled/wireless:ro
       - ./freeradius-config/sites-enabled/inner-tunnel:/etc/freeradius/3.0/sites-enabled/inner-tunnel:ro
+      - ./freeradius-config/sites-enabled/mikrotik:/etc/freeradius/3.0/sites-enabled/mikrotik:ro
       - ./app/freeradius-config/certs/server.pem:/etc/freeradius/3.0/certs/server.pem:ro
       - ./app/freeradius-config/certs/server.key:/etc/freeradius/3.0/certs/server.key:ro
       - ./freeradius-config/mods-available/eap:/etc/freeradius/3.0/mods-enabled/eap:ro

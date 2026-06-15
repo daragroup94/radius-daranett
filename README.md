@@ -8,6 +8,21 @@ Layanan ini mendukung multi-protokol otentikasi:
 * **Hotspot** (Manajemen voucher & lock MAC)
 * **VPN** (Otentikasi user VPN seperti L2TP/SSTP/Wireguard)
 
+### 🌐 Fitur Peta Jaringan FTTH (Network Map)
+Sistem dilengkapi dengan **visualisasi peta jaringan FTTH** yang mendukung:
+* **Topologi Estafet Splitter Bertingkat** - Sistem splitter dengan ratio fleksibel (30:70, 20:80, dll)
+* **OLT** (Optical Line Terminal) - Pusat transmisi fiber optik
+* **ODC** (Optical Distribution Cabinet) - Cabinet distribusi ke area
+* **OIT** (Optical Inline Tap) - Splitter inline untuk sistem estafet dengan ratio custom
+* **ODP** (Optical Distribution Point) - Splitter box terakhir sebelum ke pelanggan
+* **Visualisasi 3 Jenis Kabel:**
+  - Kabel Feeder (Ungu) - OLT → OIT atau OIT → OIT
+  - Kabel Tap (Kuning) - OIT → ODP
+  - Kabel Distribusi (Cyan) - ODC/ODP → Pelanggan atau koneksi umum
+* **Real-time ONT Health Monitoring** - RX Power, temperatur, status online/offline
+* **Drag & Drop** untuk reposisi marker di peta
+* **Manual Cable Routing** - Gambar rute kabel manual mengikuti jalan
+
 ---
 
 ## 📋 DAFTAR ISI
@@ -149,6 +164,87 @@ Jika container sudah terlanjur dijalankan dan dalam keadaan kosong:
 * **pgAdmin (Manajemen DB):** `https://pgadmin.access.daragroup.cloud`
 
 *(Domain di atas dapat disesuaikan di file `docker-compose.yml` pada konfigurasi Traefik labels)*
+
+---
+
+---
+
+## 📡 Panduan Sistem Estafet Splitter dengan OIT (Optical Inline Tap)
+
+Sistem ini mendukung topologi FTTH estafet bertingkat menggunakan **OIT (Optical Inline Tap)** untuk pembagian sinyal dengan ratio fleksibel.
+
+### Contoh Implementasi Estafet:
+
+```
+OLT (PON 1 +9dBm)
+    │
+    ├─ [OIT-1 @ 30:70]
+    │   ├─ 30% Tap → +3dBm → [Splitter 1:4] → ODC-Area-A
+    │   │
+    │   └─ 70% Pass → +7dBm ─────────────────┐
+    │                                         │
+    └─ [OIT-2 @ 20:80] <──────────────────────┘
+        ├─ 20% Tap → +5.6dBm → [Splitter 1:4] → ODC-Area-B
+        │
+        └─ 80% Pass → +6.8dBm → ODP (End of Line)
+```
+
+### Cara Menambahkan OIT di Peta:
+
+1. **Klik Tombol "Tambah OLT/ODC/ODP"** di header peta
+2. **Pilih Tipe**: `OIT (Inline Tap Splitter - Estafet)`
+3. **Isi Form OIT**:
+   - **Nama Alat**: Contoh `OIT-PATI-01`
+   - **Sumber Feeder (Upstream)**: Pilih OLT atau OIT sebelumnya
+   - **Panjang Kabel Masuk**: Dalam meter (contoh: 500)
+   - **Redaman Input**: dBm dari upstream (contoh: +5.2)
+   - **Rasio Tap Splitter**: Pilih ratio (10:90, 15:85, 20:80, 25:75, 30:70, 40:60, 50:50)
+   - **Merk Splitter**: Brand splitter yang digunakan (contoh: Fiberhome)
+   - **Redaman Tap Output**: Sinyal ke ODP (contoh: +3.5 dBm)
+   - **Redaman Pass Output**: Sinyal lanjut ke OIT berikutnya (contoh: +7.0 dBm)
+   
+4. **Port TAP (menuju ODP)**:
+   - Pilih ODP tujuan dari port Tap
+   - Pilih ratio splitter di ODP (1:2, 1:4, 1:8, 1:16)
+   - Isi panjang kabel ke ODP
+   
+5. **Port PASS (lanjut ke OIT berikutnya)**:
+   - Pilih OIT berikutnya (jika masih ada estafet)
+   - Isi panjang kabel
+   - Centang "Ujung Jalur" jika ini OIT terakhir
+   
+6. **Status & Catatan**:
+   - Status Operasional (Aktif / Instalasi / Gangguan)
+   - Tanggal Pemasangan
+   - Catatan Teknisi
+
+7. **Klik pada peta** atau **paste koordinat** untuk menempatkan marker OIT
+8. **Klik "Simpan Alat"**
+
+### Menghubungkan Kabel Infrastruktur:
+
+Setelah OIT dibuat, hubungkan kabel secara manual:
+
+1. **Klik pada marker OLT atau OIT upstream**
+2. **Klik tombol "Tarik Kabel"** dalam popup
+3. **Pilih OIT tujuan** dari dropdown
+4. **Klik beberapa titik di peta** untuk menggambar jalur kabel mengikuti jalan
+5. **Klik marker tujuan** untuk menyelesaikan koneksi
+6. **Klik "Simpan Rute"**
+
+Sistem akan otomatis menentukan jenis kabel:
+- **Kabel Feeder (Ungu tebal)**: Jika salah satu ujung adalah OLT atau OIT ke OIT
+- **Kabel Tap (Kuning)**: OIT ke ODP
+- **Kabel Distribusi (Cyan)**: Koneksi lainnya
+
+### Tips Penggunaan:
+
+- Gunakan nama yang deskriptif untuk OIT (contoh: `OIT-PATI-JL-RAYA-01`)
+- Catat redaman aktual di lapangan untuk monitoring performa jaringan
+- Manfaatkan field "Catatan Teknisi" untuk informasi lokasi spesifik (contoh: "Dekat Rumah Pak RT")
+- Centang "Ujung Jalur" pada OIT terakhir untuk menandai terminal point
+- Gunakan status "Instalasi" saat pemasangan baru, ubah ke "Aktif" setelah selesai
+- Tandai "Gangguan" jika ada masalah untuk memudahkan tracking troubleshooting
 
 ---
 

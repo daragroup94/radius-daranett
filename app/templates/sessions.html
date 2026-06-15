@@ -105,7 +105,7 @@
         <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
 
             <!-- Sub-header dengan Kontrol -->
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-700/50 pb-5">
                 <div>
                     <h3 class="text-base font-bold text-slate-800 dark:text-white">Active Sessions Accounting</h3>
                     <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Pemantauan data sesi aktif langsung dari RADIUS Accounting.</p>
@@ -114,7 +114,7 @@
                     <button onclick="loadSessions()" class="text-white px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
                         <i class="fas fa-sync-alt mr-1"></i>Refresh
                     </button>
-                    <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="text-white px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-750 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
+                    <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="text-white px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
                         <i class="fas fa-play mr-1"></i>Auto
                     </button>
                     <button onclick="disconnectAllDuplicates()" id="disconnectDupBtn" class="hidden text-white px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
@@ -189,17 +189,17 @@
         <div class="relative flex-1 min-w-[200px]">
           <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
           <input type="text" id="searchInput" placeholder="Cari username..."
-            class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+            class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
             onkeyup="filterSessions()">
         </div>
-        <select id="filterNas" onchange="filterSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
+        <select id="filterNas" onchange="filterSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
           <option value="">Semua NAS</option>
         </select>
-        <select id="filterDuplicate" onchange="filterSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
+        <select id="filterDuplicate" onchange="filterSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
           <option value="">Semua Session</option>
           <option value="duplicate">Ganda Only</option>
         </select>
-        <select id="sortBy" onchange="sortSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
+        <select id="sortBy" onchange="sortSessions()" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all">
           <option value="duration_desc">Duration (Terlama)</option>
           <option value="duration_asc">Duration (Tercepat)</option>
           <option value="download_desc">Download (Terbesar)</option>
@@ -223,7 +223,7 @@
     <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
 
       <!-- Header -->
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-700/50 pb-5">
         <div class="flex items-center gap-3">
           <div class="icon-wrapper-noc bg-gradient-to-tr from-amber-500 to-orange-600 shadow-lg shadow-orange-500/15 floating-icon">
             <i class="fas fa-router text-white"></i>
@@ -296,13 +296,13 @@
         <div class="relative flex-1 min-w-[200px]">
           <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
           <input type="text" id="mkSearch" placeholder="Cari username..."
-            class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+            class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
             oninput="renderMikrotik()">
         </div>
-        <select id="mkFilterRouter" onchange="onRouterChange()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-bold">
+        <select id="mkFilterRouter" onchange="onRouterChange()" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-bold">
           <option value="">Memuat router...</option>
         </select>
-        <select id="mkSort" onchange="renderMikrotik()" class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all">
+        <select id="mkSort" onchange="renderMikrotik()" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all">
           <option value="rx_desc">RX Speed ↓</option>
           <option value="tx_desc">TX Speed ↓</option>
           <option value="name_asc">Username A-Z</option>
@@ -312,10 +312,10 @@
 
       <!-- Mikrotik List -->
       <div id="mkList" class="w-full">
-        <div class="col-span-full text-center py-16 text-slate-400 bg-white rounded-3xl border border-slate-150 p-6 shadow-sm">
+        <div class="col-span-full text-center py-16 text-slate-450 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-6 shadow-sm">
           <i class="fas fa-router text-5xl mb-4 opacity-30 text-slate-400"></i>
-          <p class="font-semibold text-sm">Klik Refresh atau aktifkan Auto untuk mulai monitoring</p>
-          <p class="text-xs text-slate-400 mt-1">Pastikan sudah menambahkan integrasi Mikrotik di menu <a href="/integrations" class="text-emerald-500 hover:underline">Integrations</a></p>
+          <p class="font-semibold text-sm text-slate-500 dark:text-slate-400">Klik Refresh atau aktifkan Auto untuk mulai monitoring</p>
+          <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Pastikan sudah menambahkan integrasi Mikrotik di menu <a href="/integrations" class="text-emerald-500 hover:underline">Integrations</a></p>
         </div>
       </div>
     </div>
@@ -333,12 +333,22 @@ function switchTab(tab) {
   currentTab = tab;
   document.getElementById('panelRadius').classList.toggle('hidden', tab !== 'radius');
   document.getElementById('panelMikrotik').classList.toggle('hidden', tab !== 'mikrotik');
-  document.getElementById('tabRadius').classList.toggle('active', tab === 'radius');
-  document.getElementById('tabRadius').classList.toggle('bg-gray-100', tab !== 'radius');
-  document.getElementById('tabRadius').classList.toggle('text-gray-600', tab !== 'radius');
-  document.getElementById('tabMikrotik').classList.toggle('active', tab === 'mikrotik');
-  document.getElementById('tabMikrotik').classList.toggle('bg-gray-100', tab !== 'mikrotik');
-  document.getElementById('tabMikrotik').classList.toggle('text-gray-600', tab !== 'mikrotik');
+  
+  const tabRad = document.getElementById('tabRadius');
+  const tabMik = document.getElementById('tabMikrotik');
+  
+  tabRad.classList.toggle('active', tab === 'radius');
+  tabRad.classList.toggle('bg-slate-100', tab !== 'radius');
+  tabRad.classList.toggle('dark:bg-slate-800', tab !== 'radius');
+  tabRad.classList.toggle('text-slate-600', tab !== 'radius');
+  tabRad.classList.toggle('dark:text-slate-300', tab !== 'radius');
+  
+  tabMik.classList.toggle('active', tab === 'mikrotik');
+  tabMik.classList.toggle('bg-slate-100', tab !== 'mikrotik');
+  tabMik.classList.toggle('dark:bg-slate-800', tab !== 'mikrotik');
+  tabMik.classList.toggle('text-slate-600', tab !== 'mikrotik');
+  tabMik.classList.toggle('dark:text-slate-300', tab !== 'mikrotik');
+  
   if (tab === 'mikrotik' && mkData.length === 0) loadMkRouters();
 }
 
@@ -352,8 +362,9 @@ async function loadSessions() {
     if (data.error) { showError('sessionsList', data.error); return; }
     allSessions = data;
     duplicateUsernames = new Set((dupes||[]).map(d => d.username));
-    const hasPppoeDupes = (dupes||[]).some(d => (d.pppoe_count || 0) > 1);
-    document.getElementById('disconnectDupBtn').classList.toggle('hidden', !hasPppoeDupes);
+    // Show button jika ada duplicate user apapun (PPPoE, Wireless, Hotspot, VPN)
+    const hasDupes = (dupes||[]).length > 0;
+    document.getElementById('disconnectDupBtn').classList.toggle('hidden', !hasDupes);
     updateStats(data, dupes||[]);
     filterSessions();
   } catch(e) { showError('sessionsList', e.message); }
@@ -401,15 +412,15 @@ function sortAndRender(list) {
 function renderSessions(sessions) {
   const el = document.getElementById('sessionsList');
   if (!sessions.length) {
-    el.innerHTML = `<div class="text-center py-16 text-slate-400 bg-white rounded-3xl border border-slate-150 p-6 shadow-sm"><i class="fas fa-plug text-5xl mb-4 opacity-30"></i><p class="font-semibold text-sm">Tidak ada sesi aktif</p></div>`;
+    el.innerHTML = `<div class="text-center py-16 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-6 shadow-sm"><i class="fas fa-plug text-5xl mb-4 opacity-30"></i><p class="font-semibold text-sm">Tidak ada sesi aktif</p></div>`;
     return;
   }
   
   let html = `
-    <div class="overflow-x-auto min-w-full bg-white rounded-3xl border border-slate-150 p-4 shadow-sm">
+    <div class="overflow-x-auto min-w-full bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-4 shadow-sm">
       <table class="w-full text-left border-collapse align-middle">
         <thead>
-          <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
+          <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             <th class="pb-3 pt-1 px-4 font-extrabold">USER</th>
             <th class="pb-3 pt-1 px-4 font-extrabold">ALAMAT IP & SERVER</th>
             <th class="pb-3 pt-1 px-4 font-extrabold">DURASI KONEKSI</th>
@@ -417,7 +428,7 @@ function renderSessions(sessions) {
             <th class="pb-3 pt-1 px-4 font-extrabold text-right">AKSI</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-50 dark:divide-slate-750">
+        <tbody class="divide-y divide-slate-50 dark:divide-slate-700/50">
   `;
   
   html += sessions.map(s => {
@@ -427,11 +438,11 @@ function renderSessions(sessions) {
     const dlPct = total ? Math.round(ul/total*100) : 50; // Swap: dlPct represents download ratio (ul / total)
     
     const dupBadge = isDup 
-      ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100">GANDA</span>'
+      ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30">GANDA</span>'
       : '';
     
     return `
-      <tr class="hover:bg-slate-50/50 transition-colors ${isDup ? 'bg-rose-50/20' : ''}">
+      <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors ${isDup ? 'bg-rose-50/20 dark:bg-rose-950/20' : ''}">
         <td class="py-3 px-4">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 bg-gradient-to-tr from-emerald-500 to-teal-650 text-white relative">
@@ -439,22 +450,22 @@ function renderSessions(sessions) {
               <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-white pulse-dot"></span>
             </div>
             <div class="flex flex-col">
-              <span class="font-bold text-slate-800 text-sm truncate">${s.username}</span>
+              <span class="font-bold text-slate-800 dark:text-white text-sm truncate">${s.username}</span>
               <div class="flex gap-1.5 mt-0.5">
-                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">LIVE</span>
+                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">LIVE</span>
                 ${dupBadge}
               </div>
             </div>
           </div>
         </td>
         <td class="py-3 px-4">
-          <div class="flex flex-col text-xs text-slate-600">
-            <span class="font-mono"><i class="fas fa-network-wired text-slate-400 mr-1"></i>${s.framedipaddress||'Dynamic'}</span>
-            <span class="text-[10px] text-slate-400"><i class="fas fa-server text-slate-400 mr-1.5"></i>${s.nasipaddress}</span>
+          <div class="flex flex-col text-xs text-slate-600 dark:text-slate-300">
+            <span class="font-mono"><i class="fas fa-network-wired text-slate-400 dark:text-slate-500 mr-1"></i>${s.framedipaddress||'Dynamic'}</span>
+            <span class="text-[10px] text-slate-400 dark:text-slate-500"><i class="fas fa-server text-slate-400 dark:text-slate-500 mr-1.5"></i>${s.nasipaddress}</span>
           </div>
         </td>
         <td class="py-3 px-4">
-          <span class="text-xs font-mono font-bold text-indigo-650 bg-indigo-50/50 px-2 py-0.5 rounded border border-indigo-100/50">
+          <span class="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-100/50 dark:border-indigo-900/30">
             <i class="fas fa-clock text-indigo-400 mr-1.5"></i>
             <span class="session-timer font-bold" data-secs="${s.acctsessiontime||0}">${fmtDur(s.acctsessiontime||0)}</span>
           </span>
@@ -465,14 +476,14 @@ function renderSessions(sessions) {
               <span class="text-emerald-600">↓ ${fmtBytes(ul)}</span>
               <span class="text-blue-600">↑ ${fmtBytes(dl)}</span>
             </div>
-            <div class="w-full speed-bar-wrap bg-slate-100 h-1.5 overflow-hidden rounded-full">
+            <div class="w-full speed-bar-wrap bg-slate-100 dark:bg-slate-700/60 h-1.5 overflow-hidden rounded-full">
               <div class="speed-bar-fill h-full rounded-full" style="width:${dlPct}%;background:linear-gradient(90deg,#10b981,#3b82f6)"></div>
             </div>
           </div>
         </td>
         <td class="py-3 px-4 text-right">
           <button onclick="disconnectSession('${s.acctsessionid}','${s.username}')"
-            class="w-8 h-8 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-600 rounded-lg transition-all inline-flex items-center justify-center border border-rose-100/50" title="Disconnect">
+            class="w-8 h-8 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-500 dark:hover:bg-rose-600 hover:text-white text-rose-600 dark:text-rose-450 rounded-lg transition-all inline-flex items-center justify-center border border-rose-100/50 dark:border-rose-900/30" title="Disconnect">
             <i class="fas fa-plug text-xs"></i>
           </button>
         </td>
@@ -632,7 +643,7 @@ function renderMikrotik() {
 
   if (!list.length && !errors.length) {
     Object.keys(sparkCharts).forEach(k => { try { sparkCharts[k].destroy(); } catch(e){} delete sparkCharts[k]; });
-    el.innerHTML = `<div class="text-center py-16 text-slate-400 bg-white rounded-3xl border border-slate-150 p-6 shadow-sm"><i class="fas fa-router text-5xl mb-4 opacity-30"></i><p class="font-semibold">Tidak ada koneksi aktif</p></div>`;
+    el.innerHTML = `<div class="text-center py-16 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-6 shadow-sm"><i class="fas fa-router text-5xl mb-4 opacity-30"></i><p class="font-semibold">Tidak ada koneksi aktif</p></div>`;
     return;
   }
 
@@ -640,10 +651,10 @@ function renderMikrotik() {
   let tbody = el.querySelector('#mkListTableBody');
   if (!tbody) {
     el.innerHTML = `
-      <div class="overflow-x-auto min-w-full bg-white rounded-3xl border border-slate-150 p-4 shadow-sm">
+      <div class="overflow-x-auto min-w-full bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-4 shadow-sm">
         <table class="w-full text-left border-collapse align-middle">
           <thead>
-            <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
+            <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
               <th class="pb-3 pt-1 px-4 font-extrabold">USER & ROUTER</th>
               <th class="pb-3 pt-1 px-4 font-extrabold">IP / MAC</th>
               <th class="pb-3 pt-1 px-4 font-extrabold">UPTIME</th>
@@ -652,7 +663,7 @@ function renderMikrotik() {
               <th class="pb-3 pt-1 px-4 font-extrabold text-right">SPARKLINE</th>
             </tr>
           </thead>
-          <tbody id="mkListTableBody" class="divide-y divide-slate-50 dark:divide-slate-750">
+          <tbody id="mkListTableBody" class="divide-y divide-slate-50 dark:divide-slate-700/50">
           </tbody>
         </table>
       </div>
@@ -685,7 +696,7 @@ function renderMikrotik() {
       row = document.createElement('tr');
       row.id = cardId;
       row.setAttribute('data-mk-row', '1');
-      row.className = 'hover:bg-slate-50/50 transition-colors';
+      row.className = 'hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors';
       row.innerHTML = `
         <td class="py-3 px-4">
           <div class="flex items-center gap-3">
@@ -694,18 +705,18 @@ function renderMikrotik() {
               <span class="w-2 h-2 bg-emerald-500 rounded-full border border-white absolute -top-0.5 -right-0.5"></span>
             </div>
             <div class="flex flex-col">
-              <span class="font-bold text-slate-800 text-sm truncate">${s.name}</span>
+              <span class="font-bold text-slate-800 dark:text-white text-sm truncate">${s.name}</span>
               <div class="flex gap-1.5 mt-0.5">
-                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100">${s.router}</span>
-                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-50 text-slate-500 border border-slate-100">${s.service||'pppoe'}</span>
+                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30">${s.router}</span>
+                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700/80">${s.service||'pppoe'}</span>
               </div>
             </div>
           </div>
         </td>
         <td class="py-3 px-4">
-          <div class="flex flex-col text-xs text-slate-600 font-medium">
-            <span class="font-mono"><i class="fas fa-network-wired text-slate-400 mr-1"></i>${s.address||'-'}</span>
-            <span class="text-[10px] text-slate-400 font-mono"><i class="fas fa-ethernet text-slate-400 mr-1.5"></i>${s.caller_id||'-'}</span>
+          <div class="flex flex-col text-xs text-slate-600 dark:text-slate-300 font-medium">
+            <span class="font-mono"><i class="fas fa-network-wired text-slate-400 dark:text-slate-500 mr-1"></i>${s.address||'-'}</span>
+            <span class="text-[10px] text-slate-400 dark:text-slate-500 font-mono"><i class="fas fa-ethernet text-slate-400 dark:text-slate-500 mr-1.5"></i>${s.caller_id||'-'}</span>
           </div>
         </td>
         <td class="py-3 px-4">
@@ -719,16 +730,16 @@ function renderMikrotik() {
               <span class="mk-rx-val text-emerald-600">↓ ${fmtBps(s.rx_rate||0)}</span>
               <span class="mk-tx-val text-blue-600">↑ ${fmtBps(s.tx_rate||0)}</span>
             </div>
-            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div class="w-full bg-slate-100 dark:bg-slate-700/60 h-1.5 rounded-full overflow-hidden">
               <div class="mk-rx-bar speed-bar-fill h-full rounded-full" style="width:${rxPct}%;background:linear-gradient(90deg,#10b981,#34d399)"></div>
             </div>
-            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div class="w-full bg-slate-100 dark:bg-slate-700/60 h-1.5 rounded-full overflow-hidden">
               <div class="mk-tx-bar speed-bar-fill h-full rounded-full" style="width:${txPct}%;background:linear-gradient(90deg,#3b82f6,#818cf8)"></div>
             </div>
           </div>
         </td>
         <td class="py-3 px-4">
-          <div class="flex flex-col gap-0.5 text-[11px] text-slate-500 font-medium">
+          <div class="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
             <span>↓ <span class="mk-rx-byte text-emerald-500 font-semibold">${fmtBytes(s.rx_byte||0)}</span></span>
             <span>↑ <span class="mk-tx-byte text-blue-500 font-semibold">${fmtBytes(s.tx_byte||0)}</span></span>
           </div>
