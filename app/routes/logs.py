@@ -18,6 +18,7 @@ def api_logs():
         limit = min(limit, 500)  # Cap at 500 to prevent OOM
         search = request.args.get('search', '')
         reply_filter = request.args.get('reply', '')
+        service_filter = request.args.get('service', '')
         offset = (page - 1) * limit
 
         where_clauses = []
@@ -29,24 +30,71 @@ def api_logs():
         if reply_filter:
             where_clauses.append("reply = %s")
             params.append(reply_filter)
+        if service_filter:
+            where_clauses.append("""
+                COALESCE(
+                    (SELECT CASE 
+                         WHEN g.groupname = 'ipoe' THEN 'IPoE'
+                         WHEN g.groupname = 'vpn' THEN 'VPN'
+                         WHEN g.groupname = '8021x' THEN '802.1X'
+                         WHEN g.groupname = 'hotspot' THEN 'Hotspot'
+                         WHEN g.groupname = 'wireless' THEN 'Wireless'
+                         WHEN g.groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read') THEN 'MikroTik Admin'
+                         ELSE 'PPPoE'
+                     END
+                     FROM radusergroup g 
+                     WHERE LOWER(g.username) = LOWER(radpostauth.username) 
+                     LIMIT 1
+                    ), 'PPPoE'
+                ) = %s
+            """)
+            params.append(service_filter)
 
         where_sql = ('WHERE ' + ' AND '.join(where_clauses)) if where_clauses else ''
 
         logs = execute_query(f"""
             SELECT id, username, reply,
                    TO_CHAR(authdate AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD HH24:MI:SS') as authdate,
-                   calledstationid, callingstationid
+                   calledstationid, callingstationid,
+                   COALESCE(
+                       (SELECT CASE 
+                            WHEN g.groupname = 'ipoe' THEN 'IPoE'
+                            WHEN g.groupname = 'vpn' THEN 'VPN'
+                            WHEN g.groupname = '8021x' THEN '802.1X'
+                            WHEN g.groupname = 'hotspot' THEN 'Hotspot'
+                            WHEN g.groupname = 'wireless' THEN 'Wireless'
+                            WHEN g.groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read') THEN 'MikroTik Admin'
+                            ELSE 'PPPoE'
+                        END
+                        FROM radusergroup g 
+                        WHERE LOWER(g.username) = LOWER(radpostauth.username) 
+                        LIMIT 1
+                       ), 'PPPoE'
+                   ) as service
             FROM public.radpostauth
             {where_sql}
             ORDER BY authdate DESC, id DESC
             LIMIT %s OFFSET %s
         """, tuple(params + [limit, offset]))
 
-        total = execute_query(f"SELECT COUNT(*) as total FROM public.radpostauth {where_sql}", tuple(params))[0]['total']
+        stats = execute_query(f"""
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN reply = 'Access-Accept' THEN 1 ELSE 0 END) as accept,
+                SUM(CASE WHEN reply = 'Access-Reject' THEN 1 ELSE 0 END) as reject
+            FROM public.radpostauth
+            {where_sql}
+        """, tuple(params))
+
+        total = stats[0]['total'] if stats else 0
+        accept = stats[0]['accept'] if stats and stats[0]['accept'] is not None else 0
+        reject = stats[0]['reject'] if stats and stats[0]['reject'] is not None else 0
 
         return jsonify({
             'logs': logs,
             'total': total,
+            'accept': accept,
+            'reject': reject,
             'page': page,
             'total_pages': (total + limit - 1) // limit
         })

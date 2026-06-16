@@ -154,10 +154,28 @@ def background_auth_log_tail():
     print(f"[auth-log-tail] Starting tail from ID: {last_id}")
     while True:
         try:
-            new_logs = execute_query(
-                "SELECT id, username, reply, authdate, callingstationid FROM public.radpostauth WHERE id > %s ORDER BY id ASC LIMIT 50",
-                (last_id,)
-            )
+            new_logs = execute_query("""
+                SELECT id, username, reply, authdate, callingstationid,
+                       COALESCE(
+                           (SELECT CASE 
+                                WHEN g.groupname = 'ipoe' THEN 'IPoE'
+                                WHEN g.groupname = 'vpn' THEN 'VPN'
+                                WHEN g.groupname = '8021x' THEN '802.1X'
+                                WHEN g.groupname = 'hotspot' THEN 'Hotspot'
+                                WHEN g.groupname = 'wireless' THEN 'Wireless'
+                                WHEN g.groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read') THEN 'MikroTik Admin'
+                                ELSE 'PPPoE'
+                            END
+                            FROM radusergroup g 
+                            WHERE LOWER(g.username) = LOWER(radpostauth.username) 
+                            LIMIT 1
+                           ), 'PPPoE'
+                       ) as service
+                FROM public.radpostauth 
+                WHERE id > %s 
+                ORDER BY id ASC 
+                LIMIT 50
+            """, (last_id,))
             if new_logs:
                 for log in new_logs:
                     last_id = max(last_id, log['id'])

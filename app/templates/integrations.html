@@ -24,7 +24,6 @@
     }
     .dark .stat-card-glow:hover {
         box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
-        border-color: rgba(245, 158, 11, 0.25);
     }
 
     /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
@@ -45,7 +44,7 @@
     /* Guaranteed Custom Gradients */
     .icon-gradient-integrations { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; }
     
-    /* Bulletproof Amber Button Gradient */
+    /* Bulletproof Amber/Purple Button Gradient */
     .btn-gradient-purple {
         background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
         color: #ffffff !important;
@@ -71,7 +70,7 @@
 <div class="fade-in space-y-6">
 
     <!-- NOC Operations Header -->
-    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-[28px] text-white shadow-xl relative overflow-hidden">
         <div class="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
         
         <div class="z-10 mb-4 md:mb-0 flex items-center">
@@ -79,25 +78,67 @@
                 <i data-lucide="plug" class="lucide icon-noc text-white"></i>
             </div>
             <div>
-                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Integrasi Perangkat</h2>
-                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola koneksi sinkronisasi real-time ke Mikrotik API, RouterOS, dan API eksternal.</p>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent font-outfit">Integrasi Perangkat</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5 font-outfit">Kelola koneksi sinkronisasi real-time ke Mikrotik API, RouterOS, dan API eksternal.</p>
             </div>
         </div>
         
-        <button onclick="openIntegrationModal()" class="z-10 btn-gradient-purple text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] whitespace-nowrap" style="background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; color: #ffffff !important;">
-            <i data-lucide="plus-circle" class="lucide w-5 h-5 text-white" style="color: #ffffff !important;"></i>
-            <span style="color: #ffffff !important;">Tambah Integrasi</span>
+        <button onclick="openIntegrationModal()" class="z-10 btn-gradient-purple text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] whitespace-nowrap font-outfit">
+            <i data-lucide="plus-circle" class="lucide w-5 h-5 text-white"></i>
+            <span>Tambah Integrasi</span>
         </button>
     </div>
 
+    <!-- Stats Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 font-outfit">
+        <!-- Card 1: Total Bridges -->
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-purple-500/5 dark:bg-purple-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div class="space-y-2">
+                <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Bridges</span>
+                <h3 id="statTotalBridges" class="text-3xl font-extrabold text-slate-880 dark:text-white">0</h3>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">External API connections</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center text-purple-500 dark:text-purple-400 shadow-sm shadow-purple-500/5 flex-shrink-0">
+                <i class="fas fa-plug text-xl"></i>
+            </div>
+        </div>
+
+        <!-- Card 2: Active Bridges -->
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div class="space-y-2">
+                <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Active Bridges</span>
+                <h3 id="statActiveBridges" class="text-3xl font-extrabold text-emerald-500 dark:text-emerald-400">0</h3>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Synchronized endpoints</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-500 dark:text-emerald-400 shadow-sm shadow-emerald-500/5 flex-shrink-0">
+                <i class="fas fa-link text-xl"></i>
+            </div>
+        </div>
+
+        <!-- Card 3: Offline / Inactive -->
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-rose-500/5 dark:bg-rose-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div class="space-y-2">
+                <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Inactive Bridges</span>
+                <h3 id="statInactiveBridges" class="text-3xl font-extrabold text-rose-500 dark:text-rose-455">0</h3>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Disconnected bridges</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center text-rose-500 dark:text-rose-400 shadow-sm shadow-rose-500/5 flex-shrink-0">
+                <i class="fas fa-unlink text-xl"></i>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Container Card -->
-    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 shadow-sm">
         
         <!-- Controls & Header -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-700 pb-5">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
             <div>
-                <h3 class="text-base font-bold text-slate-800 dark:text-white">RADIUS External Bridges</h3>
-                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Daftar API bridge yang terhubung ke database RADIUS untuk monitoring data traffic.</p>
+                <h3 class="text-base font-bold text-slate-880 dark:text-white font-outfit">RADIUS External Bridges</h3>
+                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5 font-outfit">Daftar API bridge yang terhubung ke database RADIUS untuk monitoring data traffic.</p>
             </div>
         </div>
 
@@ -112,15 +153,15 @@
 
 <!-- Modal Add/Edit -->
 <div id="integrationModal" class="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
-  <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl shadow-2xl p-6 w-full max-w-lg mx-4">
+  <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-[28px] shadow-2xl p-6 w-full max-w-lg mx-4">
     
-    <div class="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
+    <div class="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-slate-750 pb-4 font-outfit">
       <div class="flex items-center gap-3">
         <div class="icon-wrapper-noc bg-gradient-to-tr from-purple-500 to-violet-600 shadow-lg shadow-violet-500/15">
             <i data-lucide="plug" class="lucide icon-noc text-white"></i>
         </div>
         <div>
-            <h3 id="integrationModalTitle" class="text-base font-bold text-slate-800 dark:text-white">Tambah Integrasi</h3>
+            <h3 id="integrationModalTitle" class="text-base font-bold text-slate-880 dark:text-white">Tambah Integrasi</h3>
             <p class="text-[11px] text-slate-400 dark:text-slate-500">Konfigurasi sinkronisasi perangkat RouterOS eksternal</p>
         </div>
       </div>
@@ -129,18 +170,18 @@
       </button>
     </div>
 
-    <form id="integrationModalForm" class="space-y-4">
+    <form id="integrationModalForm" class="space-y-4 font-outfit">
       <input type="hidden" id="editId">
       
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Nama *</label>
           <input id="fName" type="text" required placeholder="Router Utama"
-            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
+            class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Tipe</label>
-          <select id="fType" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-semibold">
+          <select id="fType" class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-bold">
             <option value="mikrotik">Mikrotik RouterOS</option>
             <option value="genieacs">GenieACS (TR-069 NBI)</option>
           </select>
@@ -151,12 +192,12 @@
         <div class="col-span-2">
           <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Host / IP *</label>
           <input id="fHost" type="text" required placeholder="192.168.1.1"
-            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
+            class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Port</label>
           <input id="fPort" type="number" value="8728"
-            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
+            class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
         </div>
       </div>
 
@@ -164,31 +205,31 @@
         <div>
           <label id="fUsernameLabel" class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Username *</label>
           <input id="fUsername" type="text" required placeholder="admin"
-            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
+            class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Password <span id="passHint" class="text-slate-400 dark:text-slate-550 font-normal">(kosong = tidak ubah)</span></label>
           <input id="fPassword" type="password" placeholder="••••••••"
-            class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
+            class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
         </div>
       </div>
 
       <div>
         <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Deskripsi</label>
         <input id="fDesc" type="text" placeholder="Opsional"
-          class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
+          class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium">
       </div>
 
       <div class="flex items-center gap-2">
-        <input id="fActive" type="checkbox" checked class="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 bg-slate-50 dark:bg-slate-750 dark:border-slate-700">
+        <input id="fActive" type="checkbox" checked class="w-4 h-4 rounded border-slate-350 text-purple-600 focus:ring-purple-500 bg-slate-50 dark:bg-slate-750 dark:border-slate-700">
         <label class="text-xs text-slate-700 dark:text-slate-300 font-bold">Aktif</label>
       </div>
 
       <div class="flex gap-3 pt-2">
-        <button type="submit" class="flex-1 btn-gradient-purple text-white py-2.5 rounded-xl font-bold hover:scale-[1.02] shadow-md transition-all text-xs" style="background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; color: #ffffff !important;">
-          <i class="fas fa-save mr-1.5" style="color: #ffffff !important;"></i>Simpan
+        <button type="submit" class="flex-1 btn-gradient-purple text-white py-2.5 rounded-xl font-bold hover:scale-[1.02] shadow-md transition-all text-xs">
+          <i class="fas fa-save mr-1.5"></i>Simpan
         </button>
-        <button type="button" onclick="closeIntegrationModal()" class="px-5 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl font-bold text-xs transition-all">
+        <button type="button" onclick="closeIntegrationModal()" class="px-5 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-655 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl font-bold text-xs transition-all">
           Batal
         </button>
       </div>
@@ -205,49 +246,66 @@ async function loadIntegrations() {
   const el = document.getElementById('integrationsList');
   try {
     integrations = await apiCall('/api/integrations');
+    
+    // Update stats counters
+    const totalCount = integrations.length;
+    const activeCount = integrations.filter(i => i.is_active).length;
+    const inactiveCount = totalCount - activeCount;
+
+    document.getElementById('statTotalBridges').textContent = totalCount;
+    document.getElementById('statActiveBridges').textContent = activeCount;
+    document.getElementById('statInactiveBridges').textContent = inactiveCount;
+
     if (!integrations.length) {
-      el.innerHTML = `<div class="text-center py-16 text-slate-400 dark:text-slate-500">
-        <i class="fas fa-plug text-5xl mb-4 opacity-30 text-slate-300 dark:text-slate-600"></i>
-        <p class="font-semibold text-sm">Belum Ada Integrasi Perangkat</p>
-        <p class="text-xs text-slate-400 mt-1">Silakan klik "Tambah Integrasi" untuk menyambungkan koneksi Mikrotik atau GenieACS baru.</p>
+      el.innerHTML = `<div class="text-center py-16 text-slate-400 dark:text-slate-500 font-outfit">
+        <div class="w-16 h-16 bg-purple-500/10 dark:bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-500 dark:text-purple-400">
+          <i data-lucide="plug" class="lucide w-8 h-8"></i>
+        </div>
+        <p class="font-bold text-sm text-slate-800 dark:text-white">Belum Ada Integrasi Perangkat</p>
+        <p class="text-xs text-slate-450 dark:text-slate-500 mt-1 max-w-sm mx-auto">Silakan klik "Tambah Integrasi" untuk menyambungkan koneksi Mikrotik atau GenieACS baru.</p>
       </div>`;
+      lucide.createIcons();
       return;
     }
+    
     el.innerHTML = integrations.map(ig => `
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border ${ig.is_active?'border-emerald-200/50 dark:border-emerald-800/40 bg-emerald-500/5 dark:bg-emerald-500/10':'border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-750/30'} mb-3 shadow-sm hover:shadow-md transition-all duration-200">
-        <div class="flex items-center gap-3.5 flex-1 min-w-0">
-          <div class="icon-wrapper-noc bg-gradient-to-tr from-purple-500 to-violet-600 shadow-md shadow-violet-500/15">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-[28px] border ${ig.is_active?'border-emerald-200/50 dark:border-emerald-800/40 bg-emerald-500/5 dark:bg-emerald-500/10':'border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-750/30'} mb-3 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.005]">
+        <div class="flex items-center gap-4 flex-1 min-w-0">
+          <div class="icon-wrapper-noc bg-gradient-to-tr ${ig.type === 'genieacs' ? 'from-cyan-500 to-blue-600 shadow-cyan-500/15' : 'from-purple-500 to-indigo-600 shadow-purple-500/15'} shadow-lg text-white">
             <i data-lucide="${ig.type === 'genieacs' ? 'server' : 'router'}" class="lucide icon-noc text-white"></i>
           </div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <div class="flex items-center gap-2 mb-1 flex-wrap font-outfit">
               <span class="font-bold text-slate-800 dark:text-white text-sm truncate">${ig.name}</span>
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${ig.is_active?'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400':'bg-slate-200 dark:bg-slate-750 text-slate-500 dark:text-slate-450'}">${ig.is_active?'Aktif':'Nonaktif'}</span>
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold">${ig.type === 'genieacs' ? 'GenieACS' : 'Mikrotik'}</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${ig.is_active?'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400':'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'} flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full ${ig.is_active?'bg-emerald-500 animate-pulse':'bg-slate-400'}"></span>
+                <span>${ig.is_active?'Aktif':'Nonaktif'}</span>
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] ${ig.type === 'genieacs' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400'} font-bold">${ig.type === 'genieacs' ? 'GenieACS' : 'MikroTik RouterOS'}</span>
             </div>
-            <div class="text-[11px] text-slate-550 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
-              <span><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.host}:${ig.port || ''}</span>
-              <span><i class="fas fa-user mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.username || 'No Auth'}</span>
-              ${ig.description?`<span><i class="fas fa-info-circle mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.description}</span>`:''}
+            <div class="text-[11px] text-slate-550 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1.5 font-medium">
+              <span class="flex items-center"><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.host}:${ig.port || ''}</span>
+              <span class="flex items-center"><i class="fas fa-user mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.username || 'No Auth'}</span>
+              ${ig.description?`<span class="flex items-center"><i class="fas fa-info-circle mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.description}</span>`:''}
             </div>
           </div>
         </div>
-        <div class="flex gap-2 flex-shrink-0 self-end sm:self-auto">
-          <button onclick="testIntegration(${ig.id})" class="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500 text-blue-600 hover:text-white dark:text-blue-400 dark:hover:text-white rounded-xl text-xs font-bold transition-all" title="Test koneksi">
-            <i class="fas fa-plug mr-1"></i>Test
+        <div class="flex gap-2 flex-shrink-0 self-end sm:self-auto font-outfit">
+          <button onclick="testIntegration(${ig.id})" class="px-3.5 py-2 bg-blue-500/10 hover:bg-blue-500 text-blue-600 hover:text-white dark:text-blue-400 dark:hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5" title="Test koneksi">
+            <i class="fas fa-plug text-[10px]"></i>Test
           </button>
-          <button onclick="editIntegration(${ig.id})" class="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-600 hover:text-white dark:text-indigo-400 dark:hover:text-white rounded-xl text-xs font-bold transition-all">
-            <i class="fas fa-edit mr-1"></i>Edit
+          <button onclick="editIntegration(${ig.id})" class="px-3.5 py-2 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-600 hover:text-white dark:text-indigo-400 dark:hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+            <i class="fas fa-edit text-[10px]"></i>Edit
           </button>
-          <button onclick="deleteIntegration(${ig.id},'${ig.name}')" class="px-3 py-1.5 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white dark:text-red-450 dark:hover:text-white rounded-xl text-xs font-bold transition-all">
-            <i class="fas fa-trash"></i>
+          <button onclick="deleteIntegration(${ig.id},'${ig.name}')" class="px-3.5 py-2 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white dark:text-red-450 dark:hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+            <i class="fas fa-trash text-[10px]"></i>Hapus
           </button>
         </div>
       </div>
     `).join('');
     lucide.createIcons();
   } catch(e) {
-    el.innerHTML = `<div class="text-center py-10 text-red-500"><p>${e.message}</p></div>`;
+    el.innerHTML = `<div class="text-center py-10 text-red-500 font-outfit"><p>${e.message}</p></div>`;
   }
 }
 

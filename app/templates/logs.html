@@ -25,7 +25,6 @@
     }
     .dark .stat-card-glow:hover {
         box-shadow: 0 20px 35px rgba(0, 0, 0, 0.35);
-        border-color: rgba(245, 158, 11, 0.25);
     }
 
     /* Bulletproof NOC Icon Wrapper Dimensions & Custom Gradients */
@@ -55,6 +54,20 @@
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-5px); }
     }
+
+    /* Glowing neon toggle indicator */
+    .glow-active {
+        box-shadow: 0 0 15px rgba(245, 158, 11, 0.45) !important;
+        animation: neonPulse 2.0s infinite alternate;
+    }
+    @keyframes neonPulse {
+        from {
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+        }
+        to {
+            box-shadow: 0 0 18px rgba(245, 158, 11, 0.75);
+        }
+    }
 </style>
 {% endblock %}
 
@@ -62,7 +75,7 @@
 <div class="fade-in space-y-6">
 
     <!-- NOC Operations Header -->
-    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-[28px] text-white shadow-xl relative overflow-hidden">
         <div class="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
         
         <div class="z-10 mb-4 md:mb-0 flex items-center">
@@ -70,41 +83,95 @@
                 <i data-lucide="file-text" class="lucide icon-noc text-white"></i>
             </div>
             <div>
-                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Logs Autentikasi</h2>
-                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Pemantauan real-time aktivitas request authentication dan log kejadian RADIUS Server.</p>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent font-outfit">Logs Autentikasi</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5 font-outfit">Pemantauan real-time aktivitas request authentication dan log kejadian RADIUS Server.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Card 1: Total Attempts -->
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-500/5 dark:bg-amber-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div class="space-y-2">
+                <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider font-outfit">Total Request</span>
+                <h3 id="statTotal" class="text-3xl font-extrabold text-slate-880 dark:text-white font-outfit">0</h3>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Authentication attempts logged</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center text-amber-500 dark:text-amber-400 shadow-sm shadow-amber-500/5 flex-shrink-0">
+                <i class="fas fa-history text-xl"></i>
+            </div>
+        </div>
+
+        <!-- Card 2: Success (Access-Accept) -->
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div class="space-y-2">
+                <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider font-outfit">Access Accept</span>
+                <h3 id="statAccept" class="text-3xl font-extrabold text-emerald-500 dark:text-emerald-400 font-outfit">0</h3>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Successful user sessions</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-500 dark:text-emerald-400 shadow-sm shadow-emerald-500/5 flex-shrink-0">
+                <i class="fas fa-check-circle text-xl"></i>
+            </div>
+        </div>
+
+        <!-- Card 3: Reject (Access-Reject) -->
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-rose-500/5 dark:bg-rose-500/10 rounded-full blur-xl pointer-events-none"></div>
+            <div class="space-y-2">
+                <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider font-outfit">Access Reject</span>
+                <h3 id="statReject" class="text-3xl font-extrabold text-rose-500 dark:text-rose-400 font-outfit">0</h3>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Failed login attempts</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center text-rose-500 dark:text-rose-400 shadow-sm shadow-rose-500/5 flex-shrink-0">
+                <i class="fas fa-times-circle text-xl"></i>
             </div>
         </div>
     </div>
 
     <!-- Main Container Card -->
-    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 shadow-sm">
         
         <!-- Controls & Header -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
+        <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
             <div>
-                <h3 class="text-base font-bold text-slate-880 dark:text-white flex items-center gap-2">
+                <h3 class="text-base font-bold text-slate-880 dark:text-white flex items-center gap-2 font-outfit">
                     <span>RADIUS Events Log</span>
-                    <span id="liveBadge" class="hidden px-2 py-0.5 rounded-full text-[9px] bg-rose-500 text-white font-extrabold tracking-wider uppercase animate-pulse">● Live Stream</span>
+                    <span id="liveBadge" class="hidden px-2 py-0.5 rounded-full text-[9px] bg-rose-500 text-white font-extrabold tracking-wider uppercase animate-pulse font-outfit">● Live Stream</span>
                 </h3>
-                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Gunakan filter status dan pencarian username untuk mencari log spesifik.</p>
+                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5 font-outfit">Gunakan filter status, service, dan pencarian username untuk mencari log spesifik.</p>
             </div>
             
-            <div class="flex flex-wrap gap-2.5 w-full sm:w-auto">
+            <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
                 <!-- Search Box -->
-                <div class="relative flex-1 sm:flex-initial min-w-[180px]">
+                <div class="relative flex-1 sm:flex-initial min-w-[200px]">
                     <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input type="text" id="logSearch" placeholder="Cari username..."
-                           class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all">
+                           class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-outfit">
                 </div>
                 <!-- Status Filter -->
                 <select id="replyFilter" onchange="currentPage=1;loadLogs()"
-                        class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-semibold">
+                        class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-semibold font-outfit">
                     <option value="">Semua Status</option>
                     <option value="Access-Accept">Accept Only</option>
                     <option value="Access-Reject">Reject Only</option>
                 </select>
+                <!-- Service Filter -->
+                <select id="serviceFilter" onchange="currentPage=1;loadLogs()"
+                        class="px-3 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-semibold font-outfit">
+                    <option value="">Semua Service</option>
+                    <option value="PPPoE">PPPoE</option>
+                    <option value="Hotspot">Hotspot</option>
+                    <option value="IPoE">IPoE</option>
+                    <option value="VPN">VPN</option>
+                    <option value="802.1X">802.1X</option>
+                    <option value="Wireless">Wireless</option>
+                    <option value="MikroTik Admin">MikroTik Admin</option>
+                </select>
                 <!-- Live Tail Toggle -->
-                <div class="flex items-center bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 px-3 py-2 rounded-xl transition-all select-none">
+                <div id="liveTailWrapper" class="flex items-center bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 px-3.5 py-2 rounded-xl transition-all select-none font-outfit">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="liveTailToggle" class="sr-only peer" onchange="toggleLiveTail()">
                         <div class="w-8 h-4 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500"></div>
@@ -113,7 +180,7 @@
                 </div>
                 <!-- Refresh Button -->
                 <button onclick="currentPage=1;loadLogs()" id="refreshButton"
-                        class="text-white px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] flex items-center gap-1.5 self-stretch">
+                        class="text-white px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] flex items-center gap-1.5 self-stretch font-outfit">
                     <i class="fas fa-sync-alt text-[10px]"></i>Refresh
                 </button>
             </div>
@@ -128,9 +195,9 @@
         </div>
 
         <!-- Pagination -->
-        <div id="paginationControls" class="flex items-center justify-between mt-6 pt-6 border-t border-slate-100 dark:border-slate-750">
+        <div id="paginationControls" class="flex items-center justify-between mt-6 pt-6 border-t border-slate-100 dark:border-slate-750 font-outfit">
             <p class="text-xs text-slate-450 dark:text-slate-500 font-medium">
-                Total: <span id="totalLogs" class="font-extrabold text-slate-800 dark:text-white">0</span> baris log
+                Total: <span id="totalLogs" class="font-extrabold text-slate-800 dark:text-white font-outfit">0</span> baris log
             </p>
             <div class="flex gap-2">
                 <button onclick="changePage(currentPage-1)" id="prevPage"
@@ -156,6 +223,83 @@
     let socket = null;
     let liveTailActive = false;
 
+    // Helper functions for services config
+    function getServiceConfig(service) {
+        const s = (service || 'PPPoE').trim();
+        const configs = {
+            'PPPoE': {
+                badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200/30 dark:border-blue-800/30',
+                icon: 'fas fa-ethernet',
+                label: 'PPPoE'
+            },
+            'Hotspot': {
+                badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200/30 dark:border-amber-800/30',
+                icon: 'fas fa-wifi',
+                label: 'Hotspot'
+            },
+            'IPoE': {
+                badge: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-200/30 dark:border-cyan-800/30',
+                icon: 'fas fa-network-wired',
+                label: 'IPoE'
+            },
+            'VPN': {
+                badge: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200/30 dark:border-purple-800/30',
+                icon: 'fas fa-shield-alt',
+                label: 'VPN'
+            },
+            '802.1X': {
+                badge: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-200/30 dark:border-pink-800/30',
+                icon: 'fas fa-key',
+                label: '802.1X'
+            },
+            'Wireless': {
+                badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/30 dark:border-emerald-800/30',
+                icon: 'fas fa-broadcast-tower',
+                label: 'Wireless'
+            },
+            'MikroTik Admin': {
+                badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200/30 dark:border-rose-800/30',
+                icon: 'fas fa-user-shield',
+                label: 'MikroTik Admin'
+            }
+        };
+        return configs[s] || configs['PPPoE'];
+    }
+
+    // Helper functions for replies config
+    function getReplyConfig(reply) {
+        const isAccept = reply === 'Access-Accept';
+        const isReject = reply === 'Access-Reject';
+        if (isAccept) {
+            return {
+                bg: 'bg-gradient-to-r from-emerald-500/5 to-emerald-500/0 dark:from-emerald-500/10 dark:to-emerald-500/0',
+                border: 'border-l-4 border-l-emerald-500 border-y-slate-150 border-r-slate-150 dark:border-y-slate-700/80 dark:border-r-slate-700/80',
+                iconBg: 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20',
+                icon: 'fas fa-check-circle',
+                badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/30 dark:border-emerald-800/30',
+                glow: 'hover:shadow-[0_0_15px_rgba(16,185,129,0.08)]'
+            };
+        } else if (isReject) {
+            return {
+                bg: 'bg-gradient-to-r from-rose-500/5 to-rose-500/0 dark:from-rose-500/10 dark:to-rose-500/0',
+                border: 'border-l-4 border-l-rose-500 border-y-slate-150 border-r-slate-150 dark:border-y-slate-700/80 dark:border-r-slate-700/80',
+                iconBg: 'bg-rose-500 text-white shadow-sm shadow-rose-500/20',
+                icon: 'fas fa-times-circle',
+                badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200/30 dark:border-rose-800/30',
+                glow: 'hover:shadow-[0_0_15px_rgba(244,63,94,0.08)]'
+            };
+        } else {
+            return {
+                bg: 'bg-gradient-to-r from-amber-500/5 to-amber-500/0 dark:from-amber-500/10 dark:to-amber-500/0',
+                border: 'border-l-4 border-l-amber-500 border-y-slate-150 border-r-slate-150 dark:border-y-slate-700/80 dark:border-r-slate-700/80',
+                iconBg: 'bg-amber-500 text-white shadow-sm shadow-amber-500/20',
+                icon: 'fas fa-question-circle',
+                badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200/30 dark:border-amber-800/30',
+                glow: 'hover:shadow-[0_0_15px_rgba(245,158,11,0.08)]'
+            };
+        }
+    }
+
     document.getElementById('logSearch').addEventListener('input', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => { currentPage = 1; loadLogs(); }, 300);
@@ -169,6 +313,7 @@
 
     function toggleLiveTail() {
         const toggle = document.getElementById('liveTailToggle');
+        const wrapper = document.getElementById('liveTailWrapper');
         const refreshBtn = document.getElementById('refreshButton');
         const paginator = document.getElementById('paginationControls');
         const liveBadge = document.getElementById('liveBadge');
@@ -176,6 +321,9 @@
         liveTailActive = toggle.checked;
         
         if (liveTailActive) {
+            // Add neon glow class
+            wrapper.classList.add('glow-active');
+            
             // Disable manual controls that clash with live tail
             refreshBtn.disabled = true;
             refreshBtn.classList.add('opacity-50', 'cursor-not-allowed');
@@ -208,63 +356,41 @@
                     
                     const search = document.getElementById('logSearch').value.toLowerCase();
                     const reply = document.getElementById('replyFilter').value;
+                    const service = document.getElementById('serviceFilter').value;
                     
                     if (search && !log.username.toLowerCase().includes(search)) return;
                     if (reply && log.reply !== reply) return;
+                    if (service && log.service !== service) return;
                     
                     const logsList = document.getElementById('logsList');
                     
-                    // Remove "no logs found" or any placeholders if they exist
+                    // Remove placeholder text if exists
                     if (logsList.querySelector('.opacity-30') || logsList.innerText.includes('Tidak ada log ditemukan')) {
                         logsList.innerHTML = '';
                     }
                     
-                    const isAccept = log.reply === 'Access-Accept';
-                    const isReject = log.reply === 'Access-Reject';
-                    const color = isAccept ? 'green' : isReject ? 'red' : 'yellow';
-                    const icon = isAccept ? 'check-circle' : isReject ? 'times-circle' : 'question-circle';
-                    const themes = {
-                        green: { 
-                            bg: 'bg-emerald-500/5 dark:bg-emerald-500/10', 
-                            border: 'border-emerald-200/50 dark:border-emerald-800/40', 
-                            icon: 'bg-emerald-500 text-white', 
-                            badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                            textColor: 'text-slate-800 dark:text-white',
-                            subColor: 'text-slate-500 dark:text-slate-400'
-                        },
-                        red:   { 
-                            bg: 'bg-rose-500/5 dark:bg-rose-500/10', 
-                            border: 'border-rose-200/50 dark:border-rose-800/40', 
-                            icon: 'bg-rose-500 text-white', 
-                            badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-                            textColor: 'text-slate-800 dark:text-white',
-                            subColor: 'text-slate-500 dark:text-slate-400'
-                        },
-                        yellow:{ 
-                            bg: 'bg-amber-500/5 dark:bg-amber-500/10', 
-                            border: 'border-amber-200/50 dark:border-amber-800/40', 
-                            icon: 'bg-amber-500 text-white', 
-                            badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-                            textColor: 'text-slate-800 dark:text-white',
-                            subColor: 'text-slate-500 dark:text-slate-400'
-                        }
-                    };
-                    const t = themes[color];
+                    const t = getReplyConfig(log.reply);
+                    const s = getServiceConfig(log.service);
                     
                     const logHtml = `
-                    <div class="${t.bg} rounded-2xl p-4 border ${t.border} hover:shadow-md transition-all duration-200 animate-pulse">
+                    <div class="${t.bg} rounded-2xl p-4 border ${t.border} ${t.glow} transition-all duration-300 hover:scale-[1.005] animate-pulse">
                         <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 ${t.icon} rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                                <i class="fas fa-${icon} text-lg"></i>
+                            <div class="w-10 h-10 ${t.iconBg} rounded-xl flex items-center justify-center flex-shrink-0">
+                                <i class="${t.icon} text-lg"></i>
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="flex flex-wrap items-center gap-2 mb-1">
-                                    <span class="font-bold ${t.textColor}">${log.username}</span>
+                                    <span class="font-bold text-slate-800 dark:text-white text-sm tracking-tight">${log.username}</span>
                                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${t.badge}">${log.reply || 'Unknown'}</span>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${s.badge} flex items-center gap-1">
+                                        <i class="${s.icon} text-[9px]"></i>
+                                        <span>${s.label}</span>
+                                    </span>
                                 </div>
-                                <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${t.subColor}">
-                                    <span><i class="fas fa-clock mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
-                                    ${log.callingstationid ? `<span><i class="fas fa-laptop mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
+                                <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                    <span class="flex items-center"><i class="fas fa-clock mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
+                                    ${log.callingstationid ? `<span class="flex items-center"><i class="fas fa-laptop mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
+                                    ${log.calledstationid ? `<span class="flex items-center"><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.calledstationid}</span>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -272,17 +398,38 @@
                     
                     logsList.insertAdjacentHTML('afterbegin', logHtml);
                     
+                    // Remove animation class after a short delay
+                    setTimeout(() => {
+                        const firstChild = logsList.firstElementChild;
+                        if (firstChild) firstChild.classList.remove('animate-pulse');
+                    }, 1500);
+                    
                     if (logsList.children.length > 50) {
                         logsList.removeChild(logsList.lastChild);
                     }
                     
+                    // Update stats counters dynamically
                     const totalLogs = document.getElementById('totalLogs');
                     totalLogs.textContent = parseInt(totalLogs.textContent) + 1;
+
+                    const statTotal = document.getElementById('statTotal');
+                    statTotal.textContent = parseInt(statTotal.textContent) + 1;
+
+                    if (log.reply === 'Access-Accept') {
+                        const statAccept = document.getElementById('statAccept');
+                        statAccept.textContent = parseInt(statAccept.textContent) + 1;
+                    } else if (log.reply === 'Access-Reject') {
+                        const statReject = document.getElementById('statReject');
+                        statReject.textContent = parseInt(statReject.textContent) + 1;
+                    }
                 });
             } else {
                 socket.connect();
             }
         } else {
+            // Remove neon glow class
+            wrapper.classList.remove('glow-active');
+
             // Restore regular layout
             refreshBtn.disabled = false;
             refreshBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -308,6 +455,7 @@
         const logsList = document.getElementById('logsList');
         const search = document.getElementById('logSearch').value;
         const reply = document.getElementById('replyFilter').value;
+        const service = document.getElementById('serviceFilter').value;
 
         logsList.innerHTML = `<div class="text-center py-12"><div class="animate-spin rounded-full h-10 w-10 border-4 border-amber-500/20 border-t-amber-500 mx-auto"></div></div>`;
 
@@ -317,6 +465,7 @@
             url.searchParams.set('limit', 50);
             if (search) url.searchParams.set('search', search);
             if (reply) url.searchParams.set('reply', reply);
+            if (service) url.searchParams.set('service', service);
 
             const res = await fetch(url);
             const data = await res.json();
@@ -331,60 +480,40 @@
             document.getElementById('prevPage').disabled = currentPage <= 1;
             document.getElementById('nextPage').disabled = currentPage >= (data.total_pages || 1);
 
+            // Update stats cards
+            document.getElementById('statTotal').textContent = data.total || 0;
+            document.getElementById('statAccept').textContent = data.accept || 0;
+            document.getElementById('statReject').textContent = data.reject || 0;
+
             const logs = data.logs || [];
             if (logs.length === 0) {
-                logsList.innerHTML = `<div class="text-center py-12 text-slate-400 dark:text-slate-500"><i class="fas fa-file-alt text-3xl mb-3 opacity-30"></i><p class="font-semibold text-xs">Tidak ada log ditemukan</p></div>`;
+                logsList.innerHTML = `<div class="text-center py-12 text-slate-450 dark:text-slate-500"><i class="fas fa-file-alt text-3xl mb-3 opacity-30"></i><p class="font-semibold text-xs">Tidak ada log ditemukan</p></div>`;
                 return;
             }
 
             logsList.innerHTML = logs.map(log => {
-                const isAccept = log.reply === 'Access-Accept';
-                const isReject = log.reply === 'Access-Reject';
-                const color = isAccept ? 'green' : isReject ? 'red' : 'yellow';
-                const icon = isAccept ? 'check-circle' : isReject ? 'times-circle' : 'question-circle';
-                const themes = {
-                    green: { 
-                        bg: 'bg-emerald-500/5 dark:bg-emerald-500/10', 
-                        border: 'border-emerald-200/50 dark:border-emerald-800/40', 
-                        icon: 'bg-emerald-500 text-white', 
-                        badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                        textColor: 'text-slate-800 dark:text-white',
-                        subColor: 'text-slate-500 dark:text-slate-400'
-                    },
-                    red:   { 
-                        bg: 'bg-rose-500/5 dark:bg-rose-500/10', 
-                        border: 'border-rose-200/50 dark:border-rose-800/40', 
-                        icon: 'bg-rose-500 text-white', 
-                        badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-                        textColor: 'text-slate-800 dark:text-white',
-                        subColor: 'text-slate-500 dark:text-slate-400'
-                    },
-                    yellow:{ 
-                        bg: 'bg-amber-500/5 dark:bg-amber-500/10', 
-                        border: 'border-amber-200/50 dark:border-amber-800/40', 
-                        icon: 'bg-amber-500 text-white', 
-                        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-                        textColor: 'text-slate-800 dark:text-white',
-                        subColor: 'text-slate-500 dark:text-slate-400'
-                    }
-                };
-                const t = themes[color];
+                const t = getReplyConfig(log.reply);
+                const s = getServiceConfig(log.service);
 
                 return `
-                <div class="${t.bg} rounded-2xl p-4 border ${t.border} hover:shadow-md transition-all duration-200">
+                <div class="${t.bg} rounded-2xl p-4 border ${t.border} ${t.glow} transition-all duration-300 hover:scale-[1.005]">
                     <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 ${t.icon} rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                            <i class="fas fa-${icon} text-lg"></i>
+                        <div class="w-10 h-10 ${t.iconBg} rounded-xl flex items-center justify-center flex-shrink-0">
+                            <i class="${t.icon} text-lg"></i>
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-wrap items-center gap-2 mb-1">
-                                <span class="font-bold ${t.textColor}">${log.username}</span>
+                                <span class="font-bold text-slate-800 dark:text-white text-sm tracking-tight">${log.username}</span>
                                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${t.badge}">${log.reply || 'Unknown'}</span>
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${s.badge} flex items-center gap-1">
+                                    <i class="${s.icon} text-[9px]"></i>
+                                    <span>${s.label}</span>
+                                </span>
                             </div>
-                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${t.subColor}">
-                                <span><i class="fas fa-clock mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
-                                ${log.callingstationid ? `<span><i class="fas fa-laptop mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
-                                ${log.calledstationid ? `<span><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.calledstationid}</span>` : ''}
+                            <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                <span class="flex items-center"><i class="fas fa-clock mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
+                                ${log.callingstationid ? `<span class="flex items-center"><i class="fas fa-laptop mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
+                                ${log.calledstationid ? `<span class="flex items-center"><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.calledstationid}</span>` : ''}
                             </div>
                         </div>
                     </div>
