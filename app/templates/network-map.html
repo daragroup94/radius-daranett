@@ -722,6 +722,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
+    let nasStatsInterval = null;
     let map = null;
     let nasLayer = L.layerGroup();
     let infraLayer = L.layerGroup();
@@ -854,12 +855,24 @@
                 // 2. Real-time stats for NAS
                 const nasStatsDiv = container.querySelector('div[id^="nasRealtimeStats_"]');
                 if (nasStatsDiv) {
-                    const nasIp = nasStatsDiv.id.replace('nasRealtimeStats_', '');
-                    setTimeout(() => {
-                        fetchAndRenderNasStats(nasIp, nasStatsDiv);
-                    }, 100);
+                   const nasIp = nasStatsDiv.id.replace('nasRealtimeStats_', '');
+    
+                   // Fetch pertama kali
+                   fetchAndRenderNasStats(nasIp, nasStatsDiv);
+    
+                   // Auto-refresh setiap 5 detik
+                   clearInterval(nasStatsInterval);
+                   nasStatsInterval = setInterval(() => {
+                       fetchAndRenderNasStats(nasIp, nasStatsDiv);
+                   }, 5000);
                 }
             }
+        });
+
+        // ✅ TAMBAHKAN DI SINI — tepat setelah map.on popupopen yang kedua
+        map.on('popupclose', function() {
+            clearInterval(nasStatsInterval);
+            nasStatsInterval = null;
         });
 
 
@@ -1148,8 +1161,15 @@
                             </div>
                         </div>
                         <div class="border-t border-slate-700/60 pt-2 text-[10px] space-y-1">
-                            <div class="flex justify-between"><span class="text-slate-400">Tipe NAS:</span><span class="font-bold text-white">${nas.type || 'MikroTik'}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Database ID:</span><span class="font-mono text-white">${nas.id}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Tipe NAS (DevType):</span><span class="font-bold text-white">${nas.type || 'MikroTik'}</span></div>
                             <div class="flex justify-between"><span class="text-slate-400">Koordinat:</span><span class="font-mono text-white">${nas.latitude.toFixed(5)}, ${nas.longitude.toFixed(5)}</span></div>
+                        </div>
+                        <!-- TAMBAHAN: Real-time stats NAS dari RADIUS -->
+                        <div id="nasRealtimeStats_${nas.nasname}" class="mt-2 text-[10px]">
+                           <div class="text-slate-500 italic text-center py-1">
+                               <i class="fas fa-spinner animate-spin mr-1"></i>Mengambil statistik NAS...
+                           </div>
                         </div>
                         <div class="grid grid-cols-2 gap-1.5 mt-3">
                             <button onclick="startSetLocation(null, '${nas.nasname}', 'NAS: ${nas.shortname}')"
@@ -1278,6 +1298,8 @@
                     </div>
                     
                     <div class="text-[10px] space-y-1.5">
+                        <div class="flex justify-between"><span class="text-slate-400">Username / DB ID:</span><span class="font-mono text-white">${client.username}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Device Type:</span><span class="font-bold text-white">${client.type.toUpperCase()}</span></div>
                         <div class="flex justify-between"><span class="text-slate-400">Optical RX Power:</span><span class="font-bold ${rxColorClass}">${client.rx_power} dBm</span></div>
                         ${client.proactive_alert ? `
                         <div class="p-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[8px] text-amber-400 flex items-start gap-1">
@@ -1471,6 +1493,8 @@
                             const uplink = parsed.uplink_cap || '10G';
                             const vlan = parsed.vlan_mgmt || '-';
                             detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Database ID:</span><span class="font-mono text-white">${device.id}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Device Type:</span><span class="font-bold text-white">${device.type.toUpperCase()}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Merk OLT:</span><span class="text-white font-semibold">${brand}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">IP Management:</span><span class="font-mono text-indigo-400 font-bold">${ip}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Teknologi PON:</span><span class="text-white font-semibold">${ponType}</span></div>
@@ -1482,6 +1506,8 @@
                             const feeder = parsed.feeder_source || '-';
                             const install = parsed.install_type || 'Outdoor';
                             detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Database ID:</span><span class="font-mono text-white">${device.id}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Device Type:</span><span class="font-bold text-white">${device.type.toUpperCase()}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Merk Cabinet:</span><span class="text-white font-semibold">${brand}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Feeder Source:</span><span class="text-white font-semibold truncate max-w-[120px]">${feeder}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Pemasangan:</span><span class="text-white font-semibold">${install}</span></div>
@@ -1505,6 +1531,8 @@
                                 : '<span class="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-md text-[9px] font-bold">🔴 GANGGUAN</span>';
                             
                             detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Database ID:</span><span class="font-mono text-white">${device.id}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Device Type:</span><span class="font-bold text-white">${device.type.toUpperCase()}</span></div>
                                 <div class="flex justify-between items-center"><span class="text-slate-400">Status OIT:</span>${statusBadge}</div>
                                 <div class="flex justify-between"><span class="text-slate-400">Sumber Feeder:</span><span class="font-bold text-amber-400">${feederName}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Rasio Tap:</span><span class="text-white font-semibold">${tapRatio}</span></div>
@@ -1519,6 +1547,8 @@
                             const source = parsed.odc_source || '-';
                             const color = parsed.core_color || '-';
                             detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Database ID:</span><span class="font-mono text-white">${device.id}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Device Type:</span><span class="font-bold text-white">${device.type.toUpperCase()}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Merk ODP:</span><span class="text-white font-semibold">${brand}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Tipe ODP:</span><span class="text-white font-semibold">${boxType}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">Kapasitas Port:</span><span class="text-white font-semibold">1:${ports} (${ports} Port)</span></div>
@@ -1528,6 +1558,8 @@
                         } else if (device.type === 'nas') {
                             const ip = parsed.ip_address || '-';
                             detailsHtml = `
+                                <div class="flex justify-between"><span class="text-slate-400">Database ID:</span><span class="font-mono text-white">${device.id}</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">Device Type:</span><span class="font-bold text-white">${device.type.toUpperCase()}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">IP Management:</span><span class="font-mono text-indigo-400 font-bold">${ip}</span></div>
                                 <div id="nasRealtimeStats_${ip}" class="mt-2 text-[10px]">
                                     <div class="text-slate-500 italic">Menghubungkan ke NAS...</div>
@@ -1808,6 +1840,10 @@
                         <span class="text-xs font-bold text-white">Koneksi Kabel Fiber</span>
                     </div>
                     <div class="text-[10px] space-y-1.5">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Database ID:</span>
+                            <span class="font-mono text-white">${cable.id}</span>
+                        </div>
                         <div class="flex justify-between">
                             <span class="text-slate-400">Dari ODP:</span>
                             <span class="font-bold text-emerald-400">${cable.odp_name}</span>
@@ -2182,6 +2218,7 @@
                             <span class="text-xs font-bold text-white">Koneksi Infrastruktur</span>
                         </div>
                         <div class="text-[10px] space-y-1.5">
+                            <div class="flex justify-between"><span class="text-slate-400">Database ID:</span><span class="font-mono text-white">${conn.id}</span></div>
                             <div class="flex justify-between"><span class="text-slate-400">Dari:</span><span class="font-bold text-white">${conn.src_name} (${conn.src_type.toUpperCase()})</span></div>
                             <div class="flex justify-between"><span class="text-slate-400">Ke:</span><span class="font-bold text-white">${conn.dst_name} (${conn.dst_type.toUpperCase()})</span></div>
                         </div>
@@ -4277,147 +4314,230 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     }
 
+    function formatSpeed(bits, decimals = 2) {
+        if (!+bits) return '0 bps';
+        const k = 1000;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps'];
+        const i = Math.floor(Math.log(bits) / Math.log(k));
+        return `${parseFloat((bits / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    }
+
     async function fetchAndRenderNasStats(ip, element) {
         if (!element) return;
-        element.innerHTML = `
-            <div class="flex items-center gap-1.5 justify-center py-2 text-slate-400">
-                <i class="fas fa-spinner animate-spin text-indigo-400"></i>
-                <span>Mengambil statistik NAS...</span>
-            </div>
-        `;
-        
-        try {
-            const res = await fetch(`/api/map/nas/stats/${ip}`);
-            const data = await res.json();
-            
-            if (!data.success) {
-                element.innerHTML = `
-                    <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[9px] mt-1.5">
-                        Gagal memuat data NAS: ${data.error || 'Terjadi kesalahan'}
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = '';
-            
-            // Render ping latency status
-            let pingText = 'N/A';
-            let pingColor = 'text-slate-400';
-            if (data.ping_latency !== null && data.ping_latency !== undefined) {
-                pingText = `${data.ping_latency.toFixed(1)} ms`;
-                pingColor = data.ping_latency < 30 ? 'text-emerald-400' : data.ping_latency < 80 ? 'text-amber-400' : 'text-rose-500';
-            }
-            
-            const statusBadge = data.status === 'online'
-                ? `<span class="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] font-bold rounded-md uppercase">🟢 Online</span>`
-                : `<span class="px-1.5 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[8px] font-bold rounded-md uppercase">🔴 Offline</span>`;
-                
-            html += `
+
+        // Gunakan id unik per-IP agar tidak bentrok jika ada lebih dari 1 NAS
+        const safeIp = ip.replace(/\./g, '_');
+        const isFirstLoad = !element.querySelector(`#nas_status_badge_${safeIp}`);
+
+        // Render struktur skeleton HANYA pada load pertama
+        if (isFirstLoad) {
+            element.innerHTML = `
                 <div class="mt-2 border-t border-slate-700/50 pt-2 text-[10px] space-y-1.5">
                     <div class="flex justify-between items-center">
                         <span class="text-slate-400">Status Router:</span>
-                        ${statusBadge}
+                        <span id="nas_status_badge_${safeIp}">
+                            <span class="px-1.5 py-0.5 bg-slate-700 text-slate-400 text-[8px] rounded-md">Memuat...</span>
+                        </span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-slate-400">Latensi Ping:</span>
-                        <span class="font-mono font-bold ${pingColor}">${pingText}</span>
+                        <span id="nas_ping_${safeIp}" class="font-mono font-bold text-slate-400">--</span>
                     </div>
+                    <div class="pt-1">
+                        <div class="flex justify-between text-[9px] font-semibold mb-0.5">
+                            <span class="text-slate-400">Beban CPU:</span>
+                            <span id="nas_cpu_text_${safeIp}" class="text-white font-mono">--%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div id="nas_cpu_bar_${safeIp}" class="h-full bg-indigo-500 transition-all duration-700" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <div class="pt-1">
+                        <div class="flex justify-between text-[9px] font-semibold mb-0.5">
+                            <span class="text-slate-400">Memori Terpakai:</span>
+                            <span id="nas_mem_text_${safeIp}" class="text-white font-mono">--%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div id="nas_mem_bar_${safeIp}" class="h-full bg-indigo-500 transition-all duration-700" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Uptime:</span>
+                        <span id="nas_uptime_${safeIp}" class="text-white font-semibold truncate max-w-[130px]">--</span>
+                    </div>
+                    <div id="nas_iface_${safeIp}" class="mt-2 border-t border-slate-800 pt-2">
+                        <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Trafik Interface</p>
+                        <div class="text-slate-500 italic text-center py-1 text-[9px]">Memuat...</div>
+                    </div>
+                    <div id="nas_error_${safeIp}" class="hidden"></div>
+                </div>
             `;
-            
-            if (data.integrated) {
-                if (data.status === 'online') {
-                    // Progress bar styles
+        }
+
+        try {
+            const res = await fetch(`/api/map/nas/stats/${ip}`);
+            const data = await res.json();
+
+            if (!data.success) {
+                const errEl = element.querySelector(`#nas_error_${safeIp}`);
+                if (errEl) {
+                    errEl.className = 'p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[9px] mt-1.5';
+                    errEl.innerHTML = `Gagal memuat data NAS: ${data.error || 'Terjadi kesalahan'}`;
+                }
+                return;
+            }
+
+            // ✅ Update hanya nilai elemen — tanpa rebuild HTML
+
+            // Status badge
+            const statusEl = element.querySelector(`#nas_status_badge_${safeIp}`);
+            if (statusEl) {
+                statusEl.innerHTML = data.status === 'online'
+                    ? `<span class="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] font-bold rounded-md uppercase">🟢 Online</span>`
+                    : `<span class="px-1.5 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[8px] font-bold rounded-md uppercase">🔴 Offline</span>`;
+            }
+
+            // Ping
+            const pingEl = element.querySelector(`#nas_ping_${safeIp}`);
+            if (pingEl) {
+                if (data.ping_latency !== null && data.ping_latency !== undefined) {
+                    const pingColor = data.ping_latency < 30 ? 'text-emerald-400' : data.ping_latency < 80 ? 'text-amber-400' : 'text-rose-500';
+                    pingEl.className = `font-mono font-bold ${pingColor}`;
+                    pingEl.textContent = `${data.ping_latency.toFixed(1)} ms`;
+                } else {
+                    pingEl.textContent = 'N/A';
+                }
+            }
+
+            if (data.integrated && data.status === 'online') {
+                // CPU
+                const cpuText = element.querySelector(`#nas_cpu_text_${safeIp}`);
+                const cpuBar  = element.querySelector(`#nas_cpu_bar_${safeIp}`);
+                if (cpuText) cpuText.textContent = `${data.cpu_load}%`;
+                if (cpuBar) {
                     const cpuColor = data.cpu_load >= 85 ? 'bg-rose-500' : data.cpu_load >= 60 ? 'bg-amber-500' : 'bg-indigo-500';
+                    cpuBar.className = `h-full ${cpuColor} transition-all duration-700`;
+                    cpuBar.style.width = `${data.cpu_load}%`;
+                }
+
+                // Memory
+                const memText = element.querySelector(`#nas_mem_text_${safeIp}`);
+                const memBar  = element.querySelector(`#nas_mem_bar_${safeIp}`);
+                if (memText) memText.textContent = `${data.memory_used_percent}%`;
+                if (memBar) {
                     const memColor = data.memory_used_percent >= 85 ? 'bg-rose-500' : data.memory_used_percent >= 60 ? 'bg-amber-500' : 'bg-indigo-500';
-                    
-                    html += `
-                        <div class="pt-1">
-                            <div class="flex justify-between text-[9px] font-semibold mb-0.5">
-                                <span class="text-slate-400">Beban CPU:</span>
-                                <span class="text-white font-mono">${data.cpu_load}%</span>
-                            </div>
-                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full ${cpuColor} transition-all duration-300" style="width: ${data.cpu_load}%"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="pt-1">
-                            <div class="flex justify-between text-[9px] font-semibold mb-0.5">
-                                <span class="text-slate-400">Memori Terpakai:</span>
-                                <span class="text-white font-mono">${data.memory_used_percent}%</span>
-                            </div>
-                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full ${memColor} transition-all duration-300" style="width: ${data.memory_used_percent}%"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="flex justify-between">
-                            <span class="text-slate-400">Uptime:</span>
-                            <span class="text-white truncate max-w-[130px] font-semibold">${data.uptime}</span>
-                        </div>
-                    `;
-                    
-                    if (data.interfaces && data.interfaces.length > 0) {
-                        const rows = data.interfaces.map(iface => {
-                            const rx = formatBytes(iface.rx_byte);
-                            const tx = formatBytes(iface.tx_byte);
-                            return `
-                                <tr class="border-b border-slate-800/40 text-[8px]">
-                                    <td class="py-1 text-slate-300 font-semibold truncate max-w-[60px]" title="${iface.name}">${iface.name}</td>
-                                    <td class="py-1 text-right text-emerald-400 font-mono">${rx}</td>
-                                    <td class="py-1 text-right text-indigo-400 font-mono">${tx}</td>
-                                </tr>
-                            `;
-                        }).join('');
-                        
-                        html += `
-                            <div class="mt-2 border-t border-slate-800 pt-2">
-                                <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Trafik Interface</p>
-                                <div class="max-h-24 overflow-y-auto" style="scrollbar-width:thin">
-                                    <table class="w-full text-left">
-                                        <thead>
-                                            <tr class="border-b border-slate-800 text-[8px] text-slate-500 font-bold uppercase">
-                                                <th class="pb-1">Interface</th>
-                                                <th class="pb-1 text-right">Rx (In)</th>
-                                                <th class="pb-1 text-right">Tx (Out)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${rows}
-                                        </tbody>
-                                    </table>
-                                </div>
+                    memBar.className = `h-full ${memColor} transition-all duration-700`;
+                    memBar.style.width = `${data.memory_used_percent}%`;
+                }
+
+                // Uptime
+                const uptimeEl = element.querySelector(`#nas_uptime_${safeIp}`);
+                if (uptimeEl) uptimeEl.textContent = data.uptime;
+
+                // Interface table
+                const ifaceEl = element.querySelector(`#nas_iface_${safeIp}`);
+                if (ifaceEl && data.interfaces && data.interfaces.length > 0) {
+                    window.nasTrafficCache = window.nasTrafficCache || {};
+                    if (!window.nasTrafficCache[safeIp]) {
+                        window.nasTrafficCache[safeIp] = {};
+                    }
+                    const now = Date.now();
+
+                    const ifacesWithSpeed = data.interfaces.map(iface => {
+                        const prev = window.nasTrafficCache[safeIp][iface.name];
+                        let rxSpeed = 0;
+                        let txSpeed = 0;
+
+                        if (prev) {
+                            const timeDiff = (now - prev.timestamp) / 1000;
+                            if (timeDiff > 0) {
+                                // Calculate bits per second
+                                if (iface.rx_byte >= prev.rx_byte) {
+                                    rxSpeed = ((iface.rx_byte - prev.rx_byte) * 8) / timeDiff;
+                                }
+                                if (iface.tx_byte >= prev.tx_byte) {
+                                    txSpeed = ((iface.tx_byte - prev.tx_byte) * 8) / timeDiff;
+                                }
+                            }
+                        }
+
+                        // Store for next poll
+                        window.nasTrafficCache[safeIp][iface.name] = {
+                            rx_byte: iface.rx_byte,
+                            tx_byte: iface.tx_byte,
+                            timestamp: now
+                        };
+
+                        return { ...iface, rxSpeed, txSpeed };
+                    });
+
+                    const existingTable = ifaceEl.querySelector('table');
+                    if (existingTable) {
+                        // ✅ Update nilai RX/TX per sel — tanpa rebuild tabel
+                        ifacesWithSpeed.forEach((iface, i) => {
+                            const rxEl = ifaceEl.querySelector(`#nas_rx_${safeIp}_${i}`);
+                            const txEl = ifaceEl.querySelector(`#nas_tx_${safeIp}_${i}`);
+                            if (rxEl) rxEl.textContent = formatSpeed(iface.rxSpeed);
+                            if (txEl) txEl.textContent = formatSpeed(iface.txSpeed);
+                        });
+                    } else {
+                        // Render tabel hanya pertama kali
+                        const rows = ifacesWithSpeed.map((iface, i) => `
+                            <tr class="border-b border-slate-800/40 text-[8px]">
+                                <td class="py-1 text-slate-300 font-semibold truncate max-w-[60px]" title="${iface.name}">${iface.name}</td>
+                                <td id="nas_rx_${safeIp}_${i}" class="py-1 text-right text-emerald-400 font-mono">${formatSpeed(iface.rxSpeed)}</td>
+                                <td id="nas_tx_${safeIp}_${i}" class="py-1 text-right text-indigo-400 font-mono">${formatSpeed(iface.txSpeed)}</td>
+                            </tr>
+                        `).join('');
+                        ifaceEl.innerHTML = `
+                            <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Trafik Interface</p>
+                            <div class="max-h-24 overflow-y-auto" style="scrollbar-width:thin">
+                                <table class="w-full text-left">
+                                    <thead>
+                                        <tr class="border-b border-slate-800 text-[8px] text-slate-500 font-bold uppercase">
+                                            <th class="pb-1">Interface</th>
+                                            <th class="pb-1 text-right">Rx (In)</th>
+                                            <th class="pb-1 text-right">Tx (Out)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
                             </div>
                         `;
                     }
-                } else {
-                    html += `
-                        <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[8px] mt-1.5">
+                }
+            } else if (data.integrated && data.status !== 'online') {
+                const ifaceEl = element.querySelector(`#nas_iface_${safeIp}`);
+                if (ifaceEl) {
+                    ifaceEl.innerHTML = `
+                        <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[8px]">
                             <i class="fas fa-exclamation-triangle mr-1"></i>
                             Gagal koneksi API Mikrotik: ${data.error || 'Connection Timeout'}
                         </div>
                     `;
                 }
             } else {
-                html += `
-                    <div class="p-2 bg-slate-800 border border-slate-700/50 rounded-lg text-slate-400 text-[8px] mt-1.5">
-                        Integrasi API Mikrotik tidak aktif/tidak diatur untuk IP ini.
+                const ifaceEl = element.querySelector(`#nas_iface_${safeIp}`);
+                if (ifaceEl) {
+                    ifaceEl.innerHTML = `
+                        <div class="p-2 bg-slate-800 border border-slate-700/50 rounded-lg text-slate-400 text-[8px]">
+                            Integrasi API Mikrotik tidak aktif/tidak diatur untuk IP ini.
+                        </div>
+                    `;
+                }
+            }
+
+        } catch (err) {
+            if (isFirstLoad) {
+                element.innerHTML = `
+                    <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[9px] mt-1.5">
+                        Error API: ${err.message}
                     </div>
                 `;
             }
-            
-            html += `</div>`;
-            element.innerHTML = html;
-        } catch (err) {
-            element.innerHTML = `
-                <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[9px] mt-1.5">
-                    Error API: ${err.message}
-                </div>
-            `;
         }
     }
 
 </script>
 {% endblock %}
-
