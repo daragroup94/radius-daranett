@@ -115,6 +115,32 @@ def api_test_integration(iid):
                 return jsonify({'success': True, 'message': 'Connected to GenieACS NBI successfully!'})
             else:
                 return jsonify({'success': False, 'error': f"GenieACS returned HTTP status {resp.status_code}"})
+        elif ig['type'] == 'tenda-olt':
+            host = ig['host']
+            if not host.startswith(('http://', 'https://')):
+                host = f"http://{host}"
+            url = f"{host}:{ig['port']}" if ig['port'] else host
+            url = url.rstrip('/')
+            
+            import hashlib
+            password_md5 = hashlib.md5(ig['password'].encode()).hexdigest()
+            
+            session = requests.Session()
+            login_payload = {"login": {"username": ig['username'], "password": password_md5}}
+            resp = session.post(f"{url}/getModules", json=login_payload, timeout=5, verify=False)
+            if resp.status_code == 200:
+                # Test query system info
+                info_resp = session.post(f"{url}/getModules", json={"deviceInfo": "", "customInfo": ""}, timeout=5, verify=False)
+                if info_resp.status_code == 200:
+                    info_data = info_resp.json()
+                    dev_name = info_data.get('deviceInfo', {}).get('deviceName', 'GPON-OLT')
+                    prod_type = info_data.get('deviceInfo', {}).get('productType', 'TES7002')
+                    temp = info_data.get('deviceInfo', {}).get('deviceTemperature', '?')
+                    return jsonify({'success': True, 'message': f"Connected to Tenda OLT! Device: {dev_name} ({prod_type}), Temp: {temp}°C"})
+                else:
+                    return jsonify({'success': False, 'error': f"Connected but failed to fetch system info. Code: {info_resp.status_code}"})
+            else:
+                return jsonify({'success': False, 'error': f"Failed to login. HTTP status: {resp.status_code}"})
         return jsonify({'success': False, 'error': 'Unsupported type'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -237,3 +263,81 @@ def api_telegram_test():
 @login_required
 def notifications_page():
     return render_template('notifications.html')
+
+@integrations_bp.route('/api/tenda-olt/status')
+@login_required
+def api_tenda_olt_status():
+    olt_id = request.args.get('olt_id', type=int)
+    try:
+        if olt_id:
+            olts = execute_query("SELECT id, name, type, host, port, username, password, is_active FROM integrations WHERE id=%s AND type='tenda-olt' AND is_active=true", (olt_id,)) or []
+        else:
+            olts = execute_query("SELECT id, name, type, host, port, username, password, is_active FROM integrations WHERE type='tenda-olt' AND is_active=true ORDER BY id") or []
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    results = []
+    for olt in olts:
+        try:
+            host = olt['host']
+            if not host.startswith(('http://', 'https://')):
+                host = f"http://{host}"
+            url = f"{host}:{olt['port']}" if olt['port'] else host
+            url = url.rstrip('/')
+
+            import hashlib
+            password_md5 = hashlib.md5(olt['password'].encode()).hexdigest()
+
+            session = requests.Session()
+            login_payload = {"login": {"username": olt['username'], "password": password_md5}}
+            login_resp = session.post(f"{url}/getModules", json=login_payload, timeout=4, verify=False)
+            if login_resp.status_code != 200:
+                raise Exception(f"Login HTTP status {login_resp.status_code}")
+
+            # Get system info
+            sys_resp = session.post(f"{url}/getModules", json={"deviceInfo": "", "customInfo": ""}, timeout=4, verify=False)
+            sys_data = sys_resp.json() if sys_resp.status_code == 200 else {}
+            dev_info = sys_data.get('deviceInfo', {})
+
+            # Get PON stats
+            pon_resp = session.post(f"{url}/getModules", json={"ponStatistics": "", "ontNumInfo": ""}, timeout=4, verify=False)
+            pon_data = pon_resp.json() if pon_resp.status_code == 200 else {}
+            pon_stats = pon_data.get('ponStatistics', [])
+            ont_info = pon_data.get('ontNumInfo', [])
+
+            ports_data = []
+            stats_by_pon = {item.get('ponNumber'): item for item in pon_stats}
+            ont_by_pon = {item.get('ponPort'): item for item in ont_info}
+
+            for pon_id in (1, 2):
+                p_stat = stats_by_pon.get(pon_id, {})
+                p_ont = ont_by_pon.get(pon_id, {})
+                
+                ports_data.append({
+                    'pon_id': pon_id,
+                    'name': f"PON {pon_id}",
+                    'up_speed': p_stat.get('upSpeed', '0.00'),
+                    'down_speed': p_stat.get('downSpeed', '0.00'),
+                    'ont_online': p_ont.get('ontOnline', 0),
+                    'ont_offline': p_ont.get('ontOffline', 0),
+                    'ont_total': p_ont.get('ontTotal', 0)
+                })
+
+            results.append({
+                'olt_id': olt['id'],
+                'name': olt['name'],
+                'host': olt['host'],
+                'temperature': dev_info.get('deviceTemperature', 'N/A'),
+                'soft_version': dev_info.get('softVersion', 'N/A'),
+                'uptime_days': round(dev_info.get('runTime', 0) / (24 * 3600), 1) if dev_info.get('runTime') else 0,
+                'ports': ports_data
+            })
+        except Exception as e:
+            results.append({
+                'olt_id': olt['id'],
+                'name': olt['name'],
+                'host': olt['host'],
+                'error': str(e)
+            })
+
+    return jsonify({'success': True, 'data': results})
