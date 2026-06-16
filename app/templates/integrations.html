@@ -321,7 +321,7 @@ async function loadIntegrations() {
           </button>
         </div>
       </div>
-    `).join('');
+    }).join('');
     lucide.createIcons();
   } catch(e) {
     el.innerHTML = `<div class="text-center py-10 text-red-500 font-outfit"><p>${e.message}</p></div>`;
