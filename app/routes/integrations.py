@@ -117,9 +117,19 @@ def api_test_integration(iid):
                 return jsonify({'success': False, 'error': f"GenieACS returned HTTP status {resp.status_code}"})
         elif ig['type'] == 'tenda-olt':
             host = ig['host']
-            if not host.startswith(('http://', 'https://')):
-                host = f"http://{host}"
-            url = f"{host}:{ig['port']}" if ig['port'] else host
+            port = ig['port']
+            is_https = False
+            if host.startswith('https://'):
+                is_https = True
+                host = host[8:]
+            elif host.startswith('http://'):
+                host = host[7:]
+            if str(port) == '443':
+                is_https = True
+            if is_https and str(port) == '80':
+                port = 443
+            scheme = 'https' if is_https else 'http'
+            url = f"{scheme}://{host}:{port}" if port else f"{scheme}://{host}"
             url = url.rstrip('/')
             
             import hashlib
@@ -127,10 +137,10 @@ def api_test_integration(iid):
             
             session = requests.Session()
             login_payload = {"login": {"username": ig['username'], "password": password_md5}}
-            resp = session.post(f"{url}/getModules", json=login_payload, timeout=5, verify=False)
+            resp = session.post(f"{url}/getModules", json=login_payload, timeout=5, verify=False, allow_redirects=False)
             if resp.status_code == 200:
                 # Test query system info
-                info_resp = session.post(f"{url}/getModules", json={"deviceInfo": "", "customInfo": ""}, timeout=5, verify=False)
+                info_resp = session.post(f"{url}/getModules", json={"deviceInfo": "", "customInfo": ""}, timeout=5, verify=False, allow_redirects=False)
                 if info_resp.status_code == 200:
                     info_data = info_resp.json()
                     dev_name = info_data.get('deviceInfo', {}).get('deviceName', 'GPON-OLT')
@@ -280,9 +290,19 @@ def api_tenda_olt_status():
     for olt in olts:
         try:
             host = olt['host']
-            if not host.startswith(('http://', 'https://')):
-                host = f"http://{host}"
-            url = f"{host}:{olt['port']}" if olt['port'] else host
+            port = olt['port']
+            is_https = False
+            if host.startswith('https://'):
+                is_https = True
+                host = host[8:]
+            elif host.startswith('http://'):
+                host = host[7:]
+            if str(port) == '443':
+                is_https = True
+            if is_https and str(port) == '80':
+                port = 443
+            scheme = 'https' if is_https else 'http'
+            url = f"{scheme}://{host}:{port}" if port else f"{scheme}://{host}"
             url = url.rstrip('/')
 
             import hashlib
@@ -290,17 +310,17 @@ def api_tenda_olt_status():
 
             session = requests.Session()
             login_payload = {"login": {"username": olt['username'], "password": password_md5}}
-            login_resp = session.post(f"{url}/getModules", json=login_payload, timeout=4, verify=False)
+            login_resp = session.post(f"{url}/getModules", json=login_payload, timeout=4, verify=False, allow_redirects=False)
             if login_resp.status_code != 200:
                 raise Exception(f"Login HTTP status {login_resp.status_code}")
 
             # Get system info
-            sys_resp = session.post(f"{url}/getModules", json={"deviceInfo": "", "customInfo": ""}, timeout=4, verify=False)
+            sys_resp = session.post(f"{url}/getModules", json={"deviceInfo": "", "customInfo": ""}, timeout=4, verify=False, allow_redirects=False)
             sys_data = sys_resp.json() if sys_resp.status_code == 200 else {}
             dev_info = sys_data.get('deviceInfo', {})
 
             # Get PON stats
-            pon_resp = session.post(f"{url}/getModules", json={"ponStatistics": "", "ontNumInfo": ""}, timeout=4, verify=False)
+            pon_resp = session.post(f"{url}/getModules", json={"ponStatistics": "", "ontNumInfo": ""}, timeout=4, verify=False, allow_redirects=False)
             pon_data = pon_resp.json() if pon_resp.status_code == 200 else {}
             pon_stats = pon_data.get('ponStatistics', [])
             ont_info = pon_data.get('ontNumInfo', [])
