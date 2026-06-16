@@ -127,8 +127,26 @@ def background_optical_health_scan():
                             SET serial = EXCLUDED.serial, model = EXCLUDED.model, manufacturer = EXCLUDED.manufacturer,
                                 rx_power = EXCLUDED.rx_power, temperature = EXCLUDED.temperature, pon_mode = EXCLUDED.pon_mode, last_inform = EXCLUDED.last_inform, updated_at = NOW()
                         """, (db_username, serial_clean, model, manufacturer, rx, temp, pon_mode, d.get('_lastInform', 'N/A')), fetch=False)
+
+                        # Catat riwayat kekuatan sinyal (Rx Power)
+                        execute_query("""
+                            INSERT INTO ont_signal_history (username, rx_power, recorded_at)
+                            VALUES (%s, %s, NOW())
+                        """, (db_username, rx), fetch=False)
+
+                        # Batasi riwayat maksimal 30 baris per pelanggan agar database tidak bengkak
+                        execute_query("""
+                            DELETE FROM ont_signal_history
+                            WHERE id IN (
+                                SELECT id FROM (
+                                    SELECT id, ROW_NUMBER() OVER (PARTITION BY username ORDER BY recorded_at DESC) as rn
+                                    FROM ont_signal_history
+                                    WHERE username = %s
+                                ) t WHERE t.rn > 30
+                            )
+                        """, (db_username,), fetch=False)
                     except Exception as upsert_err:
-                        print(f"[optical-health-scan] Upsert ont_status failed for {db_username}: {upsert_err}")
+                        print(f"[optical-health-scan] Upsert/History failed for {db_username}: {upsert_err}")
                         
                     # 3. Masukkan ke tabel ont_health_issues jika redaman buruk
                     try:

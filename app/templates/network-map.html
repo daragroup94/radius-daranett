@@ -671,10 +671,16 @@
             <div id="mapSearchWrapper" class="absolute top-4 left-4 lg:left-[312px] z-[1001] flex gap-2 w-60 lg:w-64 shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-2 rounded-2xl border border-slate-200 dark:border-slate-800 pointer-events-auto transition-all duration-300">
                 <input type="text" id="mapSearchInput" placeholder="Cari desa/lokasi..." 
                        onkeydown="if(event.key === 'Enter') searchLocation()"
-                       class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none">
+                       class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none">
                 <button onclick="searchLocation()" class="px-3.5 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-md">
                     <i class="fas fa-search text-[10px]"></i>
                 </button>
+            </div>
+
+            <!-- Reset Trace button (hidden by default) -->
+            <div id="btnResetTrace" class="hidden absolute top-4 right-4 z-[1001] shadow-lg bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-2xl border border-rose-500/30 flex items-center space-x-2 font-bold transition-all duration-200 cursor-pointer text-xs shadow-md shadow-rose-900/20" onclick="resetTrace()">
+                <i class="fas fa-undo"></i>
+                <span>Reset Rute Kabel</span>
             </div>
             
             <!-- Legend Kabel Fiber -->
@@ -831,16 +837,26 @@
             }
         });
 
-        // Leaflet Popup open hook to draw Sparkline chart on DOM element ready
+        // Leaflet Popup open hook to draw Sparkline chart on DOM element ready and fetch NAS stats
         map.on('popupopen', function(e) {
             const popup = e.popup;
             const container = popup.getElement();
             if (container) {
+                // 1. Sparkline chart for client
                 const canvas = container.querySelector('canvas[id^="clientTrendChart_"]');
                 if (canvas) {
                     const username = canvas.id.replace('clientTrendChart_', '');
                     setTimeout(() => {
                         renderClientTrend(username, canvas);
+                    }, 100);
+                }
+                
+                // 2. Real-time stats for NAS
+                const nasStatsDiv = container.querySelector('div[id^="nasRealtimeStats_"]');
+                if (nasStatsDiv) {
+                    const nasIp = nasStatsDiv.id.replace('nasRealtimeStats_', '');
+                    setTimeout(() => {
+                        fetchAndRenderNasStats(nasIp, nasStatsDiv);
                     }, 100);
                 }
             }
@@ -1185,10 +1201,22 @@
             }
 
             const signalDotColor = !client.is_online ? '#94a3b8' : client.rx_status === 'good' ? '#10b981' : client.rx_status === 'warning' ? '#f59e0b' : '#ef4444';
+            
+            let proactiveBadge = '';
+            if (client.proactive_alert) {
+                pulseCss = 'animation: houseWarnPulse 1.5s infinite;'; // Override pulse
+                proactiveBadge = `
+                    <div class="absolute -top-1 -left-1 w-4.5 h-4.5 bg-amber-500 rounded-full flex items-center justify-center text-[9px] font-bold text-slate-900 border border-white shadow-md animate-bounce" style="z-index: 10;" title="EWS: Sinyal drop -${client.degradation_val} dB">
+                        ⚠️
+                    </div>
+                `;
+            }
+
             const clientIcon = L.divIcon({
                 className: 'customer-house-icon',
                 html: `
-                    <div class="house-marker">
+                    <div class="house-marker relative">
+                        ${proactiveBadge}
                         <div class="house-label">${client.username}</div>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 46" width="36" height="42" style="filter:${houseGlow}; ${pulseCss}">
                             <!-- Chimney -->
@@ -1251,6 +1279,14 @@
                     
                     <div class="text-[10px] space-y-1.5">
                         <div class="flex justify-between"><span class="text-slate-400">Optical RX Power:</span><span class="font-bold ${rxColorClass}">${client.rx_power} dBm</span></div>
+                        ${client.proactive_alert ? `
+                        <div class="p-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[8px] text-amber-400 flex items-start gap-1">
+                            <i class="fas fa-exclamation-triangle mt-0.5 animate-pulse text-amber-500"></i>
+                            <div>
+                                <span class="font-bold">EWS Degradasi:</span> Sinyal drop <span class="font-bold">-${client.degradation_val} dB</span> dalam 7 hari. Pengecekan proaktif disarankan.
+                            </div>
+                        </div>
+                        ` : ''}
                         <div class="flex justify-between"><span class="text-slate-400">Temperatur ONT:</span><span class="font-bold text-white">${client.temperature} °C</span></div>
                         <div class="flex justify-between"><span class="text-slate-400">Tipe ONT:</span><span class="font-bold text-slate-300 truncate max-w-[120px]">${client.manufacturer} ${client.model}</span></div>
                         <div class="flex justify-between"><span class="text-slate-400">NAS Terhubung:</span><span class="font-mono text-slate-300">${client.last_nas}</span></div>
@@ -1264,6 +1300,10 @@
                     </div>
                     
                     <div class="space-y-1.5 mt-3">
+                        <button onclick="traceClientPath('${client.username}')"
+                                class="w-full bg-indigo-500/20 hover:bg-indigo-500 text-indigo-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-indigo-500/30 cursor-pointer">
+                            <i class="fas fa-route mr-1"></i>Trace Rute Kabel (OLT &rarr; Rumah)
+                        </button>
                         <div class="grid grid-cols-2 gap-1.5">
                             <button onclick="startSetLocation('${client.username}', null, 'Client: ${client.username}')"
                                     class="bg-slate-750 hover:bg-slate-700 text-slate-200 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-600 cursor-pointer">
@@ -1283,7 +1323,7 @@
                 </div>
             `;
 
-            const marker = L.marker([client.latitude, client.longitude], { icon: clientIcon, draggable: true })
+            const marker = L.marker([client.latitude, client.longitude], { icon: clientIcon, draggable: true, username: client.username })
                 .bindPopup(popupHtml);
 
             marker.on('click', async function(e) {
@@ -1489,6 +1529,9 @@
                             const ip = parsed.ip_address || '-';
                             detailsHtml = `
                                 <div class="flex justify-between"><span class="text-slate-400">IP Management:</span><span class="font-mono text-indigo-400 font-bold">${ip}</span></div>
+                                <div id="nasRealtimeStats_${ip}" class="mt-2 text-[10px]">
+                                    <div class="text-slate-500 italic">Menghubungkan ke NAS...</div>
+                                </div>
                             `;
                         }
                     }
@@ -1661,7 +1704,7 @@
                 </div>
             `;
 
-            const marker = L.marker([device.latitude, device.longitude], { icon: infraIcon, draggable: true })
+            const marker = L.marker([device.latitude, device.longitude], { icon: infraIcon, draggable: true, dbId: device.id, deviceType: device.type })
                 .bindPopup(popupHtml);
 
             marker.on('click', async function(e) {
@@ -1751,7 +1794,11 @@
                 weight: 3,
                 opacity: cableOpacity,
                 smoothFactor: 1,
-                className: `drop-cable drop-cable-${statusClass}`
+                className: `drop-cable drop-cable-${statusClass}`,
+                dbId: cable.id,
+                cableId: cable.id,
+                username: cable.customer_username,
+                odpId: cable.odp_id
             });
             
             cableLine.bindPopup(`
@@ -2116,7 +2163,18 @@
                     label = `Kabel Tap: ${conn.src_name} &rarr; ${conn.dst_name}`;
                     className = 'tap-cable';
                 }
-                const line = L.polyline(pathPoints, { color, weight, opacity: 0.8, className }).bindTooltip(label, { sticky: true });
+                const line = L.polyline(pathPoints, { 
+                    color, 
+                    weight, 
+                    opacity: 0.8, 
+                    className,
+                    dbId: conn.id,
+                    connId: conn.id,
+                    srcId: conn.src_id,
+                    dstId: conn.dst_id,
+                    srcType: conn.src_type,
+                    dstType: conn.dst_type
+                }).bindTooltip(label, { sticky: true });
                 line.bindPopup(`
                     <div class="p-3 w-56 text-slate-200">
                         <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700/50">
@@ -3489,6 +3547,52 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
         initMap();
         loadMapData();
         
+        // Initialize Socket.io Connection
+        try {
+            const socket = io();
+            socket.on('connect', () => {
+                console.log('[Socket.io] Connected to server successfully');
+            });
+            
+            // Listen to real-time client status updates
+            socket.on('client_status_update', (data) => {
+                console.log('[Socket.io] client_status_update:', data);
+                if (mapData && mapData.clients) {
+                    const client = mapData.clients.find(c => c.username === data.username);
+                    if (client) {
+                        client.is_online = data.is_online;
+                        renderMap();
+                        renderCables();
+                    }
+                }
+            });
+            
+            // Listen to ODP outage status updates
+            socket.on('odp_outage_update', (data) => {
+                console.log('[Socket.io] odp_outage_update:', data);
+                if (mapData && mapData.infra) {
+                    const infra = mapData.infra.find(i => i.id == data.odp_id);
+                    if (infra) {
+                        infra.status = data.status;
+                        renderInfrastructure();
+                    }
+                }
+                showNotification(`Status ODP ${data.odp_name} berubah menjadi ${data.status.toUpperCase()}!`, data.status === 'outage' ? 'error' : 'success');
+            });
+            
+            // Listen to NAS latency updates
+            socket.on('nas_latency_update', (data) => {
+                if (mapData && mapData.nas) {
+                    const nas = mapData.nas.find(n => n.nasname === data.nasname);
+                    if (nas) {
+                        nas.ping_latency = data.latency;
+                    }
+                }
+            });
+        } catch (socket_err) {
+            console.error('[Socket.io] Init failed:', socket_err);
+        }
+        
         // Real-time validation untuk field OIT
         document.addEventListener('input', (e) => {
             if (e.target.id === 'oitAttenIn' || e.target.id === 'oitAttenTap' || e.target.id === 'oitAttenPass') {
@@ -3968,6 +4072,352 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillText('Gagal memuat data', canvas.width / 2, canvas.height / 2);
         }
+    }
+
+    // --- FITUR TRACING RUTE KABEL & REAL-TIME STATS NAS ---
+
+    // Global variable to store active trace highlights state
+    let activeTrace = null;
+
+    function showResetTraceButton() {
+        const resetBtn = document.getElementById('btnResetTrace');
+        if (resetBtn) resetBtn.classList.remove('hidden');
+    }
+
+    function resetTrace() {
+        activeTrace = null;
+        
+        // Reset client markers opacity
+        clientsClusterGroup.eachLayer(layer => {
+            if (layer.setOpacity) layer.setOpacity(1.0);
+        });
+        
+        // Reset infra markers opacity
+        infraLayer.eachLayer(layer => {
+            if (layer.setOpacity) layer.setOpacity(1.0);
+        });
+        
+        // Redraw cables and topology to reset their styles
+        renderCables();
+        updateTopology();
+        
+        // Hide the reset button
+        const resetBtn = document.getElementById('btnResetTrace');
+        if (resetBtn) resetBtn.classList.add('hidden');
+        
+        showNotification("Trace rute kabel dibersihkan", "info");
+    }
+
+    function traceClientPath(username) {
+        console.log("Tracing path for client:", username);
+        
+        // Find client's cable
+        const clientCable = mapData.cables.find(c => c.customer_username === username);
+        if (!clientCable) {
+            showNotification("Kabel dropcore untuk pelanggan ini tidak ditemukan!", "warning");
+            return;
+        }
+        
+        const odpId = clientCable.odp_id;
+        if (!odpId) {
+            showNotification("ODP untuk pelanggan ini tidak terasosiasi!", "warning");
+            return;
+        }
+        
+        // Find a path from odpId to any OLT in infraConnections
+        // We treat the infraConnections as an undirected graph
+        const adj = {};
+        const edgeMap = {}; // mapping edge key (u,v) -> connection object
+        
+        if (mapData.infraConnections) {
+            mapData.infraConnections.forEach(conn => {
+                if (conn.is_disconnected) return;
+                const u = conn.src_id;
+                const v = conn.dst_id;
+                if (!adj[u]) adj[u] = [];
+                if (!adj[v]) adj[v] = [];
+                adj[u].push(v);
+                adj[v].push(u);
+                
+                edgeMap[`${u}_${v}`] = conn;
+                edgeMap[`${v}_${u}`] = conn;
+            });
+        }
+        
+        // BFS to find the shortest path to an OLT
+        const queue = [odpId];
+        const visited = {};
+        visited[odpId] = true;
+        const parent = {}; // child -> parent node
+        let foundOltId = null;
+        
+        while (queue.length > 0) {
+            const curr = queue.shift();
+            
+            // Check if curr is an OLT
+            const dev = mapData.infra.find(d => d.id == curr);
+            if (dev && dev.type === 'olt') {
+                foundOltId = curr;
+                break;
+            }
+            
+            const neighbors = adj[curr] || [];
+            for (const next of neighbors) {
+                if (!visited[next]) {
+                    visited[next] = true;
+                    parent[next] = curr;
+                    queue.push(next);
+                }
+            }
+        }
+        
+        const pathNodeIds = new Set();
+        const pathConnIds = new Set();
+        
+        if (foundOltId) {
+            // Reconstruct path
+            let curr = foundOltId;
+            pathNodeIds.add(curr);
+            while (curr != odpId) {
+                const p = parent[curr];
+                pathNodeIds.add(p);
+                // find connection between p and curr
+                const conn = edgeMap[`${p}_${curr}`];
+                if (conn) {
+                    pathConnIds.add(conn.id);
+                }
+                curr = p;
+            }
+        } else {
+            // If no OLT found, just path to the ODP
+            pathNodeIds.add(odpId);
+        }
+        
+        // Now apply highlights on Leaflet layers
+        // Dim all client markers, infra markers, cables, and topology lines
+        
+        // 1. Clients
+        clientsClusterGroup.eachLayer(layer => {
+            if (layer.options && layer.options.username) {
+                if (layer.options.username === username) {
+                    layer.setOpacity(1.0);
+                } else {
+                    layer.setOpacity(0.15);
+                }
+            }
+        });
+        
+        // 2. Infrastructure markers
+        infraLayer.eachLayer(layer => {
+            if (layer.options && layer.options.dbId) {
+                if (pathNodeIds.has(layer.options.dbId)) {
+                    layer.setOpacity(1.0);
+                } else {
+                    layer.setOpacity(0.15);
+                }
+            }
+        });
+        
+        // 3. Drop Cables (cables from client to ODP)
+        cableLayer.eachLayer(layer => {
+            if (layer.options && layer.options.dbId) {
+                if (layer.options.dbId === clientCable.id) {
+                    layer.setStyle({ opacity: 1.0, weight: 6, color: '#f59e0b' });
+                } else {
+                    layer.setStyle({ opacity: 0.1, weight: 1 });
+                }
+            }
+        });
+        
+        // 4. Infrastructure Connections (cables from ODP to OLT)
+        topologyLayer.eachLayer(layer => {
+            if (layer.options && layer.options.dbId) {
+                if (pathConnIds.has(layer.options.dbId)) {
+                    layer.setStyle({ opacity: 1.0, weight: 7, color: '#f43f5e' });
+                } else {
+                    layer.setStyle({ opacity: 0.1, weight: 1 });
+                }
+            }
+        });
+        
+        // Zoom map to fit the bounds of the path
+        const bounds = [];
+        const client = mapData.clients.find(c => c.username === username);
+        if (client && client.latitude && client.longitude) {
+            bounds.push([client.latitude, client.longitude]);
+        }
+        pathNodeIds.forEach(id => {
+            const dev = mapData.infra.find(d => d.id == id);
+            if (dev && dev.latitude && dev.longitude) {
+                bounds.push([dev.latitude, dev.longitude]);
+            }
+        });
+        
+        if (bounds.length > 0) {
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+        }
+        
+        activeTrace = {
+            username: username,
+            pathNodeIds: pathNodeIds,
+            pathConnIds: pathConnIds,
+            clientCableId: clientCable.id
+        };
+        
+        showResetTraceButton();
+        showNotification(`Menampilkan rute kabel untuk ${username}`, 'info');
+    }
+
+    function formatBytes(bytes, decimals = 2) {
+        if (!+bytes) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    }
+
+    async function fetchAndRenderNasStats(ip, element) {
+        if (!element) return;
+        element.innerHTML = `
+            <div class="flex items-center gap-1.5 justify-center py-2 text-slate-400">
+                <i class="fas fa-spinner animate-spin text-indigo-400"></i>
+                <span>Mengambil statistik NAS...</span>
+            </div>
+        `;
+        
+        try {
+            const res = await fetch(`/api/map/nas/stats/${ip}`);
+            const data = await res.json();
+            
+            if (!data.success) {
+                element.innerHTML = `
+                    <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[9px] mt-1.5">
+                        Gagal memuat data NAS: ${data.error || 'Terjadi kesalahan'}
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            
+            // Render ping latency status
+            let pingText = 'N/A';
+            let pingColor = 'text-slate-400';
+            if (data.ping_latency !== null && data.ping_latency !== undefined) {
+                pingText = `${data.ping_latency.toFixed(1)} ms`;
+                pingColor = data.ping_latency < 30 ? 'text-emerald-400' : data.ping_latency < 80 ? 'text-amber-400' : 'text-rose-500';
+            }
+            
+            const statusBadge = data.status === 'online'
+                ? `<span class="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[8px] font-bold rounded-md uppercase">🟢 Online</span>`
+                : `<span class="px-1.5 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[8px] font-bold rounded-md uppercase">🔴 Offline</span>`;
+                
+            html += `
+                <div class="mt-2 border-t border-slate-700/50 pt-2 text-[10px] space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Status Router:</span>
+                        ${statusBadge}
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Latensi Ping:</span>
+                        <span class="font-mono font-bold ${pingColor}">${pingText}</span>
+                    </div>
+            `;
+            
+            if (data.integrated) {
+                if (data.status === 'online') {
+                    // Progress bar styles
+                    const cpuColor = data.cpu_load >= 85 ? 'bg-rose-500' : data.cpu_load >= 60 ? 'bg-amber-500' : 'bg-indigo-500';
+                    const memColor = data.memory_used_percent >= 85 ? 'bg-rose-500' : data.memory_used_percent >= 60 ? 'bg-amber-500' : 'bg-indigo-500';
+                    
+                    html += `
+                        <div class="pt-1">
+                            <div class="flex justify-between text-[9px] font-semibold mb-0.5">
+                                <span class="text-slate-400">Beban CPU:</span>
+                                <span class="text-white font-mono">${data.cpu_load}%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="h-full ${cpuColor} transition-all duration-300" style="width: ${data.cpu_load}%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="pt-1">
+                            <div class="flex justify-between text-[9px] font-semibold mb-0.5">
+                                <span class="text-slate-400">Memori Terpakai:</span>
+                                <span class="text-white font-mono">${data.memory_used_percent}%</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="h-full ${memColor} transition-all duration-300" style="width: ${data.memory_used_percent}%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Uptime:</span>
+                            <span class="text-white truncate max-w-[130px] font-semibold">${data.uptime}</span>
+                        </div>
+                    `;
+                    
+                    if (data.interfaces && data.interfaces.length > 0) {
+                        const rows = data.interfaces.map(iface => {
+                            const rx = formatBytes(iface.rx_byte);
+                            const tx = formatBytes(iface.tx_byte);
+                            return `
+                                <tr class="border-b border-slate-800/40 text-[8px]">
+                                    <td class="py-1 text-slate-300 font-semibold truncate max-w-[60px]" title="${iface.name}">${iface.name}</td>
+                                    <td class="py-1 text-right text-emerald-400 font-mono">${rx}</td>
+                                    <td class="py-1 text-right text-indigo-400 font-mono">${tx}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                        
+                        html += `
+                            <div class="mt-2 border-t border-slate-800 pt-2">
+                                <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Trafik Interface</p>
+                                <div class="max-h-24 overflow-y-auto" style="scrollbar-width:thin">
+                                    <table class="w-full text-left">
+                                        <thead>
+                                            <tr class="border-b border-slate-800 text-[8px] text-slate-500 font-bold uppercase">
+                                                <th class="pb-1">Interface</th>
+                                                <th class="pb-1 text-right">Rx (In)</th>
+                                                <th class="pb-1 text-right">Tx (Out)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${rows}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    html += `
+                        <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[8px] mt-1.5">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            Gagal koneksi API Mikrotik: ${data.error || 'Connection Timeout'}
+                        </div>
+                    `;
+                }
+            } else {
+                html += `
+                    <div class="p-2 bg-slate-800 border border-slate-700/50 rounded-lg text-slate-400 text-[8px] mt-1.5">
+                        Integrasi API Mikrotik tidak aktif/tidak diatur untuk IP ini.
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            element.innerHTML = html;
+        } catch (err) {
+            element.innerHTML = `
+                <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[9px] mt-1.5">
+                    Error API: ${err.message}
+                </div>
+            `;
+        }
+    }
+
     }
 
 </script>

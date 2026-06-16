@@ -402,3 +402,41 @@ def sync_active_sessions_with_routers():
                 print(f"[session-sync] Error connecting to router {r['name']} ({nas_ip}): {router_err}")
     except Exception as e:
         print(f"[session-sync] Error: {e}")
+
+
+_last_online_users = set()
+
+def background_map_status_sync():
+    """Poll database every 5 seconds to find changes in user online status, then emit to socketio"""
+    global _last_online_users
+    socketio.sleep(10) # wait for startup
+    
+    # Initialize initial state
+    try:
+        active = execute_query("SELECT DISTINCT username FROM radacct WHERE acctstoptime IS NULL") or []
+        _last_online_users = {a['username'] for a in active}
+    except Exception as e:
+        print(f"[map-status-sync] Error initializing: {e}")
+        
+    while True:
+        try:
+            active = execute_query("SELECT DISTINCT username FROM radacct WHERE acctstoptime IS NULL") or []
+            current_online = {a['username'] for a in active}
+            
+            # Detect logins (online now, but was offline)
+            logins = current_online - _last_online_users
+            for username in logins:
+                socketio.emit('client_status_update', {'username': username, 'is_online': True})
+                print(f"[map-status-sync] Event: {username} went online")
+                
+            # Detect logouts (offline now, but was online)
+            logouts = _last_online_users - current_online
+            for username in logouts:
+                socketio.emit('client_status_update', {'username': username, 'is_online': False})
+                print(f"[map-status-sync] Event: {username} went offline")
+                
+            _last_online_users = current_online
+        except Exception as e:
+            print(f"[map-status-sync] Error: {e}")
+            
+        socketio.sleep(5)

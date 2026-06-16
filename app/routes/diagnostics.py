@@ -14,34 +14,7 @@ from services.mikrotik_coa import send_coa_disconnect
 
 diagnostics_bp = Blueprint('diagnostics', __name__)
 
-# Initialize tables at module load (once)
-def _init_diagnostics_tables():
-    try:
-        execute_query("""
-            CREATE TABLE IF NOT EXISTS public.ont_health_issues (
-                username VARCHAR(100) PRIMARY KEY,
-                serial VARCHAR(100),
-                model VARCHAR(100),
-                manufacturer VARCHAR(100),
-                rx_power VARCHAR(20),
-                temperature VARCHAR(20),
-                pon_mode VARCHAR(50),
-                last_inform VARCHAR(100),
-                detected_at TIMESTAMP DEFAULT NOW()
-            )
-        """, fetch=False)
-        execute_query("ALTER TABLE public.ont_health_issues ADD COLUMN IF NOT EXISTS pon_mode VARCHAR(50)", fetch=False)
-        execute_query("""
-            CREATE TABLE IF NOT EXISTS public.ont_serial_mapping (
-                username VARCHAR(100) PRIMARY KEY,
-                serial_number VARCHAR(100) UNIQUE NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """, fetch=False)
-    except Exception as e:
-        print(f"[diagnostics] Table init warning: {e}")
-
-_init_diagnostics_tables()
+# Tables initialized globally on startup via database.py
 
 import re as _re_mod
 

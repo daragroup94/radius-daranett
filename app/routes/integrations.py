@@ -10,26 +10,7 @@ from services.telegram import send_telegram_notification
 
 integrations_bp = Blueprint('integrations', __name__)
 
-def init_integrations_table():
-    try:
-        execute_query("""
-            CREATE TABLE IF NOT EXISTS public.integrations (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                type VARCHAR(50) DEFAULT 'mikrotik' NOT NULL,
-                host VARCHAR(255) NOT NULL,
-                port INTEGER,
-                username VARCHAR(100),
-                password VARCHAR(255),
-                description TEXT,
-                is_active BOOLEAN DEFAULT true,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """, fetch=False)
-    except Exception as e:
-        print(f"[init-db] Error creating integrations table: {e}")
-
-init_integrations_table()
+# Table integrations initialized globally on startup via database.py
 
 @integrations_bp.route('/integrations')
 @login_required

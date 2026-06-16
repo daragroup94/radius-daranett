@@ -34,6 +34,10 @@ limiter.init_app(app)
 app.config['WTF_CSRF_CHECK_DEFAULT'] = False
 csrf.init_app(app)
 
+# Initialize Database Schema Tables
+from database import init_db_schema
+init_db_schema()
+
 # Register Blueprints
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
@@ -98,7 +102,8 @@ from services.session_tasks import (
     background_metrics,
     background_stale_sessions,
     background_expired_disconnect,
-    background_auth_log_tail
+    background_auth_log_tail,
+    background_map_status_sync
 )
 from services.nas_monitor import background_nas_monitor
 from services.telegram import background_telegram_bot
@@ -113,6 +118,7 @@ socketio.start_background_task(background_auth_log_tail)
 socketio.start_background_task(background_nas_monitor)
 socketio.start_background_task(background_telegram_bot)
 socketio.start_background_task(background_optical_health_scan)
+socketio.start_background_task(background_map_status_sync)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=Config.DEBUG)
