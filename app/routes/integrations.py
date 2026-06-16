@@ -137,8 +137,11 @@ def api_test_integration(iid):
             
             session = requests.Session()
             login_payload = {"login": {"username": ig['username'], "password": password_md5}}
-            resp = session.post(f"{url}/getModules", json=login_payload, timeout=5, verify=False, allow_redirects=False)
+            resp = session.post(f"{url}/setModules", json=login_payload, timeout=5, verify=False, allow_redirects=False)
             if resp.status_code == 200:
+                token = resp.headers.get('Token')
+                if token:
+                    session.headers.update({'token': token})
                 # Test query system info
                 info_resp = session.post(f"{url}/getModules", json={"deviceInfo": "", "customInfo": ""}, timeout=5, verify=False, allow_redirects=False)
                 if info_resp.status_code == 200:
@@ -310,9 +313,13 @@ def api_tenda_olt_status():
 
             session = requests.Session()
             login_payload = {"login": {"username": olt['username'], "password": password_md5}}
-            login_resp = session.post(f"{url}/getModules", json=login_payload, timeout=4, verify=False, allow_redirects=False)
+            login_resp = session.post(f"{url}/setModules", json=login_payload, timeout=4, verify=False, allow_redirects=False)
             if login_resp.status_code != 200:
                 raise Exception(f"Login HTTP status {login_resp.status_code}")
+
+            token = login_resp.headers.get('Token')
+            if token:
+                session.headers.update({'token': token})
 
             # Get system info
             sys_resp = session.post(f"{url}/getModules", json={"deviceInfo": "", "customInfo": ""}, timeout=4, verify=False, allow_redirects=False)
