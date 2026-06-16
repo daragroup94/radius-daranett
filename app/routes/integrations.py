@@ -133,7 +133,7 @@ def api_test_integration(iid):
             url = url.rstrip('/')
             
             import hashlib
-            password_md5 = hashlib.md5(ig['password'].encode()).hexdigest()
+            password_md5 = hashlib.md5(f"an3400{ig['password']}".encode()).hexdigest()
             
             session = requests.Session()
             login_payload = {"login": {"username": ig['username'], "password": password_md5}}
@@ -306,7 +306,7 @@ def api_tenda_olt_status():
             url = url.rstrip('/')
 
             import hashlib
-            password_md5 = hashlib.md5(olt['password'].encode()).hexdigest()
+            password_md5 = hashlib.md5(f"an3400{olt['password']}".encode()).hexdigest()
 
             session = requests.Session()
             login_payload = {"login": {"username": olt['username'], "password": password_md5}}
