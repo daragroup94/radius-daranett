@@ -13,7 +13,7 @@ iptables -t nat -C POSTROUTING -s 10.10.10.0/24 -o eth0 -j MASQUERADE 2>/dev/nul
 iptables -C FORWARD -s 10.10.10.0/24 -j ACCEPT 2>/dev/null || iptables -A FORWARD -s 10.10.10.0/24 -j ACCEPT
 
 # Prepare certificate directories
-mkdir -p /etc/ipsec.d/private /etc/ipsec.d/certs /etc/ipsec.d/cacerts
+mkdir -p /etc/ipsec.d/private /etc/ipsec.d/certs /etc/ipsec.d/cacerts /etc/ipsec.d/crls /etc/ipsec.d/acerts
 
 # Get Public IP (Needed for config even if certs exist)
 echo "Getting Public IP..."

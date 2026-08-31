@@ -136,23 +136,76 @@ def trigger_connection_request_by_device_id(device_id):
         print(f"Direct Connection Request to {cr_url} using auth {username}:{password}")
         
         from requests.auth import HTTPDigestAuth
-        resp = requests.get(cr_url, auth=HTTPDigestAuth(username, password), timeout=5)
-        if resp.status_code == 200:
-            print("Direct Connection Request succeeded!")
+        resp = None
+        success_user, success_pass = username, password
+        
+        # Flag to indicate if we should try fallback credentials (only on HTTP 401 Unauthorized)
+        should_fallback = False
+        
+        try:
+            resp = requests.get(cr_url, auth=HTTPDigestAuth(username, password), timeout=4)
+            if resp.status_code == 200:
+                pass
+            elif resp.status_code == 401:
+                resp = None
+                should_fallback = True
+            else:
+                # Other status (e.g. 500, 404), probably host is up but has issues - abort
+                print(f"Direct Connection Request returned status: {resp.status_code}")
+                return False, f"HTTP Status {resp.status_code}"
+        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as conn_err:
+            print(f"Direct Connection Request failed: Host is unreachable ({conn_err})")
+            return False, "Host is unreachable"
+        except Exception as e:
+            print(f"Direct Connection Request error on primary query: {e}")
+            return False, str(e)
+
+        # Fallback credentials loop if primary failed with 401 Unauthorized
+        if should_fallback:
+            fallbacks = [
+                ("msn", "msn"),
+                ("msn", "Msn12345!"),
+                ("admin", "admin"),
+                ("admin", ""),
+                ("huawei", "huawei")
+            ]
+            for f_user, f_pass in fallbacks:
+                if f_user == username and f_pass == password:
+                    continue
+                try:
+                    print(f"Direct Connection Request fallback: trying {f_user}:{f_pass}...")
+                    r_fb = requests.get(cr_url, auth=HTTPDigestAuth(f_user, f_pass), timeout=3)
+                    if r_fb.status_code == 200:
+                        resp = r_fb
+                        success_user, success_pass = f_user, f_pass
+                        break
+                    elif r_fb.status_code != 401:
+                        # Abort fallback if server returns non-auth error (e.g. 500)
+                        resp = r_fb
+                        break
+                except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
+                    print("Direct Connection Request fallback failed: Host became unreachable")
+                    break
+                except Exception:
+                    pass
+
+        if resp and resp.status_code == 200:
+            print(f"Direct Connection Request succeeded using {success_user}!")
             # Simpan data Connection Request ke cache selama 1 jam (3600 detik)
             if redis_client:
                 try:
                     redis_client.setex(cache_key, 3600, _json.dumps({
                         'url': cr_url,
-                        'username': username,
-                        'password': password
+                        'username': success_user,
+                        'password': success_pass
                     }))
                 except Exception as cache_err:
                     print(f"Redis cache SET error in trigger_connection_request: {cache_err}")
             return True, "Success"
         else:
-            print(f"Direct Connection Request returned status: {resp.status_code}")
-            return False, f"HTTP Status {resp.status_code}"
+            status_code = resp.status_code if resp else "timeout/failed"
+            print(f"Direct Connection Request failed: {status_code}")
+            return False, f"HTTP Status {status_code}"
     except Exception as e:
         print(f"Direct Connection Request error: {e}")
         return False, str(e)
@@ -199,7 +252,7 @@ def get_genieacs_device_info(username):
                 {"VirtualParameters.getSerialNumber._value": username}
             ]
         })
-        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime,InternetGatewayDevice.WANDevice.1.WANConnectionDevice,InternetGatewayDevice.LANDevice.1.WLANConfiguration,Device.WiFi.AccessPoint'
+        projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.pppoeIP,VirtualParameters.getdeviceuptime,VirtualParameters.getpppuptime,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber,VirtualParameters.pppoeUsername,VirtualParameters.pppoeUsername2,InternetGatewayDevice.DeviceInfo.UpTime,Device.DeviceInfo.UpTime,VirtualParameters.pppoeMac,VirtualParameters.PonMac,VirtualParameters.activedevices'
         
         resp = requests.get(
             f'{GENIEACS_NBI}/devices',
@@ -279,67 +332,85 @@ def get_genieacs_device_info(username):
         # Extract WAN MAC Address
         mac_addr = 'N/A'
         try:
-            wcd = d.get('InternetGatewayDevice', {}).get('WANDevice', {}).get('1', {}).get('WANConnectionDevice', {})
-            for wcd_idx, wcd_val in wcd.items():
-                if not wcd_idx.isdigit():
-                    continue
-                # check IP connection
-                ip_conn = wcd_val.get('WANIPConnection', {})
-                for i_idx, i_val in ip_conn.items():
-                    if not i_idx.isdigit():
+            # Try to get from VirtualParameters first (much faster and avoids heavy queries)
+            vp_pppoe_mac = val(vp.get('pppoeMac', {}))
+            vp_pon_mac = val(vp.get('PonMac', {}))
+            if vp_pppoe_mac and vp_pppoe_mac != 'N/A' and vp_pppoe_mac.strip():
+                mac_addr = vp_pppoe_mac
+            elif vp_pon_mac and vp_pon_mac != 'N/A' and vp_pon_mac.strip():
+                mac_addr = vp_pon_mac
+            else:
+                # Fallback to parsing from document if the heavy paths are present
+                wcd = d.get('InternetGatewayDevice', {}).get('WANDevice', {}).get('1', {}).get('WANConnectionDevice', {})
+                for wcd_idx, wcd_val in wcd.items():
+                    if not wcd_idx.isdigit():
                         continue
-                    val_mac = i_val.get('MACAddress', {})
-                    if isinstance(val_mac, dict) and '_value' in val_mac and val_mac['_value']:
-                        mac_addr = val_mac['_value']
+                    # check IP connection
+                    ip_conn = wcd_val.get('WANIPConnection', {})
+                    for i_idx, i_val in ip_conn.items():
+                        if not i_idx.isdigit():
+                            continue
+                        val_mac = i_val.get('MACAddress', {})
+                        if isinstance(val_mac, dict) and '_value' in val_mac and val_mac['_value']:
+                            mac_addr = val_mac['_value']
+                            break
+                    if mac_addr != 'N/A':
                         break
-                if mac_addr != 'N/A':
-                    break
-                # check PPP connection
-                ppp_conn = wcd_val.get('WANPPPConnection', {})
-                for p_idx, p_val in ppp_conn.items():
-                    if not p_idx.isdigit():
-                        continue
-                    val_mac = p_val.get('MACAddress', {})
-                    if isinstance(val_mac, dict) and '_value' in val_mac and val_mac['_value']:
-                        mac_addr = val_mac['_value']
+                    # check PPP connection
+                    ppp_conn = wcd_val.get('WANPPPConnection', {})
+                    for p_idx, p_val in ppp_conn.items():
+                        if not p_idx.isdigit():
+                            continue
+                        val_mac = p_val.get('MACAddress', {})
+                        if isinstance(val_mac, dict) and '_value' in val_mac and val_mac['_value']:
+                            mac_addr = val_mac['_value']
+                            break
+                    if mac_addr != 'N/A':
                         break
-                if mac_addr != 'N/A':
-                    break
         except Exception as mac_err:
             print(f"Error parsing MAC address from document: {mac_err}")
                 
-        # Calculate wifi_active_count from WLANConfiguration / AccessPoint TotalAssociations
+        # Calculate wifi_active_count from WLANConfiguration / AccessPoint TotalAssociations / activedevices VP
         wifi_active_count = 0
         has_wifi_associations = False
         
         try:
-            # Check TR-098
-            wlan_conf = d.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
-            if wlan_conf:
-                for ssid_idx, ssid_val in wlan_conf.items():
-                    if ssid_idx.isdigit() and isinstance(ssid_val, dict):
-                        ta_val = ssid_val.get("TotalAssociations", {}).get("_value", None)
-                        if ta_val is not None:
-                            try:
-                                wifi_active_count += int(ta_val)
-                                has_wifi_associations = True
-                            except:
-                                pass
+            vp_active_devices = val(vp.get('activedevices', {}))
+            if vp_active_devices and vp_active_devices != 'N/A':
+                try:
+                    wifi_active_count = int(vp_active_devices)
+                    has_wifi_associations = True
+                except (ValueError, TypeError):
+                    pass
             
-            # Check TR-181
-            ap_conf = d.get("Device", {}).get("WiFi", {}).get("AccessPoint", {})
-            if ap_conf:
-                for ssid_idx, ssid_val in ap_conf.items():
-                    if ssid_idx.isdigit() and isinstance(ssid_val, dict):
-                        ta_val = ssid_val.get("AssociatedDeviceNumberOfEntries", {}).get("_value", None)
-                        if ta_val is None:
+            if not has_wifi_associations:
+                # Check TR-098 fallback
+                wlan_conf = d.get("InternetGatewayDevice", {}).get("LANDevice", {}).get("1", {}).get("WLANConfiguration", {})
+                if wlan_conf:
+                    for ssid_idx, ssid_val in wlan_conf.items():
+                        if ssid_idx.isdigit() and isinstance(ssid_val, dict):
                             ta_val = ssid_val.get("TotalAssociations", {}).get("_value", None)
-                        if ta_val is not None:
-                            try:
-                                wifi_active_count += int(ta_val)
-                                has_wifi_associations = True
-                            except:
-                                pass
+                            if ta_val is not None:
+                                try:
+                                    wifi_active_count += int(ta_val)
+                                    has_wifi_associations = True
+                                except:
+                                    pass
+                
+                # Check TR-181 fallback
+                ap_conf = d.get("Device", {}).get("WiFi", {}).get("AccessPoint", {})
+                if ap_conf:
+                    for ssid_idx, ssid_val in ap_conf.items():
+                        if ssid_idx.isdigit() and isinstance(ssid_val, dict):
+                            ta_val = ssid_val.get("AssociatedDeviceNumberOfEntries", {}).get("_value", None)
+                            if ta_val is None:
+                                ta_val = ssid_val.get("TotalAssociations", {}).get("_value", None)
+                            if ta_val is not None:
+                                try:
+                                    wifi_active_count += int(ta_val)
+                                    has_wifi_associations = True
+                                except:
+                                    pass
         except Exception as wifi_err:
             print(f"Error parsing TotalAssociations in device info: {wifi_err}")
                 

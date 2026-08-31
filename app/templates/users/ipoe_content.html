@@ -192,6 +192,50 @@
                 <input type="text" name="rate_limit" placeholder="10M/10M"
                        class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-sm">
             </div>
+
+            <!-- Queue Tree Section -->
+            <div class="border-t border-dashed border-blue-200 pt-3 mt-1">
+                <p class="text-xs font-bold text-blue-600 mb-2 flex items-center gap-1">
+                    <i class="fas fa-layer-group text-[10px]"></i> Queue Tree MikroTik <span class="text-gray-400 font-normal">(opsional)</span>
+                </p>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Parent DL</label>
+                        <select name="parent_dl" id="addParentDl"
+                                class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-xs">
+                            <option value="">— Pilih parent DL —</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Parent UL</label>
+                        <select name="parent_ul" id="addParentUl"
+                                class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-xs">
+                            <option value="">— Pilih parent UL —</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Limit-At (Guaranteed)</label>
+                        <input type="text" name="limit_at" placeholder="1M" id="addLimitAt"
+                               class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Priority (1-8)</label>
+                        <select name="priority" id="addPriority"
+                                class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-xs">
+                            <option value="8" selected>8 (Default)</option>
+                            <option value="7">7</option>
+                            <option value="6">6</option>
+                            <option value="5">5</option>
+                            <option value="4">4</option>
+                            <option value="3">3 (Tinggi)</option>
+                            <option value="2">2</option>
+                            <option value="1">1 (Tertinggi)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
             <div class="flex gap-3 pt-1">
                 <button type="button" onclick="closeAddModal()"
                         class="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-200 transition-all">Batal</button>
@@ -237,6 +281,54 @@
                 <label class="block text-xs font-bold text-gray-700 mb-1">Rate Limit</label>
                 <input type="text" id="editRateLimit" placeholder="10M/10M"
                        class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-sm">
+            </div>
+
+            <!-- Queue Tree Section -->
+            <div class="border-t border-dashed border-blue-200 pt-3 mt-1">
+                <p class="text-xs font-bold text-blue-600 mb-2 flex items-center gap-1">
+                    <i class="fas fa-layer-group text-[10px]"></i> Queue Tree MikroTik <span class="text-gray-400 font-normal">(opsional)</span>
+                </p>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Parent DL</label>
+                        <select id="editParentDl"
+                                class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-xs">
+                            <option value="">— Pilih parent DL —</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Parent UL</label>
+                        <select id="editParentUl"
+                                class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-xs">
+                            <option value="">— Pilih parent UL —</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Limit-At (Guaranteed)</label>
+                        <input type="text" id="editLimitAt" placeholder="1M"
+                               class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 mb-1">Priority (1-8)</label>
+                        <select id="editPriority"
+                                class="w-full px-2 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-xs">
+                            <option value="8" selected>8 (Default)</option>
+                            <option value="7">7</option>
+                            <option value="6">6</option>
+                            <option value="5">5</option>
+                            <option value="4">4</option>
+                            <option value="3">3 (Tinggi)</option>
+                            <option value="2">2</option>
+                            <option value="1">1 (Tertinggi)</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Queue Status Badge -->
+                <div id="editQueueStatus" class="mt-2 hidden">
+                    <span id="editQueueBadge" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold"></span>
+                </div>
             </div>
             <div class="flex gap-3 pt-1">
                 <button type="button" onclick="closeEditModal()"

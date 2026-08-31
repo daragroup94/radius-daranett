@@ -1,0 +1,247 @@
+<div class="fade-in space-y-6">
+
+    <!-- NOC Operations Header -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-[28px] text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="z-10 mb-4 md:mb-0 flex items-center">
+            <div class="icon-wrapper-noc icon-gradient-mikrotik mr-4 shadow-lg shadow-red-500/15 floating-icon">
+                <i data-lucide="shield-alert" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">Device Admin (NOC)</h2>
+                <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola akun administrator Perangkat (MikroTik, OLT, SSH, Web GUI, Console) dengan otentikasi RADIUS terpusat.</p>
+            </div>
+        </div>
+        
+        <button onclick="openAddModal()" class="z-10 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] whitespace-nowrap">
+            <i data-lucide="user-plus" class="lucide w-5 h-5 text-white"></i>
+            <span>Tambah User Admin</span>
+        </button>
+    </div>
+
+    <!-- Stats Cards Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
+        <!-- Total Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-5 shadow-sm stat-card-glow flex items-center gap-4 h-full">
+            <div class="icon-wrapper-noc icon-gradient-mikrotik shadow-md shadow-red-500/10">
+                <i data-lucide="users" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Admin Perangkat</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statTotal">—</p>
+            </div>
+        </div>
+        <!-- Online Users -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-5 shadow-sm stat-card-glow flex items-center gap-4 h-full">
+            <div class="icon-wrapper-noc icon-gradient-nas shadow-md shadow-emerald-500/10">
+                <i data-lucide="activity" class="lucide icon-noc text-white"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sesi Aktif (Online)</p>
+                <p class="text-3xl font-extrabold text-slate-800 dark:text-white mt-1 font-outfit" id="statOnline">—</p>
+            </div>
+        </div>
+        <!-- Group Types -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-5 shadow-sm stat-card-glow flex items-center gap-4 h-full">
+            <div class="icon-wrapper-noc bg-gradient-to-tr from-orange-500 to-red-600 shadow-md shadow-orange-500/10">
+                <i data-lucide="key-round" class="lucide icon-noc text-white"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tingkat Hak Akses</p>
+                <p class="text-xs font-extrabold text-slate-700 dark:text-slate-200 mt-1 truncate">Full, Write, Read</p>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Auto-mapping via Vendor-Specific Attributes (VSA)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main List Card Container -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 shadow-sm">
+        <!-- Sub-header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-700/50 pb-5">
+            <div>
+                <h3 class="text-base font-bold text-slate-800 dark:text-white">Daftar Admin Perangkat</h3>
+                <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Kelola akun dan role login admin perangkat network Anda (MikroTik, OLT, dll).</p>
+            </div>
+            
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <!-- SEARCH BAR -->
+                <div class="relative flex-1 sm:w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <i data-lucide="search" class="lucide w-4 h-4 text-slate-400"></i>
+                    </div>
+                    <input type="text" id="mikrotikSearch" placeholder="Cari username..."
+                           class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-red-400 focus:border-transparent text-slate-800 dark:text-slate-200 text-xs font-medium transition-all">
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto min-w-full">
+            <table class="w-full text-left border-collapse align-middle">
+                <thead>
+                    <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        <th class="pb-3 pt-1 px-4 font-extrabold">USERNAME / ADMIN</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">PASSWORD</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">GRUP HAK AKSES (ROLE)</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">STATUS SESI</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold text-right">AKSI</th>
+                    </tr>
+                </thead>
+                <tbody id="mikrotikTableBody" class="divide-y divide-slate-50 dark:divide-slate-700/35">
+                    <tr><td colspan="5" class="text-center py-10 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between mt-5 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+                <span id="mikrotikStart" class="font-bold text-slate-700 dark:text-slate-300">0</span>–<span id="mikrotikEnd" class="font-bold text-slate-700 dark:text-slate-300">0</span>
+                dari <span id="mikrotikTotal" class="font-bold text-slate-700 dark:text-slate-300">0</span> user
+            </p>
+            <div class="flex gap-1">
+                <button onclick="mikrotikChangePage(mikrotikPage-1)" id="mikrotikPrev"
+                        class="p-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                    <i class="fas fa-chevron-left text-xs"></i>
+                </button>
+                <div id="mikrotikPageNums" class="flex gap-1"></div>
+                <button onclick="mikrotikChangePage(mikrotikPage+1)" id="mikrotikNext"
+                        class="p-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                    <i class="fas fa-chevron-right text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODAL ADD ===== -->
+<div id="addModal" class="fixed inset-0 backdrop-blur-sm bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+    <div class="modern-card rounded-[28px] shadow-2xl p-6 w-full max-w-md bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="fas fa-plus text-red-500"></i> Tambah Admin Perangkat
+            </h3>
+            <button onclick="closeAddModal()" class="w-8 h-8 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-all">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        </div>
+        <form id="addForm" class="space-y-3" onsubmit="submitAdd(event)">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Username *</label>
+                <input type="text" name="username" required placeholder="admin_username"
+                       class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-red-400 text-sm text-slate-800 dark:text-slate-100">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Password *</label>
+                <input type="text" name="password" required placeholder="admin_password"
+                       class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-red-400 text-sm text-slate-800 dark:text-slate-100">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Grup Akses Perangkat (Role) *</label>
+                <select name="groupname" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-red-400 text-sm text-slate-800 dark:text-slate-100">
+                    <option value="mikrotik-full">Full Access (Super Admin)</option>
+                    <option value="mikrotik-write">Write Access (Operator)</option>
+                    <option value="mikrotik-read">Read Access (Viewer / Monitoring)</option>
+                </select>
+            </div>
+            <div class="flex gap-3 pt-1">
+                <button type="button" onclick="closeAddModal()"
+                        class="flex-1 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Batal</button>
+                <button type="submit"
+                        class="flex-1 py-2.5 text-white rounded-xl font-bold text-sm transition-all hover:opacity-90 bg-gradient-to-r from-red-500 to-rose-600">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== MODAL EDIT ===== -->
+<div id="editModal" class="fixed inset-0 backdrop-blur-sm bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+    <div class="modern-card rounded-[28px] shadow-2xl p-6 w-full max-w-md bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="fas fa-edit text-red-500"></i> Edit Admin: <span id="editUserLabel" class="text-red-600 font-bold dark:text-red-400"></span>
+            </h3>
+            <button onclick="closeEditModal()" class="w-8 h-8 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-all">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        </div>
+        <form id="editForm" class="space-y-3" onsubmit="submitEdit(event)">
+            <input type="hidden" name="username">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Password Baru</label>
+                <input type="text" name="password" placeholder="Kosongkan jika tidak diubah"
+                       class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-red-400 text-sm text-slate-800 dark:text-slate-100">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Grup Akses Perangkat (Role) *</label>
+                <select name="groupname" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-red-400 text-sm text-slate-800 dark:text-slate-100">
+                    <option value="mikrotik-full">Full Access (Super Admin)</option>
+                    <option value="mikrotik-write">Write Access (Operator)</option>
+                    <option value="mikrotik-read">Read Access (Viewer / Monitoring)</option>
+                </select>
+            </div>
+            <div class="flex gap-3 pt-1">
+                <button type="button" onclick="closeEditModal()"
+                        class="flex-1 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Batal</button>
+                <button type="submit"
+                        class="flex-1 py-2.5 text-white rounded-xl font-bold text-sm transition-all hover:opacity-90 bg-gradient-to-r from-red-500 to-rose-600">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== MODAL DETAIL / HISTORY ===== -->
+<div id="detailModal" class="fixed inset-0 backdrop-blur-sm bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+    <div class="modern-card rounded-[28px] shadow-2xl p-6 w-full max-w-4xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/80 transition-all duration-300">
+        <div class="flex justify-between items-center mb-5 border-b border-slate-100 dark:border-slate-700/50 pb-4">
+            <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i data-lucide="history" class="w-5 h-5 text-red-500"></i> Riwayat Sesi Admin: <span id="detailUserLabel" class="text-red-600 font-bold dark:text-red-400"></span>
+            </h3>
+            <button onclick="closeDetailModal()" class="w-8 h-8 bg-slate-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-all flex items-center justify-center">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="detailLoading" class="py-12 flex flex-col items-center justify-center gap-3">
+            <i data-lucide="loader" class="w-8 h-8 animate-spin text-red-500"></i>
+            <span class="text-sm font-medium text-slate-500">Memuat riwayat sesi...</span>
+        </div>
+
+        <!-- Empty State -->
+        <div id="detailEmpty" class="hidden py-12 flex flex-col items-center justify-center gap-3 text-center">
+            <div class="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-sm">
+                <i data-lucide="database" class="w-8 h-8 text-slate-400"></i>
+            </div>
+            <p class="text-sm font-bold text-slate-800 dark:text-white">Tidak Ada Riwayat Sesi</p>
+            <p class="text-xs text-slate-400">User admin ini belum memiliki catatan riwayat login RADIUS.</p>
+        </div>
+
+        <!-- Detail Table -->
+        <div id="detailContent" class="hidden overflow-x-auto max-h-[60vh] max-w-full">
+            <table class="w-full text-left border-collapse align-middle">
+                <thead>
+                    <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Waktu Mulai</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">IP Client</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">IP NAS (Router)</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Durasi</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Trafik (DL/UL)</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Status</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Penyebab Berhenti</th>
+                    </tr>
+                </thead>
+                <tbody id="detailTableBody" class="divide-y divide-slate-50 dark:divide-slate-700/35 text-xs text-slate-700 dark:text-slate-300">
+                    <!-- Session rows go here -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-700/50 mt-5">
+            <button onclick="closeDetailModal()"
+                    class="px-5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-all">Tutup</button>
+        </div>
+    </div>
+</div>
+

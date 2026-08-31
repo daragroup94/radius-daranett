@@ -2,6 +2,7 @@
 let ipoePage = 1, ipoeTotalPages = 1, ipoeSearchTimer = null, ipoeFilterStatus = null;
 let _selectedDevices = new Set();
 let _allUsers = [], _leaseMap = {};
+let _queueParents = [];  // cache parent queues dari MikroTik
 
 function showToast(msg, type='success') {
     const colors = {success:'bg-emerald-500', error:'bg-red-500'};
@@ -211,8 +212,41 @@ document.getElementById('ipoeSearch').addEventListener('input', () => {
     ipoeSearchTimer = setTimeout(() => { ipoePage=1; renderTable(); }, 300);
 });
 
+// ===== QUEUE PARENTS (dropdown) =====
+async function loadQueueParents() {
+    if (_queueParents.length) return _queueParents; // gunakan cache
+    try {
+        const res = await fetch('/api/ipoe/queue-parents');
+        const data = await res.json();
+        if (data.success) {
+            _queueParents = data.parents || [];
+        }
+    } catch(e) { _queueParents = []; }
+    return _queueParents;
+}
+
+function populateQueueDropdowns(dlId, ulId, selectedDl='', selectedUl='') {
+    const dlEl = document.getElementById(dlId);
+    const ulEl = document.getElementById(ulId);
+    if (!dlEl || !ulEl) return;
+
+    const makeOptions = (selected) => [
+        `<option value="">— Pilih —</option>`,
+        ..._queueParents.map(p =>
+            `<option value="${p.name}" ${p.name === selected ? 'selected' : ''}>${p.name}${p.max_limit && p.max_limit !== '0' ? ' ('+p.max_limit+')' : ''}</option>`
+        )
+    ].join('');
+
+    dlEl.innerHTML = makeOptions(selectedDl);
+    ulEl.innerHTML = makeOptions(selectedUl);
+}
+
 // ===== ADD =====
-function openAddModal() { document.getElementById('addModal').classList.remove('hidden'); }
+function openAddModal() {
+    document.getElementById('addModal').classList.remove('hidden');
+    // Load queue parents untuk dropdown
+    loadQueueParents().then(() => populateQueueDropdowns('addParentDl', 'addParentUl'));
+}
 function closeAddModal() { document.getElementById('addModal').classList.add('hidden'); document.getElementById('addForm').reset(); }
 
 async function submitAdd(e) {
@@ -223,7 +257,12 @@ async function submitAdd(e) {
         name: form.name.value.trim(),
         ip_address: form.ip_address.value.trim(),
         ip_pool: form.ip_pool.value.trim(),
-        rate_limit: form.rate_limit.value.trim()
+        rate_limit: form.rate_limit.value.trim(),
+        // Queue Tree fields
+        parent_dl: document.getElementById('addParentDl').value,
+        parent_ul: document.getElementById('addParentUl').value,
+        limit_at: document.getElementById('addLimitAt').value.trim() || '0',
+        priority: document.getElementById('addPriority').value,
     };
     const data = await (await fetch('/api/ipoe/users/add', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
     if (data.success) { showToast(data.message); closeAddModal(); loadIpoeUsers(); }
@@ -231,7 +270,7 @@ async function submitAdd(e) {
 }
 
 // ===== EDIT =====
-function openEditModal(mac, name, ip, pool, rate) {
+async function openEditModal(mac, name, ip, pool, rate) {
     document.getElementById('editMac').value = mac;
     document.getElementById('editMacLabel').textContent = mac;
     document.getElementById('editName').value = name;
@@ -239,6 +278,35 @@ function openEditModal(mac, name, ip, pool, rate) {
     document.getElementById('editIpPool').value = pool;
     document.getElementById('editRateLimit').value = rate;
     document.getElementById('editModal').classList.remove('hidden');
+
+    // Load queue parents dan config lama secara paralel
+    const [_, statusRes] = await Promise.all([
+        loadQueueParents(),
+        fetch(`/api/ipoe/queue-status/${encodeURIComponent(mac)}`).then(r => r.json()).catch(() => null)
+    ]);
+
+    // Isi dropdown dengan nilai lama (jika ada)
+    const cfg = statusRes?.db_config;
+    populateQueueDropdowns('editParentDl', 'editParentUl', cfg?.parent_dl || '', cfg?.parent_ul || '');
+    document.getElementById('editLimitAt').value = cfg?.limit_at || '';
+    const prio = cfg?.priority || 8;
+    document.getElementById('editPriority').value = String(prio);
+
+    // Tampilkan status queue di MikroTik
+    const mk = statusRes?.mikrotik;
+    const badge = document.getElementById('editQueueBadge');
+    const badgeWrap = document.getElementById('editQueueStatus');
+    if (mk?.found) {
+        badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-700';
+        badge.innerHTML = '<i class="fas fa-check-circle"></i> Queue aktif di MikroTik';
+        badgeWrap.classList.remove('hidden');
+    } else if (cfg) {
+        badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-yellow-100 text-yellow-700';
+        badge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Config ada, belum sync ke MikroTik';
+        badgeWrap.classList.remove('hidden');
+    } else {
+        badgeWrap.classList.add('hidden');
+    }
 }
 function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
 
@@ -249,7 +317,12 @@ async function submitEdit(e) {
         name: document.getElementById('editName').value.trim(),
         ip_address: document.getElementById('editIpAddress').value.trim(),
         ip_pool: document.getElementById('editIpPool').value.trim(),
-        rate_limit: document.getElementById('editRateLimit').value.trim()
+        rate_limit: document.getElementById('editRateLimit').value.trim(),
+        // Queue Tree fields
+        parent_dl: document.getElementById('editParentDl').value,
+        parent_ul: document.getElementById('editParentUl').value,
+        limit_at: document.getElementById('editLimitAt').value.trim() || '0',
+        priority: document.getElementById('editPriority').value,
     };
     const data = await (await fetch(`/api/ipoe/users/update/${encodeURIComponent(mac)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
     if (data.success) { showToast(data.message); closeEditModal(); loadIpoeUsers(); }

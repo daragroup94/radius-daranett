@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Blueprint, render_template, request, jsonify, current_app
 from decorators import login_required
 from database import execute_query
-from helpers import get_request_data, ping_nas
+from helpers import get_request_data, ping_nas, connect_mikrotik
 from services.mikrotik_coa import send_coa_disconnect
 
 diagnostics_bp = Blueprint('diagnostics', __name__)
@@ -290,7 +290,7 @@ def api_ipam_pools():
         
         for ig in integrations:
             try:
-                api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+                api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
                 mk_pools = list(api('/ip/pool/print'))
                 mk_leases = list(api('/ip/dhcp-server/lease/print'))
                 mk_ppp_active = list(api('/ppp/active/print'))
@@ -678,7 +678,7 @@ def api_ipam_conflicts():
         
         for ig in integrations:
             try:
-                api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+                api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
                 arp_entries = list(api('/ip/arp/print'))
                 api.close()
                 
@@ -739,7 +739,7 @@ def api_diagnostics_ping():
             return jsonify({'success': False, 'error': 'Router tidak ditemukan'}), 404
         ig = ig[0]
         
-        api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=10)
+        api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=10)
         ping_res = list(api('/ping', address=target, count=str(count)))
         api.close()
         
@@ -775,7 +775,7 @@ def api_diagnostics_traceroute():
             return jsonify({'success': False, 'error': 'Router tidak ditemukan'}), 404
         ig = ig[0]
         
-        api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=15)
+        api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=15)
         trace_res = list(api('/tool/traceroute', address=target, count='1', timeout='1s'))
         api.close()
         
@@ -808,7 +808,7 @@ def api_diagnostics_arp():
             return jsonify({'success': False, 'error': 'Router tidak ditemukan'}), 404
         ig = ig[0]
         
-        api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=5)
+        api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=5)
         arp_res = list(api('/ip/arp/print'))
         api.close()
         
@@ -855,7 +855,7 @@ def api_diagnostics_fdb():
             return jsonify({'success': False, 'error': 'Router tidak ditemukan'}), 404
         ig = ig[0]
         
-        api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=5)
+        api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=5)
         fdb_res = list(api('/interface/bridge/host/print'))
         api.close()
         
@@ -924,7 +924,7 @@ def api_diagnostics_kick():
         integrations = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true") or []
         for ig in integrations:
             try:
-                api = librouteros.connect(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+                api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
                 leases_to_remove = []
                 if mac:
                     leases_to_remove = list(api('/ip/dhcp-server/lease/print', query=f"mac-address={mac.upper()}"))
@@ -945,5 +945,217 @@ def api_diagnostics_kick():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@diagnostics_bp.route('/api/diagnostics/user-diagnose', methods=['POST'])
+@login_required
+def api_diagnostics_user_diagnose():
+    try:
+        data = get_request_data()
+        username = data.get('username', '').strip()
+        if not username:
+            return jsonify({'success': False, 'error': 'Username wajib diisi'}), 400
+
+        # 1. Cari data dasar user di RADIUS
+        user_reply = execute_query("""
+            SELECT value as ip_address 
+            FROM radreply 
+            WHERE username = %s AND attribute = 'Framed-IP-Address' 
+            LIMIT 1
+        """, (username,))
+        static_ip = user_reply[0]['ip_address'] if user_reply else None
+
+        # 2. Cek Active Session di radacct
+        session_row = execute_query("""
+            SELECT acctsessionid, nasipaddress, framedipaddress, 
+                   TO_CHAR(acctstarttime, 'YYYY-MM-DD HH24:MI:SS') as start_time,
+                   age(NOW(), acctstarttime)::text as uptime
+            FROM radacct
+            WHERE username = %s AND acctstoptime IS NULL
+            ORDER BY acctstarttime DESC
+            LIMIT 1
+        """, (username,))
+
+        radius_status = 'offline'
+        ip_address = static_ip
+        nas_ip = None
+        uptime = None
+        
+        if session_row:
+            radius_status = 'online'
+            ip_address = session_row[0]['framedipaddress']
+            nas_ip = session_row[0]['nasipaddress']
+            uptime = session_row[0]['uptime']
+            if uptime:
+                uptime = uptime.split('.')[0]
+
+        # Ambil nama NAS
+        nas_name = None
+        if nas_ip:
+            nas_res = execute_query("SELECT shortname FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
+            if nas_res:
+                nas_name = nas_res[0]['shortname']
+
+        # 3. Cari informasi ONT di GenieACS
+        ont_info = {
+            'found': False,
+            'rx_power': 'N/A',
+            'rx_status': 'unknown',
+            'temperature': 'N/A',
+            'serial': 'N/A',
+            'model': 'N/A',
+            'manufacturer': 'N/A',
+            'last_inform': 'N/A'
+        }
+
+        try:
+            from services.genieacs import get_genieacs_config
+            config = get_genieacs_config()
+            GENIEACS_NBI = config['url']
+            auth = config['auth']
+            import json as _json
+            query = _json.dumps({
+                "$or": [
+                    {"VirtualParameters.pppoeUsername._value": username},
+                    {"VirtualParameters.pppoeUsername2._value": username}
+                ]
+            })
+            projection = '_deviceId,_lastInform,DeviceInfo.SoftwareVersion,DeviceInfo.UpTime,VirtualParameters.RXPower,VirtualParameters.gettemp,VirtualParameters.getponmode,VirtualParameters.getSerialNumber'
+            
+            resp = requests.get(
+                f'{GENIEACS_NBI}/devices',
+                params={'query': query, 'projection': projection},
+                auth=auth,
+                timeout=4
+            )
+            
+            if resp.status_code == 200:
+                devices = resp.json()
+                if devices and isinstance(devices, list):
+                    d = devices[0]
+                    vp = d.get('VirtualParameters', {})
+                    dev_id = d.get('_deviceId', {})
+                    
+                    serial = vp.get('getSerialNumber', {}).get('_value') or dev_id.get('_SerialNumber', 'N/A')
+                    model = dev_id.get('_ProductClass', 'N/A')
+                    manufacturer = dev_id.get('_Manufacturer', 'N/A')
+                    rx = vp.get('RXPower', {}).get('_value') or 'N/A'
+                    temp = vp.get('gettemp', {}).get('_value') or 'N/A'
+                    
+                    rx_status = 'unknown'
+                    if rx and rx != 'N/A':
+                        try:
+                            rx_clean = str(rx).replace('dBm', '').strip()
+                            rx_float = float(rx_clean)
+                            if rx_float >= -23.0:
+                                rx_status = 'good'
+                            elif -27.0 <= rx_float < -23.0:
+                                rx_status = 'warning'
+                            else:
+                                rx_status = 'critical'
+                        except (ValueError, TypeError):
+                            rx_status = 'unknown'
+                            
+                    ont_info.update({
+                        'found': True,
+                        'rx_power': rx,
+                        'rx_status': rx_status,
+                        'temperature': temp,
+                        'serial': serial,
+                        'model': model,
+                        'manufacturer': manufacturer,
+                        'last_inform': d.get('_lastInform', 'N/A')
+                    })
+        except Exception:
+            pass
+
+        # 4. Uji Ping dari NAS
+        ping_info = {
+            'success': False,
+            'latency_ms': 'N/A',
+            'packet_loss': 100,
+            'details': []
+        }
+
+        if radius_status == 'online' and ip_address and nas_ip:
+            try:
+                ig = execute_query("SELECT id, host, username, password, port FROM integrations WHERE host = %s AND type='mikrotik' AND is_active=true", (nas_ip,))
+                if ig:
+                    ig = ig[0]
+                    api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=4)
+                    ping_res = list(api('/ping', address=ip_address, count='3'))
+                    api.close()
+                    
+                    received = 0
+                    total_time = 0
+                    for r in ping_res:
+                        status = 'ok' if r.get('received') or r.get('status') is None else r.get('status', 'timeout')
+                        if status == 'ok':
+                            received += 1
+                            t_str = r.get('time', '0ms').replace('ms', '')
+                            try:
+                                total_time += float(t_str)
+                            except ValueError:
+                                pass
+                    
+                    loss = int(((3 - received) / 3) * 100)
+                    avg_lat = round(total_time / received, 1) if received > 0 else 'N/A'
+                    
+                    ping_info.update({
+                        'success': received > 0,
+                        'latency_ms': avg_lat,
+                        'packet_loss': loss,
+                        'details': [r.get('time', 'timeout') for r in ping_res]
+                    })
+            except Exception as pe:
+                ping_info['details'] = [str(pe)]
+
+        # 5. Kesimpulan
+        conclusion = "Layanan normal. Koneksi terdaftar online dan merespons ping dengan baik."
+        status_type = "success"
+        
+        if radius_status == 'offline':
+            conclusion = "User offline. Tidak ada sesi aktif di database RADIUS. Silakan periksa apakah modem/router pelanggan menyala."
+            status_type = "warning"
+        elif ping_info['packet_loss'] == 100:
+            conclusion = "Modem pelanggan online di RADIUS, namun TIDAK merespons ping dari NAS (RTO 100%). Kemungkinan router pelanggan memblokir ICMP ping atau ada kendala routing."
+            status_type = "danger"
+        elif ont_info['found'] and ont_info['rx_status'] == 'critical':
+            conclusion = "Sinyal redaman ONT kritis (Rx Power buruk). Pelanggan mungkin mengalami putus-putus atau RTO tinggi karena masalah fisik kabel fiber optik (FO)."
+            status_type = "danger"
+        elif ont_info['found'] and ont_info['rx_status'] == 'warning':
+            conclusion = "Sinyal redaman ONT kurang optimal (Warning). Disarankan memeriksa konektor patchcord di rumah pelanggan."
+            status_type = "warning"
+        elif ping_info['success'] and ping_info['latency_ms'] != 'N/A' and float(ping_info['latency_ms']) > 50:
+            conclusion = "Koneksi terhubung tetapi latency tinggi (ping > 50ms). Kemungkinan jaringan sedang padat atau ada interferensi."
+            status_type = "warning"
+
+        return jsonify({
+            'success': True,
+            'username': username,
+            'ip_address': ip_address,
+            'radius': {
+                'status': radius_status,
+                'nas_name': nas_name or nas_ip or 'N/A',
+                'uptime': uptime or 'N/A'
+            },
+            'ont': ont_info,
+            'ping': ping_info,
+            'conclusion': conclusion,
+            'status_type': status_type
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@diagnostics_bp.route('/api/ont/issues/count')
+@login_required
+def api_ont_issues_count():
+    """Lightweight endpoint for sidebar badge: ONT issues count."""
+    try:
+        result = execute_query("SELECT COUNT(*) as count FROM ont_health_issues")
+        count = result[0]['count'] if result else 0
+        return jsonify({'count': count})
+    except Exception as e:
+        return jsonify({'count': 0})
+
 
 # ============================================================
+

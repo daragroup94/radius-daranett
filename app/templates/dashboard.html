@@ -106,10 +106,10 @@
 {% block content %}
 <div class="fade-in space-y-3">
     <!-- 1. Topbar Greeting -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 py-2.5 px-5 rounded-[28px] text-white shadow-xl relative overflow-hidden">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-white to-slate-50 dark:from-slate-950 dark:to-slate-900 border border-slate-150 dark:border-transparent py-2.5 px-5 rounded-[28px] text-slate-800 dark:text-white shadow-xl relative overflow-hidden">
         <!-- Abstract glowing accent circles -->
-        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/15 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-        <div class="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-2xl -ml-16 -mb-16 pointer-events-none"></div>
+        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 dark:bg-blue-500/15 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <div class="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/5 dark:bg-cyan-500/10 rounded-full blur-2xl -ml-16 -mb-16 pointer-events-none"></div>
         
         <div class="z-10 mb-2 md:mb-0">
             <div class="flex items-center space-x-2">
@@ -117,16 +117,16 @@
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">NOC Active & Online</span>
+                <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">NOC Active & Online</span>
             </div>
-            <h2 class="text-xl md:text-2xl font-extrabold tracking-tight mt-0.5 bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent" id="welcomeGreeting" data-username="{{ session.username }}">Selamat Pagi, {{ session.username }}!</h2>
-            <p class="text-slate-300 text-[11px] md:text-xs mt-0.5">Sistem manajemen billing dan monitoring ISP berbasis Docker.</p>
+            <h2 class="text-xl md:text-2xl font-extrabold tracking-tight mt-0.5 bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-200 bg-clip-text text-transparent" id="welcomeGreeting" data-username="{{ session.username }}">Selamat Pagi, {{ session.username }}!</h2>
+            <p class="text-slate-500 dark:text-slate-300 text-[11px] md:text-xs mt-0.5">Sistem manajemen billing dan monitoring ISP berbasis Docker.</p>
         </div>
         
         <!-- Live Clock & Date Widget -->
-        <div class="z-10 bg-white/10 dark:bg-black/20 backdrop-blur-md border border-white/10 dark:border-white/5 px-4 py-2 rounded-2xl flex flex-col items-center md:items-end justify-center min-w-[170px]">
-            <div class="text-lg md:text-xl font-black tracking-widest font-mono text-cyan-300" id="liveClock">00:00:00</div>
-            <div class="text-[9px] font-bold text-slate-300 uppercase tracking-wider mt-0.5" id="liveDate">Jumat, 29 Mei 2026</div>
+        <div class="z-10 bg-slate-900/5 dark:bg-black/20 backdrop-blur-md border border-slate-900/10 dark:border-white/5 px-4 py-2 rounded-2xl flex flex-col items-center md:items-end justify-center min-w-[170px]">
+            <div class="text-lg md:text-xl font-black tracking-widest font-mono text-cyan-600 dark:text-cyan-300" id="liveClock">00:00:00</div>
+            <div class="text-[9px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-wider mt-0.5" id="liveDate">Jumat, 29 Mei 2026</div>
         </div>
     </div>
 
@@ -514,24 +514,6 @@
                 </div>
             </div>
 
-            <!-- OLT Tenda Monitoring Widget -->
-            <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] py-4 px-5 shadow-sm font-outfit">
-                <div class="flex items-center mb-4 gap-3">
-                    <div class="icon-wrapper-noc bg-gradient-to-tr from-orange-500 to-amber-600 shadow-md shadow-orange-500/10">
-                        <i data-lucide="network" class="lucide icon-noc text-white"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-sm md:text-base font-bold text-slate-800 dark:text-white">Status OLT Tenda</h3>
-                        <p class="text-[11px] text-slate-400 dark:text-slate-500 font-medium">Monitoring temperatur & port PON 1 - PON 2</p>
-                    </div>
-                </div>
-                <div class="space-y-3" id="oltMetricsContainer">
-                    <div class="text-center py-6 text-slate-400 dark:text-slate-500 font-outfit">
-                        <div class="w-8 h-8 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mx-auto mb-2"></div>
-                        <p class="text-[10px] font-semibold">Memuat data OLT...</p>
-                    </div>
-                </div>
-            </div>
 
             <!-- Recent Activity Timeline Feed -->
             <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] py-4 px-5 shadow-sm">
@@ -596,6 +578,7 @@
     </div>
 </div>
 {% endblock %}
+
 
 {% block scripts %}
 <script>
@@ -976,106 +959,12 @@ function refreshSessionsChart() {
     showNotification('Chart sesi NAS berhasil disegarkan', 'success');
 }
 
-async function loadOltMetrics() {
-    const container = document.getElementById('oltMetricsContainer');
-    if (!container) return;
-    try {
-        const res = await fetch('/api/tenda-olt/status');
-        const rdata = await res.json();
-        
-        if (!rdata.success || !rdata.data || rdata.data.length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-6 text-slate-400 dark:text-slate-500 font-outfit">
-                    <p class="text-xs font-semibold">Tidak ada OLT Tenda aktif</p>
-                    <p class="text-[10px] mt-0.5">Integrasikan OLT Anda di menu <a href="/integrations" class="text-purple-500 hover:underline">Integration</a></p>
-                </div>`;
-            return;
-        }
-
-        container.innerHTML = rdata.data.map(olt => {
-            if (olt.error) {
-                return `
-                    <div class="p-3 bg-red-500/5 border border-red-500/20 rounded-2xl mb-2.5 text-xs text-red-500 font-outfit">
-                        <div class="font-bold flex items-center gap-1.5">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <span>${olt.name}</span>
-                        </div>
-                        <p class="text-[10px] mt-0.5 opacity-80">${olt.error}</p>
-                    </div>`;
-            }
-
-            // Temp color
-            const temp = parseInt(olt.temperature) || 0;
-            let tempColor = 'text-emerald-500 dark:text-emerald-400';
-            let tempBg = 'bg-emerald-500/10';
-            if (temp > 60) {
-                tempColor = 'text-rose-500 dark:text-rose-400';
-                tempBg = 'bg-rose-500/10';
-            } else if (temp > 45) {
-                tempColor = 'text-amber-500 dark:text-amber-400';
-                tempBg = 'bg-amber-500/10';
-            }
-
-            const portsHtml = olt.ports.map(port => {
-                const total = port.ont_total || 0;
-                const online = port.ont_online || 0;
-                const percent = total > 0 ? Math.round((online / total) * 100) : 0;
-                
-                return `
-                    <div class="p-3 bg-slate-50 dark:bg-slate-900/30 border border-slate-105 dark:border-slate-750 rounded-2xl mb-2 font-outfit transition-all hover:bg-slate-100/50 dark:hover:bg-slate-750/30">
-                        <div class="flex items-center justify-between mb-1.5">
-                            <span class="font-extrabold text-slate-800 dark:text-white text-xs">${port.name}</span>
-                            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">${online}/${total} ONU</span>
-                        </div>
-                        
-                        <!-- Mini progress bar for ONU ratio -->
-                        <div class="w-full h-1 bg-slate-200 dark:bg-slate-700/60 rounded-full overflow-hidden mb-2">
-                            <div class="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full" style="width: ${percent}%"></div>
-                        </div>
-
-                        <!-- Real-time Traffic -->
-                        <div class="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-medium font-outfit">
-                            <span class="flex items-center text-emerald-600 dark:text-emerald-400 font-bold">
-                                <i class="fas fa-arrow-down mr-1"></i>${port.down_speed} Mbps
-                            </span>
-                            <span class="flex items-center text-blue-600 dark:text-blue-400 font-bold">
-                                <i class="fas fa-arrow-up mr-1"></i>${port.up_speed} Mbps
-                            </span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            return `
-                <div class="mb-4 last:mb-0 border-b border-slate-100/60 dark:border-slate-750 pb-3 last:border-b-0 last:pb-0">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="font-bold text-slate-800 dark:text-white text-xs font-outfit truncate max-w-[170px]">
-                            ${olt.name} <span class="font-normal text-[9px] text-slate-450">(${olt.host})</span>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${tempBg} ${tempColor} font-outfit">
-                                ${olt.temperature}°C
-                            </span>
-                            <span class="text-[9px] text-slate-400 dark:text-slate-500 font-medium font-outfit">${olt.uptime_days}d</span>
-                        </div>
-                    </div>
-                    ${portsHtml}
-                </div>
-            `;
-        }).join('');
-        lucide.createIcons();
-    } catch(e) {
-        console.error('Failed to load OLT metrics:', e);
-    }
-}
-
 function refreshAllData() {
     loadStats();
     loadSystemMetrics();
     loadRecentActivity();
     createAuthActivityChart();
     createSessionsPieChart();
-    loadOltMetrics();
 }
 
 // Handle layout resize triggers
@@ -1100,7 +989,6 @@ document.addEventListener('DOMContentLoaded', function() {
     createAuthActivityChart();
     createSessionsPieChart();
     loadRecentActivity();    
-    loadOltMetrics();
     
     // Auto-refresh sequences (every 30s)
     setInterval(refreshAllData, 30000);

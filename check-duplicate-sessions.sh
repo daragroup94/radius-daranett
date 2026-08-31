@@ -7,10 +7,10 @@ TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 # Check duplikasi
 DUPLICATES=$(docker exec -i freeradius-db psql -U radius -d radius -t <<EOSQL
 SELECT COUNT(*) FROM (
-    SELECT username, callingstationid, COUNT(*) as cnt
+    SELECT LOWER(username), COUNT(*) as cnt
     FROM radacct
     WHERE acctstoptime IS NULL
-    GROUP BY username, callingstationid
+    GROUP BY LOWER(username)
     HAVING COUNT(*) > 1
 ) AS dupes;
 EOSQL
@@ -23,11 +23,12 @@ if [ "$DUPLICATES" -gt 0 ]; then
     
     # Tampilkan detail
     docker exec -i freeradius-db psql -U radius -d radius <<EOSQL
-SELECT username, callingstationid, COUNT(*) as session_count,
+SELECT LOWER(username) as username, COUNT(*) as session_count,
+       STRING_AGG(callingstationid::text, ', ') as mac_addresses,
        STRING_AGG(acctsessionid::text, ', ') as session_ids
 FROM radacct
 WHERE acctstoptime IS NULL
-GROUP BY username, callingstationid
+GROUP BY LOWER(username)
 HAVING COUNT(*) > 1;
 EOSQL
 else

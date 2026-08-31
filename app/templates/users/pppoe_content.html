@@ -174,13 +174,29 @@
                             <div class="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mr-2">
                                 <i class="fas fa-network-wired text-[10px]"></i>
                             </div>
-                            Konfigurasi IP
+                            Konfigurasi IP (IPv4 & IPv6)
                         </h4>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Alamat IP (Opsional)</label>
-                            <input type="text" name="ip_address" 
-                                   class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-sm font-medium transition-all duration-200" 
-                                   placeholder="192.168.1.100">
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Alamat IPv4 (Opsional)</label>
+                                <input type="text" name="ip_address" 
+                                       class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-sm font-medium transition-all duration-200" 
+                                       placeholder="192.168.1.100">
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Framed IPv6 Prefix (WAN)</label>
+                                    <input type="text" name="ipv6_prefix" 
+                                           class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-sm font-medium transition-all duration-200" 
+                                           placeholder="2001:db8:a000::/64">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Delegated IPv6 Prefix (PD)</label>
+                                    <input type="text" name="delegated_ipv6_prefix" 
+                                           class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-sm font-medium transition-all duration-200" 
+                                           placeholder="2001:db8:b000::/56">
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -378,13 +394,29 @@
                             <div class="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mr-2">
                                 <i class="fas fa-network-wired text-[10px]"></i>
                             </div>
-                            Konfigurasi IP
+                            Konfigurasi IP (IPv4 & IPv6)
                         </h4>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Alamat IP (Opsional)</label>
-                            <input type="text" name="ip_address" id="editIpAddress" 
-                                   class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-sm font-medium transition-all duration-200" 
-                                   placeholder="192.168.1.100">
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Alamat IPv4 (Opsional)</label>
+                                <input type="text" name="ip_address" id="editIpAddress" 
+                                       class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-sm font-medium transition-all duration-200" 
+                                       placeholder="192.168.1.100">
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Framed IPv6 Prefix (WAN)</label>
+                                    <input type="text" name="ipv6_prefix" id="editIpv6Prefix" 
+                                           class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-sm font-medium transition-all duration-200" 
+                                           placeholder="2001:db8:a000::/64">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1.5 ml-1">Delegated IPv6 Prefix (PD)</label>
+                                    <input type="text" name="delegated_ipv6_prefix" id="editDelegatedIpv6Prefix" 
+                                           class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-slate-800 dark:text-slate-200 text-sm font-medium transition-all duration-200" 
+                                           placeholder="2001:db8:b000::/56">
+                                </div>
+                            </div>
                         </div>
                     </div>
 

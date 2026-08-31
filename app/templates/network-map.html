@@ -32,12 +32,13 @@
         border-color: rgba(255, 255, 255, 0.08);
     }
 
-    /* CSS Dark mode filter to invert light map tiles while keeping road and building labels */
+    /* CSS filter to enhance map tiles colors, making them sharper and more saturated */
     .dark-invert-tile {
         transition: filter 0.3s ease;
+        filter: saturate(1.35) contrast(1.1) brightness(1.02);
     }
     .dark .dark-invert-tile {
-        filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(115%) saturate(1.4);
     }
     .dark .leaflet-container {
         background: #0f172a !important;
@@ -106,11 +107,10 @@
         flex-direction: column;
         align-items: center;
     }
-    .house-marker svg {
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+    .house-marker div.rounded-full {
         transition: transform 0.2s ease;
     }
-    .house-marker:hover svg {
+    .house-marker:hover div.rounded-full {
         transform: scale(1.15);
     }
     .house-label {
@@ -723,6 +723,8 @@
 
 <script>
     let nasStatsInterval = null;
+    let oltStatsInterval = null;
+    let snmpOltStatsInterval = null;
     let map = null;
     let nasLayer = L.layerGroup();
     let infraLayer = L.layerGroup();
@@ -777,7 +779,7 @@
     // Initialize Map View with Layer Switcher
     function initMap() {
         // 1. Define Tile Layers
-        const googleRoadmap = L.tileLayer('https://mt1.google.com/vt/lyrs=m&apistyle=s.t:2|p.v:off&hl=id&x={x}&y={y}&z={z}', {
+        const googleRoadmap = L.tileLayer('https://mt1.google.com/vt/lyrs=m&hl=id&x={x}&y={y}&z={z}', {
             attribution: '&copy; Google Maps',
             maxZoom: 22,
             className: 'dark-invert-tile'
@@ -835,11 +837,9 @@
         map.on('popupopen', function(e) {
             if (drawCableState.active) {
                 map.closePopup();
+                return;
             }
-        });
 
-        // Leaflet Popup open hook to draw Sparkline chart on DOM element ready and fetch NAS stats
-        map.on('popupopen', function(e) {
             const popup = e.popup;
             const container = popup.getElement();
             if (container) {
@@ -851,7 +851,7 @@
                         renderClientTrend(username, canvas);
                     }, 100);
                 }
-                
+
                 // 2. Real-time stats for NAS
                 const nasStatsDiv = container.querySelector('div[id^="nasRealtimeStats_"]');
                 if (nasStatsDiv) {
@@ -866,13 +866,46 @@
                        fetchAndRenderNasStats(nasIp, nasStatsDiv);
                    }, 5000);
                 }
+
+                // 3. Real-time stats for Tenda OLT
+                const oltStatsDiv = container.querySelector('div[id^="oltRealtimeStats_"]');
+                if (oltStatsDiv) {
+                   const devId = oltStatsDiv.id.replace('oltRealtimeStats_', '');
+                   const devName = oltStatsDiv.getAttribute('data-device-name') || '';
+                   const devIp = oltStatsDiv.getAttribute('data-device-ip') || '';
+
+                   // Fetch pertama kali
+                   fetchAndRenderOltStats(devId, devName, devIp, oltStatsDiv);
+
+                   // Auto-refresh setiap 5 detik (untuk memberikan pengalaman real-time)
+                   clearInterval(oltStatsInterval);
+                   oltStatsInterval = setInterval(() => {
+                       fetchAndRenderOltStats(devId, devName, devIp, oltStatsDiv);
+                   }, 5000);
+                }
+
+                // 4. Real-time stats for SNMP OLT (HSGQ)
+                const snmpOltDiv = container.querySelector('div[id^="snmpOltStats_"]');
+                if (snmpOltDiv) {
+                   const devId = snmpOltDiv.id.replace('snmpOltStats_', '');
+                   const devName = snmpOltDiv.getAttribute('data-device-name') || '';
+                   const devIp = snmpOltDiv.getAttribute('data-device-ip') || '';
+                   fetchAndRenderSnmpOltStats(devId, devName, devIp, snmpOltDiv);
+                   clearInterval(snmpOltStatsInterval);
+                   snmpOltStatsInterval = setInterval(() => {
+                       fetchAndRenderSnmpOltStats(devId, devName, devIp, snmpOltDiv);
+                   }, 15000);
+                }
             }
         });
 
-        // ✅ TAMBAHKAN DI SINI — tepat setelah map.on popupopen yang kedua
         map.on('popupclose', function() {
             clearInterval(nasStatsInterval);
             nasStatsInterval = null;
+            clearInterval(oltStatsInterval);
+            oltStatsInterval = null;
+            clearInterval(snmpOltStatsInterval);
+            snmpOltStatsInterval = null;
         });
 
 
@@ -1235,37 +1268,19 @@
             const clientIcon = L.divIcon({
                 className: 'customer-house-icon',
                 html: `
-                    <div class="house-marker relative">
+                    <div class="house-marker relative flex flex-col items-center">
                         ${proactiveBadge}
                         <div class="house-label">${client.username}</div>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 46" width="36" height="42" style="filter:${houseGlow}; ${pulseCss}">
-                            <!-- Chimney -->
-                            <rect x="26" y="4" width="5" height="9" fill="${houseStroke}" rx="1"/>
-                            <rect x="25" y="3" width="7" height="2.5" fill="${houseColor}" rx="0.8"/>
-                            <!-- Roof -->
-                            <polygon points="20,3 38,18 2,18" fill="${houseStroke}" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
-                            <!-- Roof highlight -->
-                            <polygon points="20,6 35,18 5,18" fill="${houseColor}" opacity="0.6"/>
-                            <!-- House body -->
-                            <rect x="4" y="17" width="32" height="26" fill="${houseColor}" stroke="white" stroke-width="1.2" rx="1"/>
-                            <!-- Door -->
-                            <rect x="16" y="30" width="8" height="13" fill="white" opacity="0.95" rx="1.5"/>
-                            <circle cx="22.5" cy="37" r="0.8" fill="${houseStroke}"/>
-                            <!-- Left window -->
-                            <rect x="6" y="21" width="8" height="7" fill="white" opacity="0.85" rx="1"/>
-                            <line x1="10" y1="21" x2="10" y2="28" stroke="${houseStroke}" stroke-width="0.6" opacity="0.4"/>
-                            <line x1="6" y1="24.5" x2="14" y2="24.5" stroke="${houseStroke}" stroke-width="0.6" opacity="0.4"/>
-                            <!-- Right window -->
-                            <rect x="26" y="21" width="8" height="7" fill="white" opacity="0.85" rx="1"/>
-                            <line x1="30" y1="21" x2="30" y2="28" stroke="${houseStroke}" stroke-width="0.6" opacity="0.4"/>
-                            <line x1="26" y1="24.5" x2="34" y2="24.5" stroke="${houseStroke}" stroke-width="0.6" opacity="0.4"/>
-                            <!-- ONT Status dot (signal indicator) -->
-                            <circle cx="34" cy="10" r="4" fill="${signalDotColor}" stroke="white" stroke-width="1.2"/>
-                        </svg>
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-md text-white transition-all duration-200 hover:scale-115"
+                             style="background: linear-gradient(135deg, ${houseColor} 0%, ${houseStroke} 100%); filter: ${houseGlow}; ${pulseCss}">
+                            <i class="fas fa-home text-[11px]"></i>
+                            <!-- Online status indicator dot -->
+                            <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white shadow-sm" style="background-color: ${signalDotColor}"></span>
+                        </div>
                     </div>
                 `,
-                iconSize: [36, 54],
-                iconAnchor: [18, 43]
+                iconSize: [32, 48],
+                iconAnchor: [16, 36]
             });
 
 
@@ -1501,6 +1516,25 @@
                                 <div class="flex justify-between"><span class="text-slate-400">Uplink:</span><span class="text-white font-semibold">${uplink}</span></div>
                                 <div class="flex justify-between"><span class="text-slate-400">VLAN Mgmt:</span><span class="text-white font-semibold">${vlan}</span></div>
                             `;
+                            const isTenda = brand.toLowerCase().includes('tenda') || device.name.toLowerCase().includes('tenda');
+                            const isHsgq = brand.toLowerCase().includes('hsgq') || device.name.toLowerCase().includes('hsgq');
+                            if (isTenda) {
+                                detailsHtml += `
+                                    <div id="oltRealtimeStats_${device.id}" data-device-name="${device.name}" data-device-ip="${ip}" class="mt-2.5 pt-2 border-t border-slate-700/50 text-[10px]">
+                                        <div class="text-slate-500 italic flex items-center gap-1.5">
+                                            <i class="fas fa-spinner animate-spin text-sky-400"></i> Menghubungkan ke OLT Tenda...
+                                        </div>
+                                    </div>
+                                `;
+                            } else if (isHsgq) {
+                                detailsHtml += `
+                                    <div id="snmpOltStats_${device.id}" data-device-name="${device.name}" data-device-ip="${ip}" class="mt-2.5 pt-2 border-t border-slate-700/50 text-[10px]">
+                                        <div class="text-slate-500 italic flex items-center gap-1.5">
+                                            <i class="fas fa-spinner animate-spin text-blue-400"></i> Menghubungkan ke OLT HSGQ via SNMP...
+                                        </div>
+                                    </div>
+                                `;
+                            }
                         } else if (device.type === 'odc') {
                             const brand = parsed.brand || 'Generic';
                             const feeder = parsed.feeder_source || '-';
@@ -4536,6 +4570,254 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                     </div>
                 `;
             }
+        }
+    }
+
+    async function fetchAndRenderOltStats(deviceId, deviceName, deviceIp, container) {
+        try {
+            const resp = await fetch('/api/tenda-olt/status');
+            const res = await resp.json();
+            if (!res.success || !res.data || res.data.length === 0) {
+                container.innerHTML = `
+                    <div class="text-rose-400 font-bold flex items-center gap-1">
+                        <i class="fas fa-exclamation-triangle"></i> Gagal memuat data OLT Tenda.
+                    </div>
+                    <div class="text-[9px] text-slate-500">Pastikan integrasi Tenda OLT aktif.</div>
+                `;
+                return;
+            }
+
+            const cleanIp = (deviceIp || '').trim();
+            const cleanName = (deviceName || '').trim().toLowerCase();
+            
+            const oltData = res.data.find(o => {
+                const oHost = (o.host || '').trim();
+                const oName = (o.name || '').trim().toLowerCase();
+                return (cleanIp && oHost.includes(cleanIp)) || (oHost && cleanIp.includes(oHost)) || oName === cleanName;
+            });
+
+            if (!oltData) {
+                container.innerHTML = `
+                    <div class="text-amber-400 font-bold flex items-center gap-1">
+                        <i class="fas fa-exclamation-circle"></i> OLT belum terintegrasi
+                    </div>
+                    <div class="text-[9px] text-slate-400 mt-1">IP OLT di peta (${cleanIp}) atau Nama (${deviceName}) tidak cocok dengan data di menu Integrasi.</div>
+                `;
+                return;
+            }
+
+            if (oltData.error) {
+                container.innerHTML = `
+                    <div class="text-rose-400 font-bold flex items-center gap-1">
+                        <i class="fas fa-exclamation-triangle"></i> Error OLT:
+                    </div>
+                    <div class="text-[9px] text-rose-300 font-mono mt-1">${oltData.error}</div>
+                `;
+                return;
+            }
+
+            let portsHtml = '';
+            if (oltData.ports && Array.isArray(oltData.ports)) {
+                oltData.ports.forEach(port => {
+                    const total = port.ont_total || 0;
+                    const online = port.ont_online || 0;
+                    const upSpeed = parseFloat(port.up_speed || 0).toFixed(2);
+                    const downSpeed = parseFloat(port.down_speed || 0).toFixed(2);
+                    
+                    const sfpSn = port.sfp_sn && port.sfp_sn !== '-' ? port.sfp_sn : null;
+                    let opticalHtml = '';
+                    if (sfpSn) {
+                        const sfpTx = port.sfp_tx_power !== 'N/A' && port.sfp_tx_power !== '-' ? `${parseFloat(port.sfp_tx_power).toFixed(2)} dBm` : 'N/A';
+                        const sfpTemp = port.sfp_temp !== 'N/A' && port.sfp_temp !== '-' ? `${parseFloat(port.sfp_temp).toFixed(1)}°C` : 'N/A';
+                        const sfpVolt = port.sfp_voltage !== 'N/A' && port.sfp_voltage !== '-' ? `${parseFloat(port.sfp_voltage).toFixed(2)}V` : 'N/A';
+                        
+                        opticalHtml = `
+                            <div class="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[8px] pt-1 border-t border-slate-800/40 text-slate-400 mt-1">
+                                <div><span class="text-slate-500">SFP SN:</span> <span class="font-mono text-slate-300 font-semibold">${sfpSn}</span></div>
+                                <div><span class="text-slate-500">TX Power:</span> <span class="font-mono text-amber-400 font-bold"><i class="fas fa-signal mr-0.5"></i>${sfpTx}</span></div>
+                                <div><span class="text-slate-500">SFP Temp:</span> <span class="font-mono text-slate-300">${sfpTemp}</span></div>
+                                <div><span class="text-slate-500">SFP Volt:</span> <span class="font-mono text-slate-300">${sfpVolt}</span></div>
+                            </div>
+                        `;
+                    } else {
+                        opticalHtml = `
+                            <div class="text-[8px] pt-1 border-t border-slate-800/40 text-slate-500 mt-1">
+                                <i class="fas fa-info-circle mr-0.5"></i> SFP tidak terdeteksi
+                            </div>
+                        `;
+                    }
+                    
+                    portsHtml += `
+                        <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-2 space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sky-400 text-[10px]"><i class="fas fa-ethernet mr-1 text-[8px]"></i>${port.name}</span>
+                                <span class="text-[9px] text-slate-350 font-bold">${online} / ${total} ONT Online</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1 text-[9px] pt-0.5 border-t border-slate-800/80">
+                                <div>
+                                    <span class="text-slate-500">Up:</span>
+                                    <span class="text-emerald-400 font-mono font-bold"><i class="fas fa-arrow-up mr-0.5 text-[7px]"></i>${upSpeed} Mb</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-500">Down:</span>
+                                    <span class="text-sky-400 font-mono font-bold"><i class="fas fa-arrow-down mr-0.5 text-[7px]"></i>${downSpeed} Mb</span>
+                                </div>
+                            </div>
+                            ${opticalHtml}
+                        </div>
+                    `;
+                });
+            }
+
+            container.innerHTML = `
+                <div class="space-y-2">
+                    <div class="grid grid-cols-2 gap-1.5 text-[9px] bg-slate-900/40 p-2 rounded-xl border border-slate-800/60">
+                        <div class="flex flex-col">
+                            <span class="text-slate-500">Uptime OLT:</span>
+                            <span class="text-white font-bold"><i class="far fa-clock mr-0.5 text-slate-400"></i>${oltData.uptime_days || 0} Hari</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-slate-500">Suhu / Temp:</span>
+                            <span class="text-amber-400 font-bold"><i class="fas fa-thermometer-half mr-0.5"></i>${oltData.temperature}°C</span>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Status Port PON & Trafik</p>
+                        ${portsHtml}
+                    </div>
+                </div>
+            `;
+        } catch (err) {
+            container.innerHTML = `
+                <div class="text-rose-400 font-bold flex items-center gap-1">
+                    <i class="fas fa-exclamation-triangle"></i> Gagal menghubungi server.
+                </div>
+            `;
+        }
+    }
+
+    async function fetchAndRenderSnmpOltStats(deviceId, deviceName, deviceIp, container) {
+        try {
+            const resp = await fetch('/api/snmp-olt/status');
+            const res = await resp.json();
+            if (!res.success || !res.data || res.data.length === 0) {
+                container.innerHTML = `
+                    <div class="text-rose-400 font-bold flex items-center gap-1">
+                        <i class="fas fa-exclamation-triangle"></i> Gagal memuat data OLT HSGQ.
+                    </div>
+                    <div class="text-[9px] text-slate-500">Pastikan integrasi SNMP aktif.</div>
+                `;
+                return;
+            }
+
+            const cleanIp  = (deviceIp || '').trim();
+            const cleanName = (deviceName || '').trim().toLowerCase();
+            const oltData = res.data.find(o => {
+                const oHost = (o.host || '').trim();
+                const oName = (o.name || '').trim().toLowerCase();
+                return (cleanIp && oHost.includes(cleanIp)) || (oHost && cleanIp.includes(oHost)) || oName === cleanName;
+            });
+
+            if (!oltData) {
+                container.innerHTML = `
+                    <div class="text-amber-400 font-bold flex items-center gap-1">
+                        <i class="fas fa-exclamation-circle"></i> OLT belum terintegrasi
+                    </div>
+                    <div class="text-[9px] text-slate-400 mt-1">IP OLT di peta (${cleanIp}) tidak cocok dengan data di menu Integrasi.</div>
+                `;
+                return;
+            }
+
+            if (oltData.error) {
+                container.innerHTML = `
+                    <div class="text-rose-400 font-bold flex items-center gap-1">
+                        <i class="fas fa-exclamation-triangle"></i> Error SNMP:
+                    </div>
+                    <div class="text-[9px] text-rose-300 font-mono mt-1">${oltData.error}</div>
+                `;
+                return;
+            }
+
+            // Ports HTML
+            let portsHtml = '';
+            if (oltData.ports && Array.isArray(oltData.ports)) {
+                oltData.ports.forEach(port => {
+                    const total   = port.ont_total || 0;
+                    const online  = port.ont_online || 0;
+                    const offline = port.ont_offline || 0;
+                    const portUpColor = port.port_up ? 'text-emerald-400' : 'text-rose-400';
+                    const portUpText  = port.port_up ? 'UP' : 'DOWN';
+                    const onlineRatio = total > 0 ? Math.round(online / total * 100) : 0;
+
+                    portsHtml += `
+                        <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-2 space-y-1.5">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-sky-400 text-[10px]"><i class="fas fa-ethernet mr-1 text-[8px]"></i>${port.name}</span>
+                                <span class="text-[9px] font-bold ${portUpColor}"><i class="fas fa-circle text-[6px] mr-0.5"></i>${portUpText}</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-1 text-[8px]">
+                                <div class="text-center bg-slate-800/60 rounded-lg p-1">
+                                    <div class="text-emerald-400 font-bold text-[10px]">${online}</div>
+                                    <div class="text-slate-500">Online</div>
+                                </div>
+                                <div class="text-center bg-slate-800/60 rounded-lg p-1">
+                                    <div class="text-rose-400 font-bold text-[10px]">${offline}</div>
+                                    <div class="text-slate-500">Offline</div>
+                                </div>
+                                <div class="text-center bg-slate-800/60 rounded-lg p-1">
+                                    <div class="text-white font-bold text-[10px]">${total}</div>
+                                    <div class="text-slate-500">Total</div>
+                                </div>
+                            </div>
+                            <div class="w-full bg-slate-800 rounded-full h-1">
+                                <div class="bg-emerald-500 h-1 rounded-full" style="width:${onlineRatio}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            const memPct = oltData.mem_pct || 0;
+            const memColor = memPct > 85 ? 'text-rose-400' : memPct > 60 ? 'text-amber-400' : 'text-emerald-400';
+            const tempVal = oltData.temperature;
+            const tempColor = (typeof tempVal === 'number' && tempVal > 60) ? 'text-rose-400' : (typeof tempVal === 'number' && tempVal > 45) ? 'text-amber-400' : tempVal === 'N/A' ? 'text-slate-400' : 'text-emerald-400';
+
+            container.innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex items-center gap-1 mb-1">
+                        <i class="fas fa-signal text-blue-400 text-[8px]"></i>
+                        <span class="text-[8px] font-bold text-blue-400 uppercase tracking-wider">SNMP Live — ${oltData.model || 'HSGQ OLT'}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1.5 text-[9px] bg-slate-900/40 p-2 rounded-xl border border-slate-800/60">
+                        <div class="flex flex-col">
+                            <span class="text-slate-500">Uptime:</span>
+                            <span class="text-white font-bold"><i class="far fa-clock mr-0.5 text-slate-400"></i>${oltData.uptime_days || 0} Hari</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-slate-500">Suhu:</span>
+                            <span class="${tempColor} font-bold"><i class="fas fa-thermometer-half mr-0.5"></i>${tempVal !== 'N/A' ? tempVal + '°C' : 'N/A'}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-slate-500">Memory:</span>
+                            <span class="${memColor} font-bold"><i class="fas fa-memory mr-0.5"></i>${memPct}%</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-slate-500">Firmware:</span>
+                            <span class="text-slate-300 font-mono text-[8px]">${(oltData.firmware || '-').substring(0, 18)}</span>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Status Port PON & ONT</p>
+                        ${portsHtml || '<div class="text-[9px] text-slate-500">Tidak ada data PON.</div>'}
+                    </div>
+                </div>
+            `;
+        } catch (err) {
+            container.innerHTML = `
+                <div class="text-rose-400 font-bold flex items-center gap-1">
+                    <i class="fas fa-exclamation-triangle"></i> Gagal menghubungi server SNMP.
+                </div>
+            `;
         }
     }
 

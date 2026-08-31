@@ -36,3 +36,22 @@ app/.telegram.env
 
 # Scratch/Local Tools
 scratch/
+app/scratch/
+
+# Backups & Temporary files
+*.bak
+*.backup
+app/services/PATCH_modern_ui.py
+login_js.js
+app/login_js.js
+app/chunk_common.js
+
+# Debug Dumps
+debug_dump*.json
+app/debug_dump*.json
+
+# Exports / Customer Data
+pppoe_users.*
+*.pdf
+*.csv
+

@@ -16,3 +16,5 @@ requests==2.31.0
 Flask-Limiter==3.5.0
 Flask-WTF==1.2.1
 librouteros==3.2.1
+pymongo==4.17.0
+

@@ -1,0 +1,284 @@
+<script>
+    let mikrotikPage = 1;
+    let mikrotikLimit = 10;
+    let mikrotikSearch = '';
+    let mikrotikData = [];
+
+    // Initialize lucide icons if present
+    function initIcons() {
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    }
+
+    async function loadMikrotikUsers() {
+        try {
+            const tableBody = document.getElementById('mikrotikTableBody');
+            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-400">
+                <div class="flex flex-col items-center gap-2">
+                    <i data-lucide="loader" class="lucide w-5 h-5 animate-spin text-slate-300"></i>
+                    <span class="text-xs font-medium">Memuat data admin...</span>
+                </div>
+            </td></tr>`;
+            initIcons();
+
+            const response = await fetch(`/api/mikrotik/users?page=${mikrotikPage}&limit=${mikrotikLimit}&search=${encodeURIComponent(mikrotikSearch)}`);
+            const data = await response.json();
+            
+            if (data.error) {
+                showNotification('error', 'Gagal memuat data: ' + data.error);
+                return;
+            }
+
+            mikrotikData = data.users || [];
+            const total = data.total || 0;
+            
+            // Update stats
+            document.getElementById('statTotal').innerText = total;
+            
+            // Calculate active sessions count
+            let activeCount = 0;
+            mikrotikData.forEach(u => {
+                if (u.active_sessions && u.active_sessions > 0) {
+                    activeCount += parseInt(u.active_sessions);
+                }
+            });
+            document.getElementById('statOnline').innerText = activeCount;
+
+            // Render Table
+            if (mikrotikData.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-400 text-xs font-medium">Tidak ada data user admin perangkat.</td></tr>`;
+                document.getElementById('mikrotikStart').innerText = 0;
+                document.getElementById('mikrotikEnd').innerText = 0;
+                document.getElementById('mikrotikTotal').innerText = 0;
+                renderPagination(0);
+                return;
+            }
+
+            tableBody.innerHTML = '';
+            mikrotikData.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-750/30 transition-colors";
+                
+                // Group Badge Color
+                let groupBadge = '';
+                if (u.groupname === 'mikrotik-full') {
+                    groupBadge = '<span class="px-2.5 py-1 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-bold border border-red-100 dark:border-red-900/30">FULL ACCESS</span>';
+                } else if (u.groupname === 'mikrotik-write') {
+                    groupBadge = '<span class="px-2.5 py-1 bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 rounded-lg text-[10px] font-bold border border-orange-100 dark:border-orange-900/30">WRITE ACCESS</span>';
+                } else if (u.groupname === 'mikrotik-read') {
+                    groupBadge = '<span class="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-bold border border-blue-100 dark:border-blue-900/30">READ ONLY</span>';
+                } else {
+                    groupBadge = `<span class="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold">${u.groupname || 'UNKNOWN'}</span>`;
+                }
+
+                // Active Session Status
+                const statusBadge = u.active_sessions > 0 
+                    ? `<span class="flex items-center gap-1.5 text-xs text-emerald-500 font-bold">
+                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                         Online (${u.active_sessions})
+                       </span>`
+                    : `<span class="flex items-center gap-1.5 text-xs text-slate-400 font-semibold">
+                         <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                         Offline
+                       </span>`;
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-bold text-slate-800 dark:text-slate-200 text-sm">${u.username}</td>
+                    <td class="py-3 px-4 font-mono text-slate-500 dark:text-slate-400 text-xs">${u.password}</td>
+                    <td class="py-3 px-4">${groupBadge}</td>
+                    <td class="py-3 px-4">${statusBadge}</td>
+                    <td class="py-3 px-4 text-right">
+                        <div class="flex justify-end gap-1.5">
+                            <button onclick="openEditModal('${u.username}', '${u.groupname}')" class="p-1.5 text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors" title="Edit">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteUser('${u.username}')" class="p-1.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors" title="Delete">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            // Update pagination values
+            const startVal = (mikrotikPage - 1) * mikrotikLimit + 1;
+            const endVal = Math.min(mikrotikPage * mikrotikLimit, total);
+            document.getElementById('mikrotikStart').innerText = startVal;
+            document.getElementById('mikrotikEnd').innerText = endVal;
+            document.getElementById('mikrotikTotal').innerText = total;
+
+            renderPagination(data.total_pages || 1);
+            initIcons();
+        } catch (err) {
+            console.error(err);
+            showNotification('error', 'Koneksi ke server terputus.');
+        }
+    }
+
+    function renderPagination(totalPages) {
+        document.getElementById('mikrotikPrev').disabled = (mikrotikPage <= 1);
+        document.getElementById('mikrotikNext').disabled = (mikrotikPage >= totalPages || totalPages === 0);
+
+        const numContainer = document.getElementById('mikrotikPageNums');
+        numContainer.innerHTML = '';
+
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= mikrotikPage - 1 && i <= mikrotikPage + 1)) {
+                const btn = document.createElement('button');
+                btn.innerText = i;
+                btn.className = `px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    i === mikrotikPage 
+                    ? 'bg-red-500 text-white shadow-sm' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300'
+                }`;
+                btn.onclick = () => mikrotikChangePage(i);
+                numContainer.appendChild(btn);
+            } else if (i === 2 || i === totalPages - 1) {
+                const span = document.createElement('span');
+                span.innerText = '...';
+                span.className = 'px-1.5 py-1 text-slate-400 text-xs';
+                numContainer.appendChild(span);
+            }
+        }
+    }
+
+    function mikrotikChangePage(newPage) {
+        if (newPage < 1) return;
+        mikrotikPage = newPage;
+        loadMikrotikUsers();
+    }
+
+    // Modal Control
+    function openAddModal() {
+        document.getElementById('addForm').reset();
+        document.getElementById('addModal').classList.remove('hidden');
+    }
+    function closeAddModal() {
+        document.getElementById('addModal').classList.add('hidden');
+    }
+
+    function openEditModal(username, groupname) {
+        const form = document.getElementById('editForm');
+        form.reset();
+        form.elements['username'].value = username;
+        form.elements['groupname'].value = groupname || 'mikrotik-full';
+        
+        document.getElementById('editUserLabel').innerText = username;
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+    function closeEditModal() {
+        document.getElementById('editModal').classList.add('hidden');
+    }
+
+    // Submit Add
+    async function submitAdd(e) {
+        e.preventDefault();
+        const form = e.target;
+        const payload = {
+            username: form.elements['username'].value,
+            password: form.elements['password'].value,
+            groupname: form.elements['groupname'].value
+        };
+
+        try {
+            const res = await fetch('/api/mikrotik/users/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                showNotification('success', data.message || 'User berhasil ditambahkan');
+                closeAddModal();
+                loadMikrotikUsers();
+            } else {
+                showNotification('error', data.error || 'Gagal menambahkan user');
+            }
+        } catch (err) {
+            showNotification('error', 'Gagal mengirim data.');
+        }
+    }
+
+    // Submit Edit
+    async function submitEdit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const username = form.elements['username'].value;
+        const payload = {
+            username: username,
+            password: form.elements['password'].value,
+            groupname: form.elements['groupname'].value
+        };
+
+        try {
+            const res = await fetch(`/api/mikrotik/users/update/${username}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                showNotification('success', data.message || 'User berhasil diupdate');
+                closeEditModal();
+                loadMikrotikUsers();
+            } else {
+                showNotification('error', data.error || 'Gagal mengupdate user');
+            }
+        } catch (err) {
+            showNotification('error', 'Gagal mengirim data.');
+        }
+    }
+
+    // Delete User
+    async function deleteUser(username) {
+        if (!confirm(`Apakah Anda yakin ingin menghapus user admin "${username}"?`)) return;
+
+        try {
+            const res = await fetch(`/api/mikrotik/users/delete/${username}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                showNotification('success', data.message || 'User berhasil dihapus');
+                loadMikrotikUsers();
+            } else {
+                showNotification('error', data.error || 'Gagal menghapus user');
+            }
+        } catch (err) {
+            showNotification('error', 'Gagal menghapus data.');
+        }
+    }
+
+    // Search Debounce
+    let searchTimeout = null;
+    document.getElementById('mikrotikSearch').addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            mikrotikSearch = e.target.value;
+            mikrotikPage = 1;
+            loadMikrotikUsers();
+        }, 300);
+    });
+
+    // Helper Notification
+    function showNotification(type, msg) {
+        // Fallback jika global showNotification tidak tersedia
+        if (window.showToast) {
+            window.showToast(msg, type === 'success' ? 'success' : 'error');
+        } else {
+            alert(msg);
+        }
+    }
+
+    // Load on start
+    document.addEventListener('DOMContentLoaded', () => {
+        loadMikrotikUsers();
+    });
+    // Trigger load immediately as well since templates can be dynamically loaded
+    loadMikrotikUsers();
+</script>

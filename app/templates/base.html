@@ -285,31 +285,83 @@
         .nav-submenu {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.3s ease;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .nav-submenu.open { max-height: 300px; }
+        .nav-submenu.open {
+            max-height: 400px;
+        }
         .nav-subitem {
-            border-radius: 10px;
-            margin: 1px 0;
-            transition: background 0.2s ease, transform 0.2s ease;
+            display: flex;
+            align-items: center;
+            border-radius: 8px;
+            margin: 2px 0;
+            padding: 8px 12px;
+            transition: all 0.2s ease;
             color: #64748b;
+            text-decoration: none;
         }
         .nav-subitem:hover {
             background: rgba(59, 130, 246, 0.06);
+            color: #2563eb;
             transform: translateX(4px);
         }
         .nav-subitem.active {
-            background: rgba(59, 130, 246, 0.1);
+            background: rgba(59, 130, 246, 0.08);
             color: #1e40af;
             font-weight: 600;
         }
-        .nav-subicon { color: #94a3b8; transition: color 0.2s ease; }
-        .nav-subitem:hover .nav-subicon,
-        .nav-subitem.active .nav-subicon { color: #3b82f6; }
         .dark .nav-subitem { color: #94a3b8; }
-        .dark .nav-subitem:hover { background: rgba(255,255,255,0.05); }
-        .dark .nav-subitem.active { background: rgba(59,130,246,0.15); color: #93c5fd; }
+        .dark .nav-subitem:hover { background: rgba(255,255,255,0.04); color: #60a5fa; }
+        .dark .nav-subitem.active { background: rgba(59,130,246,0.12); color: #93c5fd; }
+        
+        .subitem-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background-color: #cbd5e1;
+            transition: all 0.25s ease;
+            flex-shrink: 0;
+        }
+        .nav-subitem:hover .subitem-dot {
+            background-color: #3b82f6;
+            transform: scale(1.4);
+        }
+        .nav-subitem.active .subitem-dot {
+            background-color: #2563eb;
+            transform: scale(1.4);
+            box-shadow: 0 0 6px rgba(59,130,246,0.8);
+        }
+        .dark .subitem-dot { background-color: #475569; }
+        .dark .nav-subitem:hover .subitem-dot { background-color: #60a5fa; }
+        .dark .nav-subitem.active .subitem-dot { background-color: #93c5fd; box-shadow: 0 0 6px rgba(147,197,253,0.8); }
+
+        .dropdown-chevron {
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .nav-dropdown.open-dropdown .dropdown-chevron {
+            transform: rotate(90deg);
+        }
+        
+        .nav-dropdown-trigger {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            outline: none;
+        }
+        .nav-dropdown.active-parent .nav-dropdown-trigger {
+            background: rgba(59, 130, 246, 0.04);
+            border-left: 3px solid #3b82f6;
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+        .dark .nav-dropdown.active-parent .nav-dropdown-trigger {
+            background: rgba(59, 130, 246, 0.08);
+            border-left-color: #60a5fa;
+        }
         .sidebar.collapsed .nav-submenu { display: none; }
+        .sidebar.collapsed .dropdown-chevron { display: none; }
+
 
         /* Gradients */
         .gradient-primary {
@@ -336,7 +388,114 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* Tooltip */
+        /* Tooltip - replaced by enhanced version below */
+
+        /* Badge Pulse */
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
+        .badge-pulse { animation: pulse-badge 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+        /* ======================================================
+           SIDEBAR ENHANCEMENT #1: Live Badge Counter
+           ====================================================== */
+        .nav-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 5px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: scale(0.6);
+        }
+        .nav-badge.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .nav-badge.badge-green  { background: #dcfce7; color: #16a34a; }
+        .nav-badge.badge-red    { background: #fee2e2; color: #dc2626; }
+        .nav-badge.badge-amber  { background: #fef3c7; color: #d97706; }
+        .nav-badge.badge-blue   { background: #dbeafe; color: #2563eb; }
+        html.dark .nav-badge.badge-green  { background: rgba(16,185,129,0.2); color: #34d399; }
+        html.dark .nav-badge.badge-red    { background: rgba(239,68,68,0.2);  color: #f87171; }
+        html.dark .nav-badge.badge-amber  { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        html.dark .nav-badge.badge-blue   { background: rgba(59,130,246,0.2); color: #93c5fd; }
+
+        /* Mini badge for collapsed mode (#8) */
+        .nav-mini-badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 2px solid #ffffff;
+            z-index: 5;
+        }
+        html.dark .nav-mini-badge { border-color: #1e293b; }
+        .nav-mini-badge.badge-green  { background: #16a34a; color: #fff; }
+        .nav-mini-badge.badge-red    { background: #dc2626; color: #fff; }
+        .nav-mini-badge.badge-amber  { background: #d97706; color: #fff; }
+        .nav-mini-badge.badge-blue   { background: #2563eb; color: #fff; }
+        .nav-mini-badge.visible { opacity: 1; transform: scale(1); }
+        /* Mini badge only shows in collapsed mode */
+        .sidebar:not(.collapsed) .nav-mini-badge { opacity: 0 !important; transform: scale(0) !important; }
+        .sidebar.collapsed .nav-mini-badge.visible { opacity: 1; transform: scale(1); }
+
+        /* ======================================================
+           SIDEBAR ENHANCEMENT #6: Active Menu Glow + Shimmer
+           ====================================================== */
+        @keyframes active-shimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+        @keyframes nav-glow-pulse {
+            0%, 100% { box-shadow: inset 0 0 0 1px rgba(59,130,246,0.15), 0 0 0 0 rgba(59,130,246,0); }
+            50%       { box-shadow: inset 0 0 0 1px rgba(59,130,246,0.25), 0 0 8px 2px rgba(59,130,246,0.08); }
+        }
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(59,130,246,0.10) 0%, rgba(96,165,250,0.05) 60%, rgba(59,130,246,0.10) 100%) !important;
+            background-size: 200% auto !important;
+            animation: nav-glow-pulse 3s ease-in-out infinite !important;
+        }
+        .nav-item.active .nav-icon-container {
+            background: linear-gradient(135deg, rgba(59,130,246,0.18), rgba(96,165,250,0.12)) !important;
+            box-shadow: 0 0 10px rgba(59,130,246,0.15);
+        }
+        .nav-item.active .nav-text {
+            background: linear-gradient(90deg, #1e40af, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+        html.dark .nav-item.active .nav-text {
+            background: linear-gradient(90deg, #93c5fd, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ======================================================
+           SIDEBAR ENHANCEMENT #7: Tooltip with Keyboard Shortcut
+           ====================================================== */
         .tooltip {
             position: absolute;
             left: 100%;
@@ -346,16 +505,19 @@
             padding: 8px 14px;
             background: #1e293b;
             color: #f1f5f9;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 12px;
             font-weight: 500;
             white-space: nowrap;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.3s ease, margin 0.3s ease;
+            transition: opacity 0.25s ease, margin-left 0.25s ease;
             z-index: 1000;
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(59,130,246,0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .tooltip::before {
             content: '';
@@ -366,15 +528,22 @@
             border: 6px solid transparent;
             border-right-color: #1e293b;
         }
-        .nav-item:hover .tooltip { opacity: 1; margin-left: 20px; }
-        .sidebar:not(.collapsed) .tooltip { display: none; }
-
-        /* Badge Pulse */
-        @keyframes pulse-badge {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.05); }
+        .tooltip-shortcut {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1px 6px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            letter-spacing: 0.05em;
+            font-family: ui-monospace, SFMono-Regular, monospace;
         }
-        .badge-pulse { animation: pulse-badge 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .nav-item:hover .tooltip  { opacity: 1; margin-left: 20px; }
+        .sidebar:not(.collapsed) .tooltip { display: none; }
 
         /* Light Theme */
         .main-content {
@@ -534,6 +703,67 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
         .input-light::placeholder { color: #94a3b8; }
+
+        /* Premium Theme Toggle Button */
+        #themeToggleBtn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            background: #ffffff;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        #themeToggleBtn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+            background: #f8fafc;
+        }
+        #themeToggleBtn:active {
+            transform: translateY(0) scale(0.95);
+        }
+        
+        /* Dark Mode Button Styling */
+        html.dark #themeToggleBtn {
+            background: #1e293b;
+            border-color: rgba(51, 65, 85, 0.8);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        html.dark #themeToggleBtn:hover {
+            background: #334155;
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+
+        #themeToggleBtn .sun-icon {
+            transform: scale(0) rotate(90deg);
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            color: #f59e0b !important; /* Amber */
+        }
+        #themeToggleBtn .moon-icon {
+            transform: scale(1) rotate(0deg);
+            opacity: 1;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            color: #6366f1 !important; /* Indigo */
+        }
+        
+        /* Active Theme State Animations */
+        html.dark #themeToggleBtn .sun-icon {
+            transform: scale(1) rotate(0deg) !important;
+            opacity: 1 !important;
+        }
+        html.dark #themeToggleBtn .moon-icon {
+            transform: scale(0) rotate(-90deg) !important;
+            opacity: 0 !important;
+        }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -574,11 +804,11 @@
         <!-- Navigation -->
         <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
             <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
+                <div class="nav-icon-container" style="position:relative;">
                     <i data-lucide="layout-dashboard" class="lucide nav-icon icon-indigo"></i>
                 </div>
                 <span class="nav-text flex-1 font-medium text-sm">Dashboard</span>
-                <span class="tooltip">Dashboard</span>
+                <span class="tooltip">Dashboard <span class="tooltip-shortcut">Alt+1</span></span>
             </a>
 
             <!-- Network Section -->
@@ -591,130 +821,121 @@
             </div>
 
             <a href="/nas" class="nav-item {% if request.path == '/nas' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
+                <div class="nav-icon-container" style="position:relative;">
                     <i data-lucide="hard-drive" class="lucide nav-icon icon-cyan"></i>
                 </div>
                 <span class="nav-text flex-1 font-medium text-sm">NAS Devices</span>
-                <span class="tooltip">NAS Devices</span>
+                <span class="tooltip">NAS Devices <span class="tooltip-shortcut">Alt+2</span></span>
             </a>
 
             <a href="/integrations" class="nav-item {% if request.path == '/integrations' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
+                <div class="nav-icon-container" style="position:relative;">
                     <i data-lucide="plug" class="lucide nav-icon icon-orange"></i>
                 </div>
                 <span class="nav-text flex-1 font-medium text-sm">Integrations</span>
-                <span class="tooltip">Integrations</span>
+                <span class="tooltip">Integrations <span class="tooltip-shortcut">Alt+3</span></span>
             </a>
 
             <!-- Consolidated Customer Users Link -->
             <a href="/users" class="nav-item {% if request.path in ['/users', '/vpn-users', '/8021x-users', '/ipoe-users', '/hotspot-users'] %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
+                <div class="nav-icon-container" style="position:relative;">
                     <i data-lucide="users" class="lucide nav-icon icon-emerald"></i>
                 </div>
                 <span class="nav-text flex-1 font-medium text-sm">Customer Users</span>
-                <span class="tooltip">Customer Users</span>
+                <span class="tooltip">Customer Users <span class="tooltip-shortcut">Alt+4</span></span>
             </a>
 
             <a href="/sessions" class="nav-item {% if request.path == '/sessions' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
+                <div class="nav-icon-container" style="position:relative;">
                     <i data-lucide="activity" class="lucide nav-icon icon-green"></i>
+                    <span id="miniBadgeSessions" class="nav-mini-badge badge-green"></span>
                 </div>
                 <span class="nav-text flex-1 font-medium text-sm">Active Sessions</span>
-                <span class="tooltip">Active Sessions</span>
+                <span id="navBadgeSessions" class="nav-badge badge-green"></span>
+                <span class="tooltip">Active Sessions <span class="tooltip-shortcut">Alt+5</span></span>
             </a>
 
 
             <a href="/logs" class="nav-item {% if request.path == '/logs' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
+                <div class="nav-icon-container" style="position:relative;">
                     <i data-lucide="file-text" class="lucide nav-icon icon-amber"></i>
+                    <span id="miniBadgeLogs" class="nav-mini-badge badge-red"></span>
                 </div>
                 <span class="nav-text flex-1 font-medium text-sm">Auth Logs</span>
-                <span class="tooltip">Authentication Logs</span>
+                <span id="navBadgeLogs" class="nav-badge badge-red"></span>
+                <span class="tooltip">Auth Logs <span class="tooltip-shortcut">Alt+6</span></span>
             </a>
 
-            <!-- NOC Monitoring Section -->
-            <div class="section-divider">
-                <div class="px-3 py-2 mt-3">
-                    <div class="logo-text">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.15em]">NOC Monitoring</p>
+            <!-- NOC Monitoring Dropdown -->
+            <div class="nav-dropdown" data-dropdown="noc">
+                <button type="button" class="nav-dropdown-trigger nav-item flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-left relative group">
+                    <div class="flex items-center space-x-3">
+                        <div class="nav-icon-container" style="position:relative;">
+                            <i data-lucide="monitor" class="lucide nav-icon icon-rose"></i>
+                            <span id="miniBadgeOnt" class="nav-mini-badge badge-red"></span>
+                        </div>
+                        <span class="nav-text font-medium text-sm">NOC Monitoring</span>
                     </div>
+                    <div class="flex items-center space-x-2 pr-1">
+                        <span id="navBadgeOnt" class="nav-badge badge-red"></span>
+                        <i data-lucide="chevron-right" class="lucide w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 dropdown-chevron"></i>
+                    </div>
+                    <span class="tooltip">NOC Monitoring</span>
+                </button>
+                <div class="nav-submenu pl-6 border-l border-slate-200 dark:border-slate-800 ml-5 space-y-0.5 mt-1">
+                    <a href="/optical-health" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/optical-health' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Kesehatan ONT</span>
+                    </a>
+                    <a href="/ipam" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/ipam' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Visual IPAM</span>
+                    </a>
+                    <a href="/topology" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/topology' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Topologi Sistem</span>
+                    </a>
+                    <a href="/network-map" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/network-map' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Peta Jaringan</span>
+                    </a>
+                    <a href="/diagnostics" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/diagnostics' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Pusat Diagnostik</span>
+                    </a>
                 </div>
             </div>
 
-
-
-            <a href="/optical-health" class="nav-item {% if request.path == '/optical-health' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
-                    <i data-lucide="router" class="lucide nav-icon icon-rose"></i>
-                </div>
-                <span class="nav-text flex-1 font-medium text-sm">Kesehatan ONT</span>
-                <span class="tooltip">Kesehatan Optik ONT</span>
-            </a>
-            <a href="/ipam" class="nav-item {% if request.path == '/ipam' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
-                    <i data-lucide="layout-grid" class="lucide nav-icon icon-emerald"></i>
-                </div>
-                <span class="nav-text flex-1 font-medium text-sm">Visual IPAM</span>
-                <span class="tooltip">Visual IPAM & IP Pool</span>
-            </a>
-            <a href="/topology" class="nav-item {% if request.path == '/topology' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
-                    <i data-lucide="network" class="lucide nav-icon icon-amber"></i>
-                </div>
-                <span class="nav-text flex-1 font-medium text-sm">Topologi Sistem</span>
-                <span class="tooltip">Topologi & Integrasi Sistem</span>
-            </a>
-
-            <a href="/network-map" class="nav-item {% if request.path == '/network-map' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
-                    <i data-lucide="map" class="lucide nav-icon icon-rose"></i>
-                </div>
-                <span class="nav-text flex-1 font-medium text-sm">Peta Jaringan</span>
-                <span class="tooltip">Peta Jaringan Modern</span>
-            </a>
-
-
-            <a href="/diagnostics" class="nav-item {% if request.path == '/diagnostics' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
-                    <i data-lucide="wrench" class="lucide nav-icon icon-indigo"></i>
-                </div>
-                <span class="nav-text flex-1 font-medium text-sm">Pusat Diagnostik</span>
-                <span class="tooltip">Diagnostik & Troubleshooting</span>
-            </a>
-
-
-            <!-- Settings Section -->
-            <div class="section-divider">
-                <div class="px-3 py-2 pt-4">
-                    <div class="logo-text">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.15em]">Settings</p>
+            <!-- Settings Dropdown -->
+            <div class="nav-dropdown" data-dropdown="settings">
+                <button type="button" class="nav-dropdown-trigger nav-item flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-left relative group">
+                    <div class="flex items-center space-x-3">
+                        <div class="nav-icon-container" style="position:relative;">
+                            <i data-lucide="settings" class="lucide nav-icon icon-blue"></i>
+                        </div>
+                        <span class="nav-text font-medium text-sm">Settings</span>
                     </div>
+                    <div class="flex items-center space-x-2 pr-1">
+                        <i data-lucide="chevron-right" class="lucide w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-300 dropdown-chevron"></i>
+                    </div>
+                    <span class="tooltip">Settings</span>
+                </button>
+                <div class="nav-submenu pl-6 border-l border-slate-200 dark:border-slate-800 ml-5 space-y-0.5 mt-1">
+                    <a href="/backup" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/backup' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Backup &amp; Restore</span>
+                    </a>
+                    <a href="/notifications" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/notifications' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Notifikasi Telegram</span>
+                    </a>
+                    <a href="/profile" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/profile' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Profile</span>
+                    </a>
                 </div>
             </div>
 
-            <a href="/backup" class="nav-item {% if request.path == '/backup' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
-                    <i data-lucide="cloud-upload" class="lucide nav-icon icon-blue"></i>
-                </div>
-                <span class="nav-text flex-1 font-medium text-sm">Backup & Restore</span>
-                <span class="tooltip">Backup & Restore</span>
-            </a>
-
-            <a href="/notifications" class="nav-item {% if request.path == '/notifications' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
-                    <i data-lucide="bell" class="lucide nav-icon icon-violet"></i>
-                </div>
-                <span class="nav-text flex-1 font-medium text-sm">Notifikasi Telegram</span>
-                <span class="tooltip">Notifikasi Telegram</span>
-            </a>
-
-            <a href="/profile" class="nav-item {% if request.path == '/profile' %}active{% endif %} flex items-center space-x-3 px-3 py-3 cursor-pointer group">
-                <div class="nav-icon-container">
-                    <i data-lucide="user-cog" class="lucide nav-icon icon-slate"></i>
-                </div>
-                <span class="nav-text flex-1 font-medium text-sm">Profile</span>
-                <span class="tooltip">User Profile</span>
-            </a>
         </nav>
 
         <!-- User Profile -->
@@ -755,8 +976,11 @@
 
                     <div class="flex items-center space-x-1">
                         <!-- Theme Toggle Button -->
-                        <button id="themeToggleBtn" class="p-2.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-xl transition-all duration-300" title="Ubah Tema">
-                            <i id="themeToggleIcon" data-lucide="moon" class="w-5 h-5"></i>
+                        <button id="themeToggleBtn" title="Ubah Tema">
+                            <div class="relative w-5 h-5 flex items-center justify-center">
+                                <i data-lucide="sun" class="sun-icon absolute w-5 h-5"></i>
+                                <i data-lucide="moon" class="moon-icon absolute w-5 h-5"></i>
+                            </div>
                         </button>
                     </div>
                 </div>
@@ -815,9 +1039,23 @@
                 if (sidebar.classList.contains('collapsed')) {
                     mainContent.classList.remove('lg:ml-72');
                     mainContent.classList.add('lg:ml-20');
+                    // Close all dropdowns when sidebar is collapsed to keep it tidy
+                    document.querySelectorAll('.nav-dropdown').forEach(d => {
+                        d.classList.remove('open-dropdown');
+                        const submenu = d.querySelector('.nav-submenu');
+                        if (submenu) submenu.classList.remove('open');
+                    });
                 } else {
                     mainContent.classList.remove('lg:ml-20');
                     mainContent.classList.add('lg:ml-72');
+                    // Restore dropdown that contains the currently active page when expanded
+                    document.querySelectorAll('.nav-dropdown').forEach(d => {
+                        const submenu = d.querySelector('.nav-submenu');
+                        if (submenu && submenu.querySelector('.nav-subitem.active')) {
+                            d.classList.add('open-dropdown');
+                            submenu.classList.add('open');
+                        }
+                    });
                 }
             });
         }
@@ -896,6 +1134,155 @@
 
 
 
+        // ======================================================
+        // SIDEBAR LIVE BADGE COUNTER (#1) + KEYBOARD SHORTCUTS (#7)
+        // ======================================================
+        (function initSidebarEnhancements() {
+
+            // --- Badge helper ---
+            function updateBadge(badgeId, miniBadgeId, count, zeroHide) {
+                const badge = document.getElementById(badgeId);
+                const mini  = document.getElementById(miniBadgeId);
+                if (!badge) return;
+                const display = count > 0 ? (count > 99 ? '99+' : String(count)) : '';
+                badge.textContent = display;
+                mini && (mini.textContent = display);
+                if (count > 0) {
+                    badge.classList.add('visible');
+                    mini && mini.classList.add('visible');
+                } else {
+                    badge.classList.remove('visible');
+                    mini && mini.classList.remove('visible');
+                }
+            }
+
+            // --- Fetch live badge counts ---
+            async function refreshSidebarBadges() {
+                try {
+                    // Active Sessions count
+                    const sessRes = await fetch('/api/sessions/count', { method: 'GET' });
+                    if (sessRes.ok) {
+                        const d = await sessRes.json();
+                        const cnt = d.count ?? d.total ?? d.active ?? 0;
+                        updateBadge('navBadgeSessions', 'miniBadgeSessions', cnt);
+                    }
+                } catch(e) {}
+
+                try {
+                    // Auth Logs - recent failures in last 5 minutes
+                    const logRes = await fetch('/api/logs/recent-failures', { method: 'GET' });
+                    if (logRes.ok) {
+                        const d = await logRes.json();
+                        const cnt = d.count ?? d.total ?? 0;
+                        updateBadge('navBadgeLogs', 'miniBadgeLogs', cnt);
+                    }
+                } catch(e) {}
+
+                try {
+                    // ONT health issues count
+                    const ontRes = await fetch('/api/ont/issues/count', { method: 'GET' });
+                    if (ontRes.ok) {
+                        const d = await ontRes.json();
+                        const cnt = d.count ?? d.total ?? d.issues ?? 0;
+                        updateBadge('navBadgeOnt', 'miniBadgeOnt', cnt);
+                    }
+                } catch(e) {}
+            }
+
+            // Initial load + refresh every 30 seconds
+            refreshSidebarBadges();
+            setInterval(refreshSidebarBadges, 30000);
+
+            // --- Keyboard shortcuts (#7) ---
+            const shortcuts = {
+                '1': '/',
+                '2': '/nas',
+                '3': '/integrations',
+                '4': '/users',
+                '5': '/sessions',
+                '6': '/logs',
+                '7': '/optical-health',
+                '8': '/ipam',
+                '9': '/topology',
+                'm': '/network-map',
+                'd': '/diagnostics',
+                'b': '/backup',
+                'n': '/notifications',
+                'p': '/profile',
+            };
+            document.addEventListener('keydown', function(e) {
+                if (!e.altKey) return;
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+                const key = e.key.toLowerCase();
+                if (shortcuts[key]) {
+                    e.preventDefault();
+                    window.location.href = shortcuts[key];
+                }
+            });
+
+            // --- Dropdown Accordion Logic ---
+            const dropdowns = document.querySelectorAll('.nav-dropdown');
+            const sidebarEl = document.getElementById('sidebar');
+
+            dropdowns.forEach(dropdown => {
+                const trigger = dropdown.querySelector('.nav-dropdown-trigger');
+                const submenu = dropdown.querySelector('.nav-submenu');
+
+                // Check if any child subitem is active
+                const hasActiveChild = submenu.querySelector('.nav-subitem.active') !== null;
+                if (hasActiveChild) {
+                    dropdown.classList.add('open-dropdown', 'active-parent');
+                    submenu.classList.add('open');
+                }
+
+                if (trigger) {
+                    trigger.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        
+                        // Expand sidebar if it is collapsed
+                        if (sidebarEl && sidebarEl.classList.contains('collapsed')) {
+                            sidebarEl.classList.remove('collapsed');
+                            const icon = document.querySelector('#sidebarToggle i');
+                            if (icon) {
+                                icon.setAttribute('data-lucide', 'panel-left-close');
+                                if (typeof lucide !== 'undefined') lucide.createIcons();
+                            }
+                            // Also adjust main content margin
+                            const mainContentEl = document.getElementById('mainContent');
+                            if (mainContentEl) {
+                                mainContentEl.classList.remove('lg:ml-20');
+                                mainContentEl.classList.add('lg:ml-72');
+                            }
+                            // Open this dropdown immediately after expanding sidebar
+                            dropdown.classList.add('open-dropdown');
+                            submenu.classList.add('open');
+                            return;
+                        }
+
+                        const isOpen = submenu.classList.contains('open');
+                        
+                        // Close other dropdowns for accordion effect
+                        dropdowns.forEach(other => {
+                            if (other !== dropdown) {
+                                other.classList.remove('open-dropdown');
+                                const otherSub = other.querySelector('.nav-submenu');
+                                if (otherSub) otherSub.classList.remove('open');
+                            }
+                        });
+
+                        if (isOpen) {
+                            dropdown.classList.remove('open-dropdown');
+                            submenu.classList.remove('open');
+                        } else {
+                            dropdown.classList.add('open-dropdown');
+                            submenu.classList.add('open');
+                        }
+                    });
+                }
+            });
+
+        })();
+
         // Intercept fetch to inject CSRF token automatically for unsafe methods
         const originalFetch = window.fetch;
         window.fetch = async function(resource, init) {
@@ -929,15 +1316,10 @@
 
         // Theme Toggle Handler
         const themeToggleBtn = document.getElementById('themeToggleBtn');
-        const themeToggleIcon = document.getElementById('themeToggleIcon');
 
         function updateThemeUI() {
-            const isDark = document.documentElement.classList.contains('dark');
-            if (themeToggleIcon) {
-                themeToggleIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
-                if (typeof lucide !== 'undefined') {
-                    lucide.createIcons();
-                }
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
             }
         }
 
@@ -945,7 +1327,6 @@
             themeToggleBtn.addEventListener('click', () => {
                 const isDark = document.documentElement.classList.toggle('dark');
                 localStorage.setItem('theme', isDark ? 'dark' : 'light');
-                updateThemeUI();
             });
         }
         

@@ -1,10 +1,18 @@
 import psutil
+import time
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, jsonify
 from decorators import login_required
 from database import execute_query
+from helpers import get_cached_mikrotik
 
 dashboard_bp = Blueprint('dashboard', __name__)
+
+# Cache hasil /api/stats selama 25 detik
+# Mencegah flood koneksi MikroTik jika ada beberapa tab/user terbuka
+_stats_cache = {'data': None, 'ts': 0.0}
+_STATS_TTL = 25  # detik
+
 
 @dashboard_bp.route('/')
 @login_required
@@ -14,8 +22,12 @@ def dashboard_page():
 @dashboard_bp.route('/api/stats')
 @login_required
 def api_stats():
-    try:
+    # Kembalikan cache jika masih fresh (< 25 detik)
+    now = time.monotonic()
+    if _stats_cache['data'] is not None and (now - _stats_cache['ts']) < _STATS_TTL:
+        return jsonify(_stats_cache['data'])
 
+    try:
         # PPPoE Stats (Users not in ipoe, vpn, 8021x, wireless, hotspot, or mikrotik groups)
         pppoe_users = execute_query("""
             SELECT COUNT(*) as count FROM radcheck c 
@@ -109,15 +121,16 @@ def api_stats():
         mikrotik_users = execute_query("SELECT COUNT(*) as count FROM radusergroup WHERE groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read')")[0]['count']
         
         # Get active sessions live from RouterOS API
+        # Gunakan koneksi persistent (cached) agar tidak flood log MikroTik
         mikrotik_sessions = 0
         try:
             routers = execute_query("SELECT host, username, password, port FROM integrations WHERE type='mikrotik' AND is_active=true")
             if routers:
-                import librouteros
                 valid_admins = {r['username'].lower() for r in execute_query("SELECT username FROM radusergroup WHERE groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read')")}
                 for r in routers:
                     try:
-                        api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=1.0)
+                        # get_cached_mikrotik: koneksi di-reuse, tidak login ulang setiap poll
+                        api = get_cached_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=3.0)
                         active_users = list(api('/user/active/print'))
                         for au in active_users:
                             uname = au.get('name', '').strip().lower()
@@ -127,6 +140,7 @@ def api_stats():
                         pass
         except Exception:
             pass
+
 
         total_users = pppoe_users + ipoe_users + hotspot_users + vpn_users + x8021x_users + wireless_users + mikrotik_users
         active_sessions = pppoe_sessions + ipoe_sessions + hotspot_sessions + vpn_sessions + x8021x_sessions + wireless_sessions + mikrotik_sessions
@@ -139,7 +153,7 @@ def api_stats():
         except Exception:
             total_nas = 0
 
-        return jsonify({
+        result = {
             'pppoe_users': pppoe_users,
             'pppoe_sessions': pppoe_sessions,
             'ipoe_users': ipoe_users,
@@ -159,7 +173,11 @@ def api_stats():
             'online_users': online_users,
             'today_auth': today_auth,
             'total_nas': total_nas
-        })
+        }
+        # Simpan ke cache agar polling berikutnya tidak perlu koneksi MikroTik baru
+        _stats_cache['data'] = result
+        _stats_cache['ts'] = time.monotonic()
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -287,6 +305,7 @@ def api_auth_activity():
     except Exception as e:
         print(f"Error in auth activity: {str(e)}")
         return jsonify({'labels': [], 'data': []})
+
 
 @dashboard_bp.route('/api/sessions-by-nas')
 @login_required

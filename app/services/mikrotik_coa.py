@@ -20,17 +20,20 @@ def _send_coa_packet(nas_ip, secret, packet_type, attributes):
         return ''
 
 def send_coa_disconnect(nas_ip, session_id, nas_secret, framed_ip=None):
-    if framed_ip:
-        out = _send_coa_packet(nas_ip, nas_secret, 'disconnect', {
-            'Framed-IP-Address': framed_ip, 'NAS-IP-Address': nas_ip
-        })
-        if 'Disconnect-ACK' in out:
-            return True
-    # Fallback: Acct-Session-Id (PPPoE)
+    # ✅ SELALU gunakan Acct-Session-Id terlebih dahulu.
+    # Acct-Session-Id bersifat unik per session dan tidak bisa salah sasaran.
+    #
+    # ⚠️ JANGAN gunakan Framed-IP-Address sebagai metode utama:
+    # IP dari pool bisa di-recycle ke user lain setelah disconnect,
+    # sehingga CoA berbasis IP akan memutus koneksi user yang SALAH.
     out = _send_coa_packet(nas_ip, nas_secret, 'disconnect', {
         'Acct-Session-Id': session_id, 'NAS-IP-Address': nas_ip
     })
-    return 'Disconnect-ACK' in out
+    if 'Disconnect-ACK' in out:
+        return True
+    # Jika gagal dengan Acct-Session-Id, tidak ada fallback ke Framed-IP-Address
+    # untuk menghindari pemutusan session user yang salah.
+    return False
 
 def send_coa_update(nas_ip, session_id, nas_secret, rate_limit):
     out = _send_coa_packet(nas_ip, nas_secret, 'coa', {

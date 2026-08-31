@@ -100,3 +100,20 @@ def api_logs():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@logs_bp.route('/api/logs/recent-failures')
+@login_required
+def api_recent_failures():
+    """Lightweight endpoint for sidebar badge: auth failures in last 5 minutes."""
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as count
+            FROM radpostauth
+            WHERE reply = 'Access-Reject'
+              AND authdate >= NOW() - INTERVAL '5 minutes'
+        """)
+        count = result[0]['count'] if result else 0
+        return jsonify({'count': count})
+    except Exception as e:
+        return jsonify({'count': 0})
+

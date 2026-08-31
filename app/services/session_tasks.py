@@ -66,14 +66,8 @@ def background_stale_sessions():
             # 1. Run live sync with MikroTik routers
             sync_active_sessions_with_routers()
 
-            # 2. PPPoE: interim-update setiap 2 menit, threshold 10 menit (5x interval, toleransi network delay)
-            execute_query("""
-                UPDATE radacct
-                SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
-                WHERE acctstoptime IS NULL
-                AND LOWER(calledstationid) LIKE '%pppoe%'
-                AND acctupdatetime < NOW() - INTERVAL '10 minutes'
-            """, fetch=False)
+            # 2. PPPoE (Dihapus): Pembersihan PPPoE dimatikan di Python untuk mencegah bug dan redundancy.
+            # Pembersihan PPPoE sekarang sepenuhnya ditangani secara stabil oleh cronjob (cleanup-stale-sessions.sh).
 
             # 3. non-PPPoE (L2TP/IPoE/dhcp2): hanya kill jika:
             # - sudah pernah dapat interim-update (acctupdatetime != acctstarttime) DAN tidak update >30 menit, ATAU
@@ -200,19 +194,30 @@ def sync_active_sessions_with_routers():
     2. Are active on the router but marked as offline/closed in the database.
     """
     try:
-        # 1. Self-healing: Reopen sessions that got interim updates after being marked closed (within last 15 minutes)
+        # 1. Self-healing: Reopen sessions that got interim updates after being marked closed (within last 15 minutes).
+        # HANYA berlaku untuk PPPoE — wireless/IPoE/L2TP tidak menggunakan pola interim-update yang sama.
+        # Guard tambahan: NOT EXISTS sesi aktif lain untuk username yg sama, mencegah double session.
         try:
             reopened = execute_query("""
                 UPDATE radacct
                 SET acctstoptime = NULL, acctterminatecause = NULL
                 WHERE acctstoptime IS NOT NULL
+                  AND LOWER(calledstationid) LIKE '%pppoe%'
                   AND acctupdatetime > acctstoptime
-                  AND acctupdatetime > NOW() - INTERVAL '15 minutes'
+                  AND acctupdatetime > NOW() - INTERVAL '10 minutes'
+                  AND acctstoptime > NOW() - INTERVAL '10 minutes'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM radacct r2
+                      WHERE LOWER(r2.username) = LOWER(radacct.username)
+                        AND r2.nasipaddress = radacct.nasipaddress
+                        AND r2.acctstoptime IS NULL
+                        AND r2.radacctid != radacct.radacctid
+                  )
                 RETURNING radacctid, username
             """)
             if reopened:
                 for r in reopened:
-                    print(f"[session-sync] Reopened session {r['radacctid']} for {r['username']} (interim update received after stop time)")
+                    print(f"[session-sync] Reopened PPPoE session {r['radacctid']} for {r['username']} (interim update received after stop time)")
         except Exception as reopen_err:
             print(f"[session-sync] Error in interim-update self-healing: {reopen_err}")
 
@@ -225,6 +230,18 @@ def sync_active_sessions_with_routers():
         """)
         if active_sessions is None:
             active_sessions = []
+            
+        # Build sets of all globally active usernames and MAC addresses in DB to prevent double sessions on reopen
+        global_active_unames = {s['username'].lower() for s in active_sessions if s.get('username')}
+        global_active_macs = set()
+        for s in active_sessions:
+            mac = (s.get('callingstationid') or '').replace(':', '').replace('-', '').replace('_', '').lower()
+            if mac:
+                global_active_macs.add(mac)
+            uname = s['username'].lower() if s.get('username') else ''
+            clean_uname = uname.replace(':', '').replace('-', '').replace('_', '').lower()
+            if len(clean_uname) == 12:
+                global_active_macs.add(clean_uname)
             
         # Get active MikroTik integrations
         routers = execute_query("SELECT id, name, host, username, password, port FROM integrations WHERE type='mikrotik' AND is_active=true")
@@ -239,19 +256,28 @@ def sync_active_sessions_with_routers():
                 sessions_by_nas[nas_ip] = []
             sessions_by_nas[nas_ip].append(s)
             
-        import librouteros
+        from helpers import connect_mikrotik
         for r in routers:
             nas_ip = r['host']
             nas_sessions = sessions_by_nas.get(nas_ip, [])
             
             try:
-                api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=10)
+                api = connect_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=10)
                 
-                # Fetch active PPP users
+                # Fetch active PPP users and sessions
                 active_ppp_users = None
+                active_ppp_sessions = {}
                 try:
                     active_ppp = list(api('/ppp/active/print'))
                     active_ppp_users = {p.get('name', '').lower() for p in active_ppp if p.get('name')}
+                    for p in active_ppp:
+                        uname = p.get('name', '').lower()
+                        sid = p.get('session-id')
+                        if uname and sid:
+                            clean_sid = sid.lower().replace('0x', '')
+                            if uname not in active_ppp_sessions:
+                                active_ppp_sessions[uname] = set()
+                            active_ppp_sessions[uname].add(clean_sid)
                 except Exception as ppp_err:
                     print(f"[session-sync] Error fetching PPP from {r['name']}: {ppp_err}")
                     
@@ -269,7 +295,7 @@ def sync_active_sessions_with_routers():
                 # [EDIT 2] Fetch active Wireless clients dari registration table Mikrotik
                 active_wireless_macs = None
                 try:
-                    api2 = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=10)
+                    api2 = connect_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=10)
                     wireless_macs = set()
                     for endpoint in ['/interface/wireless/registration-table/print', '/interface/wifi/registration-table/print']:
                         try:
@@ -284,80 +310,59 @@ def sync_active_sessions_with_routers():
                 except Exception as w_err:
                     print(f"[session-sync] Error fetching Wireless from {r['name']}: {w_err}")
                 
-                # Build sets of active usernames/macs in the DB for this NAS
+                # Build sets of active usernames/macs in the DB for this NAS.
+                # Catatan klasifikasi tipe sesi:
+                #   - PPPoE/L2TP/SSTP/PPTP: calledstationid berisi keyword protokol
+                #   - Wireless (802.1X/WPA-Enterprise): calledstationid format "MAC:SSID" (mengandung ':')
+                #   - IPoE/DHCP: calledstationid berisi nama interface/pool, tanpa ':'
+                #   - NULL calledstationid: TIDAK dianggap PPP — bisa wireless/IPoE baru
                 db_active_ppp_unames = set()
                 db_active_ipoe_macs_clean = set()
                 for s in nas_sessions:
                     uname = s['username'].lower() if s.get('username') else ''
                     called = (s.get('calledstationid') or '').lower()
-                    is_ppp = 'pppoe' in called or 'l2tp' in called or 'sstp' in called or 'pptp' in called or not called
+                    # is_ppp hanya True jika calledstationid benar-benar ada DAN berisi kata kunci PPP
+                    is_ppp = bool(called) and (
+                        'pppoe' in called or 'l2tp' in called or
+                        'sstp' in called or 'pptp' in called
+                    )
                     if is_ppp:
                         db_active_ppp_unames.add(uname)
                     else:
+                        # IPoE + Wireless: keduanya kejar MAC dari username atau callingstationid
                         clean_mac = uname.replace(':', '').replace('-', '').replace('_', '').lower()
                         db_active_ipoe_macs_clean.add(clean_mac)
                         calling_mac = (s.get('callingstationid') or '').replace(':', '').replace('-', '').replace('_', '').lower()
                         if calling_mac:
                             db_active_ipoe_macs_clean.add(calling_mac)
                 
-                # --- A. REOPEN SESSIONS (Router shows online, DB shows offline) ---
-                
-                # 1. PPP Active Users
-                if active_ppp_users is not None:
-                    for uname_router in active_ppp_users:
-                        if uname_router not in db_active_ppp_unames:
-                            # Router says active, DB says inactive. Find and reopen last closed session.
-                            closed_s = execute_query("""
-                                SELECT radacctid FROM radacct
-                                WHERE LOWER(username) = %s AND nasipaddress = %s AND acctstoptime IS NOT NULL
-                                ORDER BY acctstarttime DESC LIMIT 1
-                            """, (uname_router, nas_ip))
-                            if closed_s:
-                                execute_query("""
-                                    UPDATE radacct
-                                    SET acctstoptime = NULL, acctterminatecause = NULL, acctupdatetime = NOW()
-                                    WHERE radacctid = %s
-                                """, (closed_s[0]['radacctid'],), fetch=False)
-                                print(f"[session-sync] Router active mismatch: Reopened closed PPP session {closed_s[0]['radacctid']} for {uname_router} on NAS {nas_ip}")
-                                # Add to our local set so we treat it as active
-                                db_active_ppp_unames.add(uname_router)
-                                
-                # 2. DHCP Active Leases
-                if active_macs is not None:
-                    for l in active_leases:
-                        if l.get('status') == 'bound' and l.get('mac-address'):
-                            mac_router = l.get('mac-address', '')
-                            mac_clean = mac_router.lower().replace(':', '').replace('-', '').replace('_', '')
-                            if mac_clean not in db_active_ipoe_macs_clean:
-                                # Find and reopen last closed session for this MAC
-                                closed_s = execute_query("""
-                                    SELECT radacctid FROM radacct
-                                    WHERE REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g') = %s
-                                      AND nasipaddress = %s
-                                      AND acctstoptime IS NOT NULL
-                                    ORDER BY acctstarttime DESC LIMIT 1
-                                """, (mac_clean, nas_ip))
-                                if closed_s:
-                                    execute_query("""
-                                        UPDATE radacct
-                                        SET acctstoptime = NULL, acctterminatecause = NULL, acctupdatetime = NOW()
-                                        WHERE radacctid = %s
-                                    """, (closed_s[0]['radacctid'],), fetch=False)
-                                    print(f"[session-sync] Router active mismatch: Reopened closed IPoE session {closed_s[0]['radacctid']} for {mac_router} on NAS {nas_ip}")
-                                    db_active_ipoe_macs_clean.add(mac_clean)
-                
-                # --- B. CLOSE STALE SESSIONS (DB shows online, Router shows offline) ---
+                # --- A. CLOSE STALE SESSIONS (DB shows online, Router shows offline) ---
+                # Jalankan Close block terlebih dahulu agar jika ada session ganda (misal session lama yang ghost),
+                # session tersebut ditutup dulu dari database. Dengan begitu, sisa session aktif di database
+                # akan akurat sebelum kita mengevaluasi block Reopen.
+                closed_any = False
                 for s in nas_sessions:
                     uname = s['username'].lower() if s.get('username') else ''
                     called = (s.get('calledstationid') or '').lower()
-                    is_ppp = 'pppoe' in called or 'l2tp' in called or 'sstp' in called or 'pptp' in called or not called
-                    # [EDIT 3] Deteksi wireless: calledstationid format MAC:SSID mengandung ':'
-                    is_wireless = ':' in called and not is_ppp
+                    # Konsisten dengan blok Build Sets di atas:
+                    # is_ppp hanya True jika calledstationid ada DAN mengandung keyword PPP
+                    is_ppp = bool(called) and (
+                        'pppoe' in called or 'l2tp' in called or
+                        'sstp' in called or 'pptp' in called
+                    )
+                    # Wireless: calledstationid format "MAC:SSID" mengandung ':', ATAU NULL (sesi awal wireless)
+                    is_wireless = (':' in called or not called) and not is_ppp
                     
                     is_online = False
                     if is_ppp:
                         if active_ppp_users is not None:
-                            is_online = uname in active_ppp_users
+                            # Cek secara presisi menggunakan session ID jika tersedia
+                            router_sids = active_ppp_sessions.get(uname, set())
+                            db_sid = (s.get('acctsessionid') or '').lower()
+                            if router_sids and db_sid:
+                                is_online = db_sid in router_sids
+                            else:
+                                is_online = uname in active_ppp_users
                         else:
                             is_online = True
                     # [EDIT 4] Blok khusus wireless, tidak menyentuh logika IPoE di bawahnya
@@ -397,6 +402,7 @@ def sync_active_sessions_with_routers():
                             WHERE radacctid = %s AND acctstoptime IS NULL
                         """, (stop_time, s['radacctid']), fetch=False)
                         print(f"[session-sync] Marked stale session {s['radacctid']} ({s['username']}) on NAS {nas_ip} as disconnected")
+                        closed_any = True
                     else:
                         # Session is confirmed online on router. Prevent stale-session cleaner from closing it.
                         last_update = s.get('acctupdatetime') or s.get('acctstarttime')
@@ -416,6 +422,124 @@ def sync_active_sessions_with_routers():
                                 SET acctupdatetime = NOW()
                                 WHERE radacctid = %s
                             """, (s['radacctid'],), fetch=False)
+
+                if closed_any:
+                    # Query ulang database untuk mendapatkan status session aktif terbaru pasca pembersihan session stale
+                    active_sessions_fresh = execute_query("""
+                        SELECT radacctid, username, nasipaddress, acctsessionid, calledstationid, callingstationid, acctupdatetime, acctstarttime 
+                        FROM radacct 
+                        WHERE acctstoptime IS NULL
+                    """) or []
+                    global_active_unames = {s['username'].lower() for s in active_sessions_fresh if s.get('username')}
+                    global_active_macs = set()
+                    db_active_ppp_unames = set()
+                    db_active_ipoe_macs_clean = set()
+                    for s in active_sessions_fresh:
+                        mac = (s.get('callingstationid') or '').replace(':', '').replace('-', '').replace('_', '').lower()
+                        if mac:
+                            global_active_macs.add(mac)
+                        uname = s['username'].lower() if s.get('username') else ''
+                        clean_uname = uname.replace(':', '').replace('-', '').replace('_', '').lower()
+                        if len(clean_uname) == 12:
+                            global_active_macs.add(clean_uname)
+                            
+                        if s['nasipaddress'] == nas_ip:
+                            called = (s.get('calledstationid') or '').lower()
+                            is_ppp = bool(called) and (
+                                'pppoe' in called or 'l2tp' in called or
+                                'sstp' in called or 'pptp' in called
+                            )
+                            if is_ppp:
+                                db_active_ppp_unames.add(uname)
+                            else:
+                                db_active_ipoe_macs_clean.add(clean_uname)
+                                calling_mac = (s.get('callingstationid') or '').replace(':', '').replace('-', '').replace('_', '').lower()
+                                if calling_mac:
+                                    db_active_ipoe_macs_clean.add(calling_mac)
+
+                # --- B. REOPEN SESSIONS (Router shows online, DB shows offline) ---
+                
+                # 1. PPP Active Users
+                if active_ppp_users is not None:
+                    for uname_router in active_ppp_users:
+                        # Only reopen if user is neither active on this NAS in DB nor globally active in DB
+                        if uname_router not in db_active_ppp_unames and uname_router not in global_active_unames:
+                            # ⚠️ Fresh DB check untuk mencegah race condition:
+                            # FreeRADIUS mungkin sudah buat session baru SETELAH query awal dijalankan.
+                            # Jika ada session aktif baru, SKIP reopen untuk menghindari double session.
+                            fresh_active = execute_query("""
+                                SELECT COUNT(*) as cnt FROM radacct
+                                WHERE LOWER(username) = %s AND nasipaddress = %s AND acctstoptime IS NULL
+                            """, (uname_router, nas_ip))
+                            if fresh_active and fresh_active[0]['cnt'] > 0:
+                                # Session baru sudah ada (dibuat FreeRADIUS saat sync berjalan) — skip
+                                db_active_ppp_unames.add(uname_router)
+                                global_active_unames.add(uname_router)
+                                continue
+                            # Router says active, DB says inactive. Find and reopen last closed session.
+                            router_sids = active_ppp_sessions.get(uname_router, set())
+                            closed_s = None
+                            if router_sids:
+                                closed_s = execute_query("""
+                                    SELECT radacctid FROM radacct
+                                    WHERE LOWER(username) = %s 
+                                      AND nasipaddress = %s 
+                                      AND acctsessionid = ANY(%s) 
+                                      AND acctstoptime IS NOT NULL
+                                    ORDER BY acctstarttime DESC LIMIT 1
+                                """, (uname_router, nas_ip, list(router_sids)))
+                            if not closed_s:
+                                closed_s = execute_query("""
+                                    SELECT radacctid FROM radacct
+                                    WHERE LOWER(username) = %s AND nasipaddress = %s AND acctstoptime IS NOT NULL
+                                    ORDER BY acctstarttime DESC LIMIT 1
+                                """, (uname_router, nas_ip))
+                            if closed_s:
+                                execute_query("""
+                                    UPDATE radacct
+                                    SET acctstoptime = NULL, acctterminatecause = NULL, acctupdatetime = NOW()
+                                    WHERE radacctid = %s
+                                """, (closed_s[0]['radacctid'],), fetch=False)
+                                print(f"[session-sync] Router active mismatch: Reopened closed PPP session {closed_s[0]['radacctid']} for {uname_router} on NAS {nas_ip}")
+                                # Add to our local set so we treat it as active
+                                db_active_ppp_unames.add(uname_router)
+                                global_active_unames.add(uname_router)
+                                
+                # 2. DHCP Active Leases
+                if active_macs is not None:
+                    for l in active_leases:
+                        if l.get('status') == 'bound' and l.get('mac-address'):
+                            mac_router = l.get('mac-address', '')
+                            mac_clean = mac_router.lower().replace(':', '').replace('-', '').replace('_', '')
+                            # Only reopen if MAC is neither active on this NAS in DB nor globally active in DB
+                            if mac_clean not in db_active_ipoe_macs_clean and mac_clean not in global_active_macs:
+                                # ⚠️ Fresh DB check untuk mencegah race condition (sama seperti PPP di atas)
+                                fresh_active = execute_query("""
+                                    SELECT COUNT(*) as cnt FROM radacct
+                                    WHERE REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g') = %s
+                                      AND nasipaddress = %s AND acctstoptime IS NULL
+                                """, (mac_clean, nas_ip))
+                                if fresh_active and fresh_active[0]['cnt'] > 0:
+                                    db_active_ipoe_macs_clean.add(mac_clean)
+                                    global_active_macs.add(mac_clean)
+                                    continue
+                                # Find and reopen last closed session for this MAC
+                                closed_s = execute_query("""
+                                    SELECT radacctid FROM radacct
+                                    WHERE REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g') = %s
+                                      AND nasipaddress = %s
+                                      AND acctstoptime IS NOT NULL
+                                    ORDER BY acctstarttime DESC LIMIT 1
+                                """, (mac_clean, nas_ip))
+                                if closed_s:
+                                    execute_query("""
+                                        UPDATE radacct
+                                        SET acctstoptime = NULL, acctterminatecause = NULL, acctupdatetime = NOW()
+                                        WHERE radacctid = %s
+                                    """, (closed_s[0]['radacctid'],), fetch=False)
+                                    print(f"[session-sync] Router active mismatch: Reopened closed IPoE session {closed_s[0]['radacctid']} for {mac_router} on NAS {nas_ip}")
+                                    db_active_ipoe_macs_clean.add(mac_clean)
+                                    global_active_macs.add(mac_clean)
             except Exception as router_err:
                 print(f"[session-sync] Error connecting to router {r['name']} ({nas_ip}): {router_err}")
     except Exception as e:

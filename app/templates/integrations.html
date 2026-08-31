@@ -70,16 +70,16 @@
 <div class="fade-in space-y-6">
 
     <!-- NOC Operations Header -->
-    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 p-6 rounded-[28px] text-white shadow-xl relative overflow-hidden">
-        <div class="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-white to-slate-50 dark:from-slate-950 dark:to-slate-900 border border-slate-200 dark:border-transparent p-6 rounded-[28px] text-slate-800 dark:text-white shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 dark:bg-purple-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
         
         <div class="z-10 mb-4 md:mb-0 flex items-center">
             <div class="icon-wrapper-noc icon-gradient-integrations mr-4 shadow-lg shadow-purple-500/15 floating-icon">
                 <i data-lucide="plug" class="lucide icon-noc text-white"></i>
             </div>
             <div>
-                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent font-outfit">Integrasi Perangkat</h2>
-                <p class="text-slate-300 text-xs md:text-sm mt-0.5 font-outfit">Kelola koneksi sinkronisasi real-time ke Mikrotik API, RouterOS, dan API eksternal.</p>
+                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-200 bg-clip-text text-transparent font-outfit">Integrasi Perangkat</h2>
+                <p class="text-slate-500 dark:text-slate-300 text-xs md:text-sm mt-0.5 font-outfit">Kelola koneksi sinkronisasi real-time ke Mikrotik API, RouterOS, dan API eksternal.</p>
             </div>
         </div>
         
@@ -92,7 +92,7 @@
     <!-- Stats Row -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 font-outfit">
         <!-- Card 1: Total Bridges -->
-        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
             <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-purple-500/5 dark:bg-purple-500/10 rounded-full blur-xl pointer-events-none"></div>
             <div class="space-y-2">
                 <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Bridges</span>
@@ -105,7 +105,7 @@
         </div>
 
         <!-- Card 2: Active Bridges -->
-        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
             <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
             <div class="space-y-2">
                 <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Active Bridges</span>
@@ -118,7 +118,7 @@
         </div>
 
         <!-- Card 3: Offline / Inactive -->
-        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
+        <div class="stat-card-glow bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-[28px] p-6 flex items-center justify-between relative overflow-hidden">
             <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-rose-500/5 dark:bg-rose-500/10 rounded-full blur-xl pointer-events-none"></div>
             <div class="space-y-2">
                 <span class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Inactive Bridges</span>
@@ -132,7 +132,7 @@
     </div>
 
     <!-- Main Container Card -->
-    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-[28px] p-6 shadow-sm">
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-[28px] p-6 shadow-sm">
         
         <!-- Controls & Header -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-750 pb-5">
@@ -185,6 +185,7 @@
             <option value="mikrotik">Mikrotik RouterOS</option>
             <option value="genieacs">GenieACS (TR-069 NBI)</option>
             <option value="tenda-olt">Tenda OLT TES7002</option>
+            <option value="snmp">SNMP (OLT / Router)</option>
           </select>
         </div>
       </div>
@@ -285,6 +286,11 @@ async function loadIntegrations() {
         typeIcon = 'network';
         typeGradient = 'from-orange-500 to-amber-600 shadow-orange-500/15';
         typeBadge = 'bg-orange-500/10 text-orange-600 dark:text-orange-400';
+      } else if (ig.type === 'snmp') {
+        typeLabel = 'SNMP (OLT / Router)';
+        typeIcon = 'cpu';
+        typeGradient = 'from-blue-500 to-indigo-600 shadow-blue-500/15';
+        typeBadge = 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
       }
       
       return `
@@ -304,7 +310,7 @@ async function loadIntegrations() {
             </div>
             <div class="text-[11px] text-slate-550 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1.5 font-medium">
               <span class="flex items-center"><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.host}:${ig.port || ''}</span>
-              <span class="flex items-center"><i class="fas fa-user mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.username || 'No Auth'}</span>
+              <span class="flex items-center"><i class="fas fa-user mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.type === 'snmp' ? 'Community: ' + (ig.username || 'public') : (ig.username || 'No Auth')}</span>
               ${ig.description?`<span class="flex items-center"><i class="fas fa-info-circle mr-1.5 text-slate-400 dark:text-slate-500"></i>${ig.description}</span>`:''}
             </div>
           </div>
@@ -321,7 +327,7 @@ async function loadIntegrations() {
           </button>
         </div>
       </div>
-    `;
+      `;
     }).join('');
     lucide.createIcons();
   } catch(e) {
@@ -338,21 +344,28 @@ document.getElementById('fType').addEventListener('change', function() {
   const usernameLabel = document.getElementById('fUsernameLabel');
   
   if (type === 'genieacs') {
-    if (portInput.value == '8728' || portInput.value == '80' || portInput.value == '443' || !portInput.value) {
+    if (portInput.value == '8728' || portInput.value == '80' || portInput.value == '443' || portInput.value == '161' || !portInput.value) {
       portInput.value = '7557';
     }
     usernameInput.required = false;
     usernameInput.placeholder = "Optional (e.g. admin)";
     usernameLabel.textContent = "Username";
   } else if (type === 'tenda-olt') {
-    if (portInput.value == '8728' || portInput.value == '7557' || !portInput.value) {
+    if (portInput.value == '8728' || portInput.value == '7557' || portInput.value == '161' || !portInput.value) {
       portInput.value = '80';
     }
     usernameInput.required = true;
     usernameInput.placeholder = "admin";
     usernameLabel.textContent = "Username *";
+  } else if (type === 'snmp') {
+    if (portInput.value == '8728' || portInput.value == '7557' || portInput.value == '80' || !portInput.value) {
+      portInput.value = '161';
+    }
+    usernameInput.required = false;
+    usernameInput.placeholder = "Community string (e.g. public)";
+    usernameLabel.textContent = "SNMP Community";
   } else {
-    if (portInput.value == '7557' || portInput.value == '80' || !portInput.value) {
+    if (portInput.value == '7557' || portInput.value == '80' || portInput.value == '161' || !portInput.value) {
       portInput.value = '8728';
     }
     usernameInput.required = true;

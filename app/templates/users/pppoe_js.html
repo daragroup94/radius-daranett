@@ -140,6 +140,8 @@
             document.getElementById('editUsername').value = user.username;
             document.getElementById('editUsernameDisplay').value = user.username;
             document.getElementById('editIpAddress').value = user.ip_address || '';
+            document.getElementById('editIpv6Prefix').value = user.ipv6_prefix || '';
+            document.getElementById('editDelegatedIpv6Prefix').value = user.delegated_ipv6_prefix || '';
             document.getElementById('editDataLimit').value = user.data_limit || '';
             document.getElementById('editSessionTimeout').value = user.session_timeout || '';
             document.getElementById('editIdleTimeout').value = user.idle_timeout || '';
@@ -292,6 +294,18 @@
                     ? 'border-l-[4px] border-l-emerald-500 dark:border-l-emerald-600' 
                     : 'border-l-[4px] border-l-slate-250 dark:border-l-slate-700';
 
+                let ipDisplay = '<div class="flex flex-col gap-0.5">';
+                ipDisplay += '<span class="text-xs font-mono text-slate-600 dark:text-slate-400"><i class="fas fa-network-wired text-slate-400 mr-1.5"></i>' + (user.ip_address || 'Dynamic (IPv4)') + '</span>';
+                if (user.ipv6_prefix || user.delegated_ipv6_prefix) {
+                    if (user.ipv6_prefix) {
+                        ipDisplay += '<span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1" title="Framed IPv6 Prefix"><i class="fas fa-link text-[9px] text-slate-400"></i>' + user.ipv6_prefix + '</span>';
+                    }
+                    if (user.delegated_ipv6_prefix) {
+                        ipDisplay += '<span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1" title="Delegated IPv6 Prefix (PD)"><i class="fas fa-share-alt text-[9px] text-slate-400"></i>' + user.delegated_ipv6_prefix + '</span>';
+                    }
+                }
+                ipDisplay += '</div>';
+
                 html += '<tr class="row-card-item transition-all duration-200 ' + leftBorderClass + '">'
                     + '<td class="py-3 px-4">'
                     + '<div class="flex items-center gap-3">'
@@ -300,7 +314,7 @@
                     + '</div>'
                     + '</td>'
                     + '<td class="py-3 px-4">' + statusBadge + '</td>'
-                    + '<td class="py-3 px-4"><span class="text-xs font-mono text-slate-600 dark:text-slate-400"><i class="fas fa-network-wired text-slate-400 mr-1.5"></i>' + (user.ip_address || 'Dynamic') + '</span></td>'
+                    + '<td class="py-3 px-4">' + ipDisplay + '</td>'
                     + '<td class="py-3 px-4">' + parseRateLimit(user.rate_limit || 'Not set') + '</td>'
                     + '<td class="py-3 px-4 text-right">'
                     + '<div class="flex gap-1.5 justify-end">'

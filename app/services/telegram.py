@@ -338,6 +338,12 @@ def execute_prov_push(state_data):
         if not device_id:
             return False, "ID Perangkat tidak valid."
             
+        # Auto-correct WAN type based on vendor capability
+        manufacturer = device_doc.get("_deviceId", {}).get("_Manufacturer", "").upper()
+        if "ZTE" in manufacturer and wtype == 'ppp_bridged':
+            wtype = 'ip_bridged'
+            state_data['wan_type'] = 'ip_bridged'
+            
         # Helper untuk cek keaktifan parameter di data doc
         def check_path_exists(doc, path):
             parts = path.split('.')
@@ -505,19 +511,22 @@ def execute_prov_push(state_data):
                     if has_vlan_id_mark:
                         parameter_values.append([f"{gpon_path}.VLANIDMark", vlan_val])
 
-            # --- FiberHome X_FH_IPMode ---
-            # X_FH_IPMode = 1 (IPv4), diperlukan agar koneksi PPPoE/IPoE bisa dial
+            # --- IP Mode (IPv4/IPv6) ---
+            # Set IP mode to IPv4 (or 1 for Fiberhome/others) if the device has an IP mode parameter
             ip_mode_leaf = None
-            for leaf in ["X_FH_IPMode"]:
+            for leaf in ["X_FH_IPMode", "X_ZTE-COM_IPMode", "X_ZTE_IPMode"]:
                 found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                 if found_path:
                     ip_mode_leaf = found_path.split(".")[-1]
                     break
             if ip_mode_leaf:
-                parameter_values.append([f"{base_path}.{ip_mode_leaf}", 1])
+                if "ZTE" in ip_mode_leaf:
+                    parameter_values.append([f"{base_path}.{ip_mode_leaf}", "IPv4"])
+                else:
+                    parameter_values.append([f"{base_path}.{ip_mode_leaf}", 1])
             
             svc_leaf = None
-            for leaf in ["ServiceList", "X_FH_ServiceList", "X_HW_ServiceList", "X_ZTE_ServiceList", "X_CMCC_ServiceList"]:
+            for leaf in ["ServiceList", "X_FH_ServiceList", "X_HW_ServiceList", "X_ZTE_ServiceList", "X_ZTE-COM_ServiceList", "X_CMCC_ServiceList"]:
                 found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                 if found_path:
                     svc_leaf = found_path.split(".")[-1]
@@ -647,16 +656,17 @@ def execute_prov_push(state_data):
 
             # Set VLAN Tagging jika diaktifkan
             # Jangan set VLANEnable=True di level WAN connection pada device yang tidak memilikinya (misal ZICG).
+            vlan_enable_leaves = ["VLANEnabled", "VLANEnable", "VLANMark", "X_HW_VLAN_Enable", "X_ZTE_VLAN_Enable", "X_ZTE-COM_VLANEnable", "X_CMCC_VLAN_Enable"]
             if state_data.get('vlan_enabled'):
                 vlan_enable_path = None
-                for leaf in ["VLANEnabled", "VLANEnable", "VLANMark", "X_HW_VLAN_Enable", "X_ZTE_VLAN_Enable", "X_CMCC_VLAN_Enable"]:
+                for leaf in vlan_enable_leaves:
                     found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                     if found_path:
                         vlan_enable_path = found_path
                         break
                 
                 vlan_id_path = None
-                for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN", "X_CMCC_VLANIDMark", "X_CMCC_VLANID"]:
+                for leaf in ["VLANIDMark", "VLANID", "VLANId", "X_HW_VLAN", "X_ZTE_VLAN", "X_ZTE-COM_VLANID", "X_CMCC_VLANIDMark", "X_CMCC_VLANID"]:
                     found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                     if found_path:
                         vlan_id_path = found_path
@@ -665,16 +675,25 @@ def execute_prov_push(state_data):
                 # Tulis jika ditemukan di device, atau jika ini bukan GPON link config device (ZTE/Huawei/dll)
                 if (vlan_enable_path and vlan_id_path) or not has_gpon_link_config:
                     if not vlan_enable_path:
-                        vlan_enable_path = f"{base_path}.VLANEnabled"
+                        if "ZTE" in manufacturer:
+                            vlan_enable_path = f"{base_path}.X_ZTE-COM_VLANEnable"
+                        else:
+                            vlan_enable_path = f"{base_path}.VLANEnabled"
                     if not vlan_id_path:
-                        vlan_id_path = f"{base_path}.VLANIDMark"
+                        if "ZTE" in manufacturer:
+                            vlan_id_path = f"{base_path}.X_ZTE-COM_VLANID"
+                        else:
+                            vlan_id_path = f"{base_path}.VLANIDMark"
                         
-                    parameter_values.append([vlan_enable_path, True])
+                    vlan_enable_val = True
+                    if "X_ZTE" in vlan_enable_path or "X_CMCC" in vlan_enable_path:
+                        vlan_enable_val = 1
+                    parameter_values.append([vlan_enable_path, vlan_enable_val])
                     parameter_values.append([vlan_id_path, int(state_data['vlan_id'])])
                     
                     # Set VLAN Priority if supported by device
                     prio_path = None
-                    for leaf in ["VLANPriorityMark", "VLANPriority", "802-1pMark", "X_FH_802-1pMark", "X_HW_VLANPriority", "X_ZTE_VLANPriority", "X_CMCC_802-1pMark"]:
+                    for leaf in ["VLANPriorityMark", "VLANPriority", "802-1pMark", "X_FH_802-1pMark", "X_HW_VLANPriority", "X_ZTE_VLANPriority", "X_ZTE-COM_8021P", "X_ZTE-COM_8021PbitMark", "X_CMCC_802-1pMark"]:
                         found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                         if found_path:
                             prio_path = found_path
@@ -683,15 +702,21 @@ def execute_prov_push(state_data):
                         parameter_values.append([prio_path, int(state_data.get('priority', 0))])
             else:
                 vlan_enable_path = None
-                for leaf in ["VLANEnabled", "VLANEnable", "VLANMark"]:
+                for leaf in vlan_enable_leaves:
                     found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                     if found_path:
                         vlan_enable_path = found_path
                         break
                 if vlan_enable_path or not has_gpon_link_config:
                     if not vlan_enable_path:
-                        vlan_enable_path = f"{base_path}.VLANEnabled"
-                    parameter_values.append([vlan_enable_path, False])
+                        if "ZTE" in manufacturer:
+                            vlan_enable_path = f"{base_path}.X_ZTE-COM_VLANEnable"
+                        else:
+                            vlan_enable_path = f"{base_path}.VLANEnabled"
+                    vlan_enable_val = False
+                    if "X_ZTE" in vlan_enable_path or "X_CMCC" in vlan_enable_path:
+                        vlan_enable_val = 0
+                    parameter_values.append([vlan_enable_path, vlan_enable_val])
 
             # Set Port Binding (LAN/SSID)
             full_binds = []
@@ -701,18 +726,24 @@ def execute_prov_push(state_data):
             binding_str = ",".join(full_binds)
             
             binding_leaf = None
-            for leaf in ["BindLANPort", "WANBindLANPort", "X_BROADCOM_COM_BindLans", "X_ZTE_BindLan", "X_HW_LANInterface", "X_FH_LanInterface", "X_FH_LanInterfaceBind", "X_CMCC_LanInterface"]:
+            for leaf in ["BindLANPort", "WANBindLANPort", "X_BROADCOM_COM_BindLans", "X_ZTE_BindLan", "X_ZTE-COM_BindLan", "X_HW_LANInterface", "X_FH_LanInterface", "X_FH_LanInterfaceBind", "X_CMCC_LanInterface"]:
                 found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                 if found_path:
                     binding_leaf = found_path.split(".")[-1]
                     break
             if not binding_leaf:
-                binding_leaf = "BindLANPort"
+                if "ZTE" in manufacturer:
+                    if "X_ZTE-COM" in str(device_doc):
+                        binding_leaf = "X_ZTE-COM_BindLan"
+                    else:
+                        binding_leaf = "X_ZTE_BindLan"
+                else:
+                    binding_leaf = "BindLANPort"
             parameter_values.append([f"{base_path}.{binding_leaf}", binding_str])
                 
             # ZTE (and other models) WanInterface binding auto-detection
             wan_leaf = None
-            for leaf in ["WanInterface", "WANInterface", "X_ZTE_WANInterface", "WanInterfaceBind"]:
+            for leaf in ["WanInterface", "WANInterface", "X_ZTE_WANInterface", "X_ZTE-COM_WanInterface", "X_ZTE-COM_WANInterface", "X_ZTE-COM_WanInterfaceBind", "WanInterfaceBind"]:
                 found_path = check_param_exists_on_device(device_doc, base_path, leaf)
                 if found_path:
                     wan_leaf = found_path.split(".")[-1]
@@ -751,11 +782,19 @@ def execute_prov_push(state_data):
                     beacon_leaf = "BeaconType"
                 parameter_values.append([f"{base_path}.{beacon_leaf}", sec_mode])
                 
+                manufacturer = device_doc.get("_deviceId", {}).get("_Manufacturer", "").upper()
+                is_fiberhome = "FIBERHOME" in manufacturer or "FHTT" in manufacturer
+                
                 if check_path_exists(device_doc, f"{base_path}.IEEE11iEncryptionModes"):
                     enc_mode = "AES" if sec_mode == '11i' else "TKIPandAES"
+                    if is_fiberhome:
+                        enc_mode += "Encryption"
                     parameter_values.append([f"{base_path}.IEEE11iEncryptionModes", enc_mode])
                 if sec_mode == 'WPAand11i' and check_path_exists(device_doc, f"{base_path}.WPAEncryptionModes"):
-                    parameter_values.append([f"{base_path}.WPAEncryptionModes", "TKIPandAES"])
+                    wpa_enc = "TKIPandAES"
+                    if is_fiberhome:
+                        wpa_enc += "Encryption"
+                    parameter_values.append([f"{base_path}.WPAEncryptionModes", wpa_enc])
 
         # 2. Kirim task setParameterValues ke GenieACS
         task_url = f"{GENIEACS_NBI}/devices/{urllib.parse.quote(device_id)}/tasks?connection_request"

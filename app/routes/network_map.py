@@ -71,14 +71,30 @@ def api_map_devices():
               AND n.shortname NOT ILIKE '%%test%%' AND n.shortname NOT ILIKE '%%demo%%' AND n.shortname NOT ILIKE '%%mock%%' AND n.shortname NOT ILIKE '%%dummy%%'
         """)
         
+        # Check active integrations to match types
+        integrations_rows = execute_query("SELECT host, type FROM integrations WHERE is_active=true") or []
+        integration_types = {ig['host']: ig['type'] for ig in integrations_rows}
+
         nas_map = {}
         for nas in nas_list:
             lat = float(nas['latitude']) if nas['latitude'] is not None else None
             lng = float(nas['longitude']) if nas['longitude'] is not None else None
+            
+            # Determine dev type
+            dev_type = nas['type'] or 'other'
+            ig_type = integration_types.get(nas['nasname'])
+            if ig_type == 'snmp':
+                dev_type = 'SNMP OLT'
+            elif ig_type == 'mikrotik':
+                dev_type = 'MikroTik'
+            elif ig_type == 'tenda-olt':
+                dev_type = 'Tenda OLT'
+                
             nas_map[nas['nasname']] = {
                 'id': nas['id'],
                 'nasname': nas['nasname'],
                 'shortname': nas['shortname'] or nas['nasname'],
+                'type': dev_type,
                 'latitude': lat,
                 'longitude': lng,
                 'status': 'online'
@@ -743,7 +759,7 @@ def api_get_client_history(username):
 def api_get_nas_stats(nasname):
     # Lookup integration for this nasname (IP)
     router = execute_query(
-        "SELECT id, name, host, username, password, port FROM integrations WHERE host = %s AND type='mikrotik' AND is_active=true LIMIT 1",
+        "SELECT id, name, type, host, username, password, port FROM integrations WHERE host = %s AND is_active=true LIMIT 1",
         (nasname,)
     )
     
@@ -768,9 +784,47 @@ def api_get_nas_stats(nasname):
         })
         
     r = router[0]
-    import librouteros
+    
+    # Handle SNMP OLT device stats lookup
+    if r['type'] == 'snmp':
+        from routes.integrations import _snmp_get_hsgq_olt
+        try:
+            community = r['username'] or 'public'
+            olt_data = _snmp_get_hsgq_olt(r['host'], r['port'] or 161, community)
+            
+            ifaces_data = []
+            for port in olt_data.get('ports', []):
+                ifaces_data.append({
+                    'name': f"{port['name']} (ONTs: {port['ont_online']}/{port['ont_total']})",
+                    'type': 'pon',
+                    'running': port['port_up'],
+                    'disabled': not port['port_up'],
+                    'rx_byte': 0,
+                    'tx_byte': 0
+                })
+                
+            return jsonify({
+                'success': True,
+                'integrated': True,
+                'status': 'online',
+                'ping_latency': latency,
+                'cpu_load': 0,
+                'memory_used_percent': olt_data.get('mem_pct', 0),
+                'uptime': f"{olt_data.get('uptime_days', 0)} Hari (Suhu: {olt_data.get('temperature')}°C)",
+                'interfaces': ifaces_data
+            })
+        except Exception as e:
+            return jsonify({
+                'success': True,
+                'integrated': True,
+                'status': 'offline',
+                'ping_latency': latency,
+                'error': str(e)
+            })
+
+    from helpers import connect_mikrotik
     try:
-        api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=3)
+        api = connect_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=3)
         
         # 1. Fetch system resource (CPU, memory, uptime)
         resource = list(api('/system/resource/print'))

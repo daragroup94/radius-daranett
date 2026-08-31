@@ -1,0 +1,101 @@
+server mikrotik {
+
+listen {
+    type = auth
+    ipaddr = *
+    port = 51812
+    limit {
+        max_connections = 16
+        lifetime = 0
+        idle_timeout = 30
+    }
+}
+
+listen {
+    ipaddr = *
+    port = 51813
+    type = acct
+    limit {
+    }
+}
+
+authorize {
+    # Hanya izinkan jika user memiliki salah satu grup mikrotik (mikrotik-full, mikrotik-write, mikrotik-read)
+    if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read') LIMIT 1}" == "") {
+        reject
+    }
+
+    filter_username
+    preprocess
+    chap
+    mschap
+    digest
+    suffix
+    eap {
+        ok = return
+    }
+    files
+    sql
+    pap
+}
+
+authenticate {
+    Auth-Type PAP {
+        pap
+    }
+    Auth-Type CHAP {
+        chap
+    }
+    Auth-Type MS-CHAP {
+        mschap
+    }
+    mschap
+    digest
+    eap
+}
+
+preacct {
+    preprocess
+    acct_unique
+    suffix
+    files
+}
+
+accounting {
+    sql
+    attr_filter.accounting_response
+}
+
+session {
+    sql
+}
+
+post-auth {
+    sql
+
+    # Fallback/Assign Mikrotik-Group secara dinamis berdasarkan grup user jika tidak ter-load dari radgroupreply
+    if (!reply:Mikrotik-Group) {
+        if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname = 'mikrotik-full' LIMIT 1}" == "mikrotik-full") {
+            update reply {
+                Mikrotik-Group := "full"
+            }
+        }
+        elsif ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname = 'mikrotik-write' LIMIT 1}" == "mikrotik-write") {
+            update reply {
+                Mikrotik-Group := "write"
+            }
+        }
+        elsif ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname = 'mikrotik-read' LIMIT 1}" == "mikrotik-read") {
+            update reply {
+                Mikrotik-Group := "read"
+            }
+        }
+    }
+
+    Post-Auth-Type REJECT {
+        sql
+        attr_filter.access_reject
+    }
+}
+
+}

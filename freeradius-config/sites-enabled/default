@@ -49,8 +49,11 @@ authorize {
     }
 
     # Reject jika user masuk grup non-PPPoE (Mencegah salah auth di port PPPoE)
+    # PENGECUALIAN: Izinkan jika nama NAS client mengandung kata "olt" (case-insensitive)
     if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname IN ('vpn', 'wireless', 'ipoe', '8021x', 'mikrotik-full', 'mikrotik-write', 'mikrotik-read') LIMIT 1}" != "") {
-        reject
+        if (!("%{client:shortname}" =~ /olt/i)) {
+            reject
+        }
     }
 
     filter_username
@@ -64,6 +67,12 @@ authorize {
     }
     files
     sql
+    # Enforce global simultaneous use limit of 1 if not specified in radcheck
+    if (!control:Simultaneous-Use) {
+        update control {
+            Simultaneous-Use := 1
+        }
+    }
     -ldap
     expiration
     logintime
@@ -105,6 +114,32 @@ session {
 
 post-auth {
     sql
+
+    # Kirim attribute privilege OLT jika login dari perangkat OLT (Shortname mengandung 'olt')
+    if ("%{client:shortname}" =~ /olt/i) {
+        if ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname = 'mikrotik-full' LIMIT 1}" == "mikrotik-full") {
+            update reply {
+                Service-Type := Administrative-User
+                Cisco-AVPair := "shell:priv-lvl=15"
+                Mikrotik-Group := "full"
+            }
+        }
+        elsif ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname = 'mikrotik-write' LIMIT 1}" == "mikrotik-write") {
+            update reply {
+                Service-Type := NAS-Prompt-User
+                Cisco-AVPair := "shell:priv-lvl=7"
+                Mikrotik-Group := "write"
+            }
+        }
+        elsif ("%{sql:SELECT groupname FROM radusergroup WHERE username = '%{User-Name}' AND groupname = 'mikrotik-read' LIMIT 1}" == "mikrotik-read") {
+            update reply {
+                Service-Type := NAS-Prompt-User
+                Cisco-AVPair := "shell:priv-lvl=1"
+                Mikrotik-Group := "read"
+            }
+        }
+    }
+
 
     if (session-state:User-Name && reply:User-Name && request:User-Name && (reply:User-Name == request:User-Name)) {
         update reply {

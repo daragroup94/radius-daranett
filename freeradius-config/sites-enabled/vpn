@@ -36,6 +36,12 @@ authorize {
     }
     files
     sql
+    # Enforce global simultaneous use limit of 1 if not specified in radcheck
+    if (!control:Simultaneous-Use) {
+        update control {
+            Simultaneous-Use := 1
+        }
+    }
     pap
 }
 

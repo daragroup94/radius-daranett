@@ -33,7 +33,7 @@ def api_sessions():
         try:
             routers = execute_query("SELECT id, name, host, username, password, port FROM integrations WHERE type='mikrotik' AND is_active=true")
             if routers and sessions:
-                import librouteros
+                from helpers import get_cached_mikrotik
                 import re
 
                 def parse_uptime(ut_str):
@@ -61,7 +61,7 @@ def api_sessions():
                 for r in routers:
                     nas_ip = r['host']
                     try:
-                        api = librouteros.connect(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=1.5)
+                        api = get_cached_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=1.5)
                         
                         # PPP active users
                         try:
@@ -106,7 +106,8 @@ def api_sessions():
                         except Exception:
                             pass
 
-                        api.close()
+                        # Connection cached, do not close
+                        pass
                     except Exception as conn_err:
                         print(f"Failed to fetch live stats in API from router {r['name']}: {conn_err}")
 
@@ -115,9 +116,14 @@ def api_sessions():
                     nas_ip = s['nasipaddress']
                     uname = s['username'].lower()
                     called = (s['calledstationid'] or '').lower()
-                    
-                    is_ppp = 'pppoe' in called or 'l2tp' in called or 'sstp' in called or 'pptp' in called or not called
-                    
+
+                    # is_ppp hanya True jika calledstationid ada DAN berisi keyword PPP.
+                    # Wireless (calledstationid='MAC:SSID' atau NULL) tidak masuk jalur PPP.
+                    is_ppp = bool(called) and (
+                        'pppoe' in called or 'l2tp' in called or
+                        'sstp' in called or 'pptp' in called
+                    )
+
                     if is_ppp:
                         live_key = (nas_ip, uname)
                         if live_key in live_ppp_data:
@@ -129,7 +135,7 @@ def api_sessions():
                             if ldata['tx_byte'] > 0:
                                 s['acctoutputoctets'] = ldata['tx_byte']
                     else:
-                        # IPoE / DHCP
+                        # IPoE / DHCP / Wireless — coba cocokkan MAC via DHCP lease
                         clean_mac = uname.replace(':', '').replace('-', '').replace('_', '')
                         for (lip, lmac), ldata in live_leases.items():
                             if lip == nas_ip and clean_mac == lmac.replace(':', '').replace('-', '').replace('_', ''):
@@ -148,6 +154,19 @@ def api_sessions():
         print(f"Error in api_sessions: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@sessions_bp.route('/api/sessions/count')
+@login_required
+def api_sessions_count():
+    """Lightweight endpoint for sidebar badge counter."""
+    try:
+        result = execute_query("""
+            SELECT COUNT(*) as count FROM radacct WHERE acctstoptime IS NULL
+        """)
+        count = result[0]['count'] if result else 0
+        return jsonify({'count': count})
+    except Exception as e:
+        return jsonify({'count': 0})
+
 @sessions_bp.route('/api/sessions/cleanup', methods=['POST'])
 @login_required
 def api_cleanup_sessions():
@@ -156,7 +175,7 @@ def api_cleanup_sessions():
         # Hanya menarget PPPoE (pppoe/PPPoE) - L2TP/IPoE/Hotspot tidak boleh dimatikan paksa.
         updated = execute_query("""
             UPDATE radacct
-            SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
+            SET acctstoptime = COALESCE(acctupdatetime, acctstarttime, NOW()), acctterminatecause = 'Lost-Carrier'
             WHERE acctstoptime IS NULL
             AND POSITION('pppoe' IN LOWER(calledstationid)) > 0
             AND acctupdatetime < NOW() - INTERVAL '30 minutes'
@@ -176,7 +195,7 @@ def api_fix_stale_sessions():
         threshold = max(5, min(threshold, 1440))
         updated = execute_query("""
             UPDATE radacct 
-            SET acctstoptime = acctupdatetime, acctterminatecause = 'Lost-Carrier'
+            SET acctstoptime = COALESCE(acctupdatetime, acctstarttime, NOW()), acctterminatecause = 'Lost-Carrier'
             WHERE acctstoptime IS NULL 
             AND POSITION('pppoe' IN LOWER(calledstationid)) > 0
             AND acctupdatetime < NOW() - (INTERVAL '1 minute' * %s)
@@ -308,7 +327,7 @@ def api_disconnect_expired():
 @login_required
 def api_disconnect_duplicates():
     try:
-        # Menghapus semua session duplikat (menyisakan session terbaru) untuk semua tipe koneksi.
+        # Menyisakan session terbaru, menutup semua session lama (duplikat/ghost) di database.
         dupes = execute_query("""
             WITH ranked AS (
                 SELECT acctsessionid, nasipaddress, username, framedipaddress,
@@ -321,21 +340,25 @@ def api_disconnect_duplicates():
         if not dupes:
             return jsonify({'success': True, 'message': 'Tidak ada session duplikat', 'count': 0})
 
-        coa_success = 0
+        count = 0
         for s in dupes:
-            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
-            secret = nas[0]['secret'] if nas else 'radiussecret'
-            if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret, framed_ip=s.get('framedipaddress')):
-                coa_success += 1
+            # ⚠️  PENTING — JANGAN kirim CoA Disconnect untuk session duplikat/ghost.
+            # Alasan:
+            # 1. CoA berbasis Framed-IP-Address → IP yang sama sedang dipakai oleh koneksi
+            #    REAL user yang baru → MikroTik akan memutus koneksi user asli!
+            # 2. Session ID lama sudah tidak ada di router (user sudah reconnect) →
+            #    CoA tidak dibutuhkan sama sekali.
+            # Cukup tandai sebagai selesai di database saja.
             execute_query("""
                 UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
-                WHERE acctsessionid = %s
+                WHERE acctsessionid = %s AND acctstoptime IS NULL
             """, (s['acctsessionid'],), fetch=False)
+            count += 1
 
         return jsonify({
             'success': True,
-            'message': f'{len(dupes)} session duplikat di-disconnect ({coa_success} CoA sent)',
-            'count': len(dupes)
+            'message': f'{count} session duplikat (ghost) ditutup di database tanpa CoA',
+            'count': count
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -10,12 +10,11 @@ RESULT=$(docker exec -i freeradius-db psql -U radius -d radius <<EOSQL
 WITH dupe AS (
     SELECT radacctid,
            ROW_NUMBER() OVER (
-               PARTITION BY username, callingstationid, calledstationid
+               PARTITION BY LOWER(username)
                ORDER BY acctstarttime DESC
            ) AS rn
     FROM radacct
     WHERE acctstoptime IS NULL
-      AND LOWER(calledstationid) LIKE '%pppoe%'
 )
 UPDATE radacct
 SET acctstoptime = COALESCE(acctupdatetime, acctstarttime, NOW()), acctterminatecause = 'Lost-Carrier'

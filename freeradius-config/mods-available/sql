@@ -19,12 +19,37 @@ sql {
     
     group_membership_query = "SELECT groupname FROM radusergroup WHERE username='%{SQL-User-Name}'"
     
+    # Enforce simultaneous-use checking against the database
+    simul_count_query = "SELECT COUNT(*) FROM radacct WHERE username = '%{SQL-User-Name}' AND acctstoptime IS NULL AND (callingstationid IS NULL OR callingstationid != '%{Calling-Station-Id}') AND (acctupdatetime >= NOW() - INTERVAL '3 minutes' OR (acctupdatetime IS NULL AND acctstarttime >= NOW() - INTERVAL '3 minutes'))"
+    # Comment out simul_verify_query to disable the checkrad external verification step and trust database state
+    # simul_verify_query = ""
+    
     accounting {
         reference = "%{tolower:type.%{Acct-Status-Type}.query}"
         
         type {
             start {
-                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), NOW(), 0, 0, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}') ON CONFLICT (acctuniqueid) DO UPDATE SET acctupdatetime = NOW()"
+                # Saat Accounting-Start diterima:
+                # 1. Tutup SEMUA session lama (ghost) untuk username+NAS yang sama — mencegah double session
+                # 2. Baru INSERT session baru (atau UPDATE jika acctuniqueid sudah ada / retry)
+                query = "\
+WITH close_old AS (\
+    UPDATE radacct \
+    SET acctstoptime = NOW(), acctterminatecause = 'Lost-Carrier' \
+    WHERE acctstoptime IS NULL \
+      AND username = '%{SQL-User-Name}' \
+      AND nasipaddress = '%{NAS-IP-Address}' \
+      AND acctuniqueid != '%{Acct-Unique-Session-Id}' \
+) \
+INSERT INTO radacct \
+    (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, \
+      acctstarttime, acctupdatetime, acctinputoctets, acctoutputoctets, \
+      calledstationid, callingstationid, framedipaddress) \
+VALUES \
+    ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', \
+      '%{NAS-IP-Address}', '%{NAS-Port}', NOW(), NOW(), 0, 0, \
+      '%{Called-Station-Id}', '%{Calling-Station-Id}', NULLIF('%{Framed-IP-Address}', '')::inet) \
+ON CONFLICT (acctuniqueid) DO UPDATE SET acctupdatetime = NOW()"
             }
             
             stop {
@@ -32,7 +57,7 @@ sql {
             }
             
             interim-update {
-                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', NOW(), %{%{Acct-Session-Time}:-0}, %{%{Acct-Input-Octets}:-0}, %{%{Acct-Output-Octets}:-0}, '%{Called-Station-Id}', '%{Calling-Station-Id}', '%{Framed-IP-Address}') ON CONFLICT (acctuniqueid) DO UPDATE SET acctsessiontime = EXCLUDED.acctsessiontime, acctinputoctets = EXCLUDED.acctinputoctets, acctoutputoctets = EXCLUDED.acctoutputoctets, acctupdatetime = NOW()"
+                query = "INSERT INTO radacct (acctsessionid, acctuniqueid, username, nasipaddress, nasportid, acctstarttime, acctupdatetime, acctsessiontime, acctinputoctets, acctoutputoctets, calledstationid, callingstationid, framedipaddress) VALUES ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', '%{SQL-User-Name}', '%{NAS-IP-Address}', '%{NAS-Port}', NOW() - INTERVAL '%{%{Acct-Session-Time}:-0} seconds', NOW(), %{%{Acct-Session-Time}:-0}, %{%{Acct-Input-Octets}:-0}, %{%{Acct-Output-Octets}:-0}, '%{Called-Station-Id}', '%{Calling-Station-Id}', NULLIF('%{Framed-IP-Address}', '')::inet) ON CONFLICT (acctuniqueid) DO UPDATE SET acctsessiontime = EXCLUDED.acctsessiontime, acctinputoctets = EXCLUDED.acctinputoctets, acctoutputoctets = EXCLUDED.acctoutputoctets, acctupdatetime = NOW()"
             }
         }
     }

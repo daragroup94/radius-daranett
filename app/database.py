@@ -179,6 +179,23 @@ def init_db_schema():
             )
         """, fetch=False)
 
+        # 11. ipoe_queue_config
+        # Menyimpan konfigurasi Queue Tree + Mangle per user IPoE
+        # Hanya untuk IPoE — tidak mempengaruhi PPPoE, hotspot, VPN, dll.
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.ipoe_queue_config (
+                username       VARCHAR(100) PRIMARY KEY,
+                parent_dl      VARCHAR(200) NOT NULL,
+                parent_ul      VARCHAR(200) NOT NULL,
+                limit_at       VARCHAR(20)  DEFAULT '0',
+                priority       SMALLINT     DEFAULT 8,
+                integration_id INTEGER      REFERENCES public.integrations(id) ON DELETE SET NULL,
+                synced_at      TIMESTAMP    DEFAULT NULL,
+                created_at     TIMESTAMP    DEFAULT NOW(),
+                updated_at     TIMESTAMP    DEFAULT NOW()
+            )
+        """, fetch=False)
+
         print("[database] Database schema initialized/verified successfully.")
     except Exception as e:
         print(f"[database] Error initializing database schema: {str(e)}")

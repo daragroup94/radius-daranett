@@ -104,8 +104,8 @@ services:
       POSTGRES_INITDB_ARGS: "-E UTF8"
       TZ: ${TZ}
     # Ports (Optional - comment if not needed)
-#    ports:
-#      - "5432:5432"
+    ports:
+      - "5432:5432"
     # Volumes
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -217,45 +217,45 @@ services:
   # ==========================================
   # PGADMIN (Database Management)
   # ==========================================
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: freeradius-pgadmin
-    restart: unless-stopped
+#  pgadmin:
+#    image: dpage/pgadmin4:latest
+#    container_name: freeradius-pgadmin
+#    restart: unless-stopped
     # Traefik Labels
-    labels:
-      - "traefik.enable=true"
+#    labels:
+#      - "traefik.enable=true"
       # HTTP (Redirect to HTTPS)
-      - "traefik.http.routers.pgadmin.entrypoints=web"
-      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.go.daragroup.cloud`) || Host(`pgadmin.access.daragroup.cloud`)"
-      - "traefik.http.routers.pgadmin.middlewares=pgadmin-https-redirect"
-      - "traefik.http.middlewares.pgadmin-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.pgadmin-https-redirect.redirectscheme.permanent=true"
+#      - "traefik.http.routers.pgadmin.entrypoints=web"
+#      - "traefik.http.routers.pgadmin.rule=Host(`pgadmin.go.daragroup.cloud`) || Host(`pgadmin.access.daragroup.cloud`)"
+#      - "traefik.http.routers.pgadmin.middlewares=pgadmin-https-redirect"
+#      - "traefik.http.middlewares.pgadmin-https-redirect.redirectscheme.scheme=https"
+#      - "traefik.http.middlewares.pgadmin-https-redirect.redirectscheme.permanent=true"
       # HTTPS (Secure)
-      - "traefik.http.routers.pgadmin-secure.entrypoints=websecure"
-      - "traefik.http.routers.pgadmin-secure.rule=Host(`pgadmin.go.daragroup.cloud`) || Host(`pgadmin.access.daragroup.cloud`)"
-      - "traefik.http.routers.pgadmin-secure.tls=true"
-      - "traefik.http.routers.pgadmin-secure.tls.certresolver=cloudflare"
-      - "traefik.http.routers.pgadmin-secure.service=pgadmin-service"
+#      - "traefik.http.routers.pgadmin-secure.entrypoints=websecure"
+#      - "traefik.http.routers.pgadmin-secure.rule=Host(`pgadmin.go.daragroup.cloud`) || Host(`pgadmin.access.daragroup.cloud`)"
+#      - "traefik.http.routers.pgadmin-secure.tls=true"
+#      - "traefik.http.routers.pgadmin-secure.tls.certresolver=cloudflare"
+#      - "traefik.http.routers.pgadmin-secure.service=pgadmin-service"
       # Service Configuration
-      - "traefik.http.services.pgadmin-service.loadbalancer.server.port=80"
+#      - "traefik.http.services.pgadmin-service.loadbalancer.server.port=80"
     # Environment Variables
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-      PGADMIN_CONFIG_SERVER_MODE: 'True'
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-      TZ: ${TZ}
+#    environment:
+#      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+#      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+#      PGADMIN_CONFIG_SERVER_MODE: 'True'
+#      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+#      TZ: ${TZ}
     # Volumes
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
+#    volumes:
+#      - pgadmin_data:/var/lib/pgadmin
     # Network
-    networks:
-      my-net:
-        ipv4_address: 100.204.0.55
+#    networks:
+#      my-net:
+#        ipv4_address: 100.204.0.55
     # Dependencies
-    depends_on:
-      postgres:
-        condition: service_healthy
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
 
   # ==========================================
   # IKEv2 VPN SERVER (StrongSwan)
@@ -309,6 +309,6 @@ volumes:
   ikev2_certs:
     external: true
     name: ikev2_certs
-  pgadmin_data:
-    driver: local
-    name: freeradius_pgadmin_data
+#  pgadmin_data:
+#    driver: local
+#    name: freeradius_pgadmin_data
