@@ -100,10 +100,10 @@
                                class="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-mono font-medium"
                                placeholder="Masukkan Bot Token (e.g. 123456789:ABCdefGh...)">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                            <i class="fas fa-key text-xs"></i>
+                            <i data-lucide="key" class="w-4 h-4"></i>
                         </div>
                         <button type="button" onclick="togglePasswordVisibility('bot_token')" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-350">
-                            <i id="bot_token_eye" class="fas fa-eye text-xs"></i>
+                            <i id="bot_token_eye" data-lucide="eye" class="w-4 h-4"></i>
                         </button>
                     </div>
                 </div>
@@ -117,7 +117,7 @@
                                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-450 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all font-mono font-medium"
                                placeholder="Masukkan Chat ID (e.g. 987654321 atau -100123456789)">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                            <i class="fas fa-user-circle text-xs"></i>
+                            <i data-lucide="user" class="w-4 h-4"></i>
                         </div>
                     </div>
                 </div>
@@ -125,12 +125,12 @@
                 <div class="flex flex-col sm:flex-row gap-3 pt-2">
                     <button type="submit" 
                             class="flex-1 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white py-3 px-5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-[1.01] flex items-center justify-center space-x-2">
-                        <i class="fas fa-save text-xs"></i>
+                        <i data-lucide="save" class="w-4 h-4 mr-1.5 inline-block"></i>
                         <span>Simpan Konfigurasi</span>
                     </button>
                     <button type="button" id="btnTestNotification" onclick="sendTestNotification()"
                             class="px-5 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl font-bold text-xs transition-all flex items-center justify-center space-x-2">
-                        <i class="fas fa-paper-plane text-xs"></i>
+                        <i data-lucide="send" class="w-4 h-4 mr-1.5 inline-block"></i>
                         <span>Kirim Test Alert</span>
                     </button>
                 </div>
@@ -141,7 +141,7 @@
         <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm space-y-6">
             <div class="flex items-center pb-4 border-b border-slate-100 dark:border-slate-700">
                 <div class="w-11 h-11 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-md text-white flex-shrink-0">
-                    <i class="fas fa-book-open text-sm"></i>
+                    <i data-lucide="book-open" class="w-5 h-5"></i>
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-slate-850 dark:text-white font-outfit">Panduan Integrasi</h3>
@@ -218,13 +218,12 @@
         const eyeIcon = document.getElementById(id + '_eye');
         if (input.type === 'password') {
             input.type = 'text';
-            eyeIcon.classList.remove('fa-eye');
-            eyeIcon.classList.add('fa-eye-slash');
+            eyeIcon.setAttribute('data-lucide', 'eye-off');
         } else {
             input.type = 'password';
-            eyeIcon.classList.remove('fa-eye-slash');
-            eyeIcon.classList.add('fa-eye');
+            eyeIcon.setAttribute('data-lucide', 'eye');
         }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // Handle form submit to save settings
@@ -236,7 +235,8 @@
         
         const submitBtn = this.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i><span>Menyimpan...</span>';
+        submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 mr-2 inline-block animate-spin"></i><span>Menyimpan...</span>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         submitBtn.disabled = true;
         
         try {
@@ -262,6 +262,7 @@
         } finally {
             submitBtn.innerHTML = originalText;
             submitBtn.disabled = false;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     });
 
@@ -269,7 +270,8 @@
     async function sendTestNotification() {
         const testBtn = document.getElementById('btnTestNotification');
         const originalText = testBtn.innerHTML;
-        testBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i><span>Mengirim...</span>';
+        testBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 mr-2 inline-block animate-spin"></i><span>Mengirim...</span>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         testBtn.disabled = true;
         
         try {
@@ -291,6 +293,7 @@
         } finally {
             testBtn.innerHTML = originalText;
             testBtn.disabled = false;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 

@@ -16,25 +16,45 @@ auth_bp = Blueprint('auth', __name__)
 @limiter.limit("10 per minute")
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password'] or session.pop('_mfa_pending_password', '')
+        username = request.form.get('username', '').strip()
         mfa_code = request.form.get('mfa_code')
-        
+        password = request.form.get('password', '')
+
+        # Check if this is an MFA verification step
+        pending_user_id = session.get('_mfa_pending_user_id')
+        if mfa_code and pending_user_id:
+            user = execute_query("SELECT * FROM admin_users WHERE id = %s AND username = %s AND is_active = TRUE", (pending_user_id, username))
+            if user and user[0]['is_mfa_enabled']:
+                totp = pyotp.TOTP(user[0]['mfa_secret'])
+                if totp.verify(mfa_code):
+                    session.pop('_mfa_pending_user_id', None)
+                    session.pop('_mfa_pending_username', None)
+                    session['user_id'] = user[0]['id']
+                    session['username'] = user[0]['username']
+                    session['role'] = user[0]['role']
+
+                    execute_query("UPDATE admin_users SET last_login = NOW() WHERE id = %s", (user[0]['id'],), fetch=False)
+                    send_telegram_notification(f"🔔 <b>Admin Login</b>\nUser: {username}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    flash('Login successful!', 'success')
+                    return redirect(url_for('dashboard.dashboard_page'))
+                else:
+                    flash('Invalid MFA code', 'error')
+                    return render_template('login.html', mfa_required=True, username=username)
+            else:
+                session.pop('_mfa_pending_user_id', None)
+                session.pop('_mfa_pending_username', None)
+
         user = execute_query("SELECT * FROM admin_users WHERE username = %s AND is_active = TRUE", (username,))
         
-        if user and check_password_hash(user[0]['password_hash'], password):
+        if user and password and check_password_hash(user[0]['password_hash'], password):
             # Check MFA
             if user[0]['is_mfa_enabled']:
-                if not mfa_code:
-                    session['_mfa_pending_password'] = password
-                    return render_template('login.html', mfa_required=True, username=username)
-                
-                totp = pyotp.TOTP(user[0]['mfa_secret'])
-                if not totp.verify(mfa_code):
-                    flash('Invalid MFA code', 'error')
-                    session['_mfa_pending_password'] = password
-                    return render_template('login.html', mfa_required=True, username=username)
+                session['_mfa_pending_user_id'] = user[0]['id']
+                session['_mfa_pending_username'] = username
+                return render_template('login.html', mfa_required=True, username=username)
             
+            session.pop('_mfa_pending_user_id', None)
+            session.pop('_mfa_pending_username', None)
             session['user_id'] = user[0]['id']
             session['username'] = user[0]['username']
             session['role'] = user[0]['role']

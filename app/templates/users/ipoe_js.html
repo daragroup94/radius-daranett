@@ -53,7 +53,7 @@ function ipoeSetStatus(status) {
 // ===== LOAD DATA =====
 async function loadIpoeUsers() {
     document.getElementById('ipoeTableBody').innerHTML =
-        `<tr><td colspan="8" class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...</td></tr>`;
+        `<tr><td colspan="8" class="text-center py-10 text-gray-400"><span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Loading...</td></tr>`;
     clearSelection();
 
     // Fetch RADIUS users + DHCP leases paralel
@@ -111,7 +111,7 @@ function renderTable() {
     if (!pageUsers.length) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center py-12">
             <div class="flex flex-col items-center gap-2 text-gray-400">
-                <i class="fas fa-network-wired text-3xl opacity-30"></i>
+                <i data-lucide="network" class="w-8 h-8 opacity-30"></i>
                 <p class="text-sm font-medium">Tidak ada device ditemukan</p>
             </div></td></tr>`;
     } else {
@@ -120,10 +120,10 @@ function renderTable() {
             const isOnline = u.active_sessions > 0 || isBound;
 
             const statusBadge = isBound
-                ? `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white" style="background:#22c55e"><i class="fas fa-circle text-[8px] mr-1"></i>Bound</span>`
+                ? `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white inline-flex items-center" style="background:#22c55e"><span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 inline-block"></span>Bound</span>`
                 : (u.active_sessions > 0
-                    ? `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white" style="background:#22c55e"><i class="fas fa-circle text-[8px] mr-1"></i>Online</span>`
-                    : `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white" style="background:#ef4444"><i class="fas fa-circle text-[8px] mr-1"></i>Offline</span>`);
+                    ? `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white inline-flex items-center" style="background:#22c55e"><span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 inline-block"></span>Online</span>`
+                    : `<span class="px-2 py-1 rounded-lg text-xs font-bold text-white inline-flex items-center" style="background:#ef4444"><span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 inline-block"></span>Offline</span>`);
 
             const flagsBadge = u.lease_flags
                 ? u.lease_flags.split('').map(f => {
@@ -177,17 +177,18 @@ function renderTable() {
                     <div class="flex justify-end gap-1">
                         <button onclick="openEditModal('${u.mac_address}','${(u.name||'').replace(/'/g, '\\\'')}','${u.ip_address||''}','${u.framed_pool||''}','${u.rate_limit||''}')"
                                 class="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-all" title="Edit">
-                            <i class="fas fa-edit text-xs"></i>
+                            <i data-lucide="edit" class="w-3.5 h-3.5"></i>
                         </button>
                         <button onclick="deleteDevice('${u.mac_address}')"
                                 class="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-all" title="Hapus">
-                            <i class="fas fa-trash text-xs"></i>
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                         </button>
                     </div>
                 </td>
             </tr>`;
         }).join('');
     }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
     document.getElementById('ipoeStart').textContent = total ? start + 1 : 0;
     document.getElementById('ipoeEnd').textContent = Math.min(start + 20, total);
@@ -298,12 +299,14 @@ async function openEditModal(mac, name, ip, pool, rate) {
     const badgeWrap = document.getElementById('editQueueStatus');
     if (mk?.found) {
         badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-700';
-        badge.innerHTML = '<i class="fas fa-check-circle"></i> Queue aktif di MikroTik';
+        badge.innerHTML = '<i data-lucide="check-circle" class="w-3.5 h-3.5 inline mr-1"></i> Queue aktif di MikroTik';
         badgeWrap.classList.remove('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     } else if (cfg) {
         badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-yellow-100 text-yellow-700';
-        badge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Config ada, belum sync ke MikroTik';
+        badge.innerHTML = '<i data-lucide="alert-circle" class="w-3.5 h-3.5 inline mr-1"></i> Config ada, belum sync ke MikroTik';
         badgeWrap.classList.remove('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     } else {
         badgeWrap.classList.add('hidden');
     }

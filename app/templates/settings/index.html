@@ -1,0 +1,1094 @@
+{% extends "base.html" %}
+
+{% block title %}Pengaturan Sistem - RADIUS Manager{% endblock %}
+{% block page_title %}Pengaturan Sistem{% endblock %}
+{% block page_subtitle %}Pusat konfigurasi antarmuka, identitas ISP, pemeliharaan sesi, dan parameter keamanan{% endblock %}
+
+{% block extra_css %}
+<style>
+    .font-outfit { font-family: 'Outfit', 'Inter', sans-serif; }
+    
+    /* Tab Styling */
+    .tab-btn.active {
+        background-color: rgba(59, 130, 246, 0.12);
+        color: #3b82f6;
+        border-color: #3b82f6;
+    }
+    .dark .tab-btn.active {
+        background-color: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+        border-color: #60a5fa;
+    }
+
+    /* Theme Card Preview */
+    .theme-card {
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .theme-card:hover {
+        transform: translateY(-2px);
+    }
+    .theme-card.selected {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
+    }
+
+    /* Resource Meter Bar */
+    .meter-bar {
+        transition: width 0.6s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in space-y-6 pb-12">
+
+    <!-- Header Banner -->
+    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden border border-slate-800/80">
+        <div class="absolute -right-10 -top-10 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div class="flex items-center space-x-4">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 shrink-0">
+                    <i data-lucide="sliders" class="w-7 h-7 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-extrabold tracking-tight font-outfit text-white">Pengaturan Sistem &amp; Preferensi</h1>
+                    <p class="text-slate-300 text-xs md:text-sm mt-0.5">Kelola preferensi tema visual, identitas ISP, pemeliharaan database, dan keamanan.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/settings/admins" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs md:text-sm font-medium transition backdrop-blur-sm border border-white/10">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400"></i>
+                    <span>Manajemen Admin</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex flex-wrap gap-2 mt-6 pt-5 border-t border-slate-700/60">
+            <button type="button" onclick="switchTab('appearance')" id="tabBtn-appearance" class="tab-btn active px-4 py-2 rounded-xl text-xs md:text-sm font-semibold border border-transparent transition flex items-center gap-2">
+                <i data-lucide="palette" class="w-4 h-4"></i>
+                <span>Tampilan &amp; Tema</span>
+            </button>
+            <button type="button" onclick="switchTab('isp')" id="tabBtn-isp" class="tab-btn px-4 py-2 rounded-xl text-xs md:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 border border-transparent transition flex items-center gap-2">
+                <i data-lucide="globe" class="w-4 h-4"></i>
+                <span>Profil ISP &amp; RADIUS</span>
+            </button>
+            <button type="button" onclick="switchTab('maintenance')" id="tabBtn-maintenance" class="tab-btn px-4 py-2 rounded-xl text-xs md:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 border border-transparent transition flex items-center gap-2">
+                <i data-lucide="database-zap" class="w-4 h-4"></i>
+                <span>Pemeliharaan &amp; Health</span>
+            </button>
+            <button type="button" onclick="switchTab('security')" id="tabBtn-security" class="tab-btn px-4 py-2 rounded-xl text-xs md:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 border border-transparent transition flex items-center gap-2">
+                <i data-lucide="lock" class="w-4 h-4"></i>
+                <span>Keamanan &amp; Sesi</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 1: TAMPILAN & TEMA (APPEARANCE & TYPOGRAPHY)                     -->
+    <!-- ===================================================================== -->
+    <div id="tabContent-appearance" class="tab-pane space-y-6">
+        
+        <!-- Pilihan Tema Warna Palette -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white font-outfit flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-indigo-500"></i>
+                        <span>Pilihan Tema Warna (Palette)</span>
+                    </h3>
+                    <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Pilih skema warna antarmuka yang paling nyaman untuk pemantauan harian Anda.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="activeThemeBadge" class="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                        Tema Aktif
+                    </span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 mt-6">
+                
+                <!-- 1. Cyber Slate -->
+                <div onclick="selectThemePalette('cyber')" id="card-theme-cyber" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#0b1120] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                            Cyber Slate
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono">NOC Cyan</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#162238] p-2.5 rounded-xl border border-cyan-900/30">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-cyan-300 font-bold">#162238</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-slate-700 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Teknis, presisi &amp; standar monitoring NOC.</div>
+                </div>
+
+                <!-- 2. Enterprise Cobalt -->
+                <div onclick="selectThemePalette('cobalt')" id="card-theme-cobalt" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#070c18] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                            Enterprise Cobalt
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono">Navy</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#12203b] p-2.5 rounded-xl border border-indigo-900/40">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-indigo-300 font-bold">#12203b</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-indigo-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-blue-600 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-sky-400 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-slate-800 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Elegan &amp; berwibawa gaya AWS / Cisco.</div>
+                </div>
+
+                <!-- 3. Emerald Matrix -->
+                <div onclick="selectThemePalette('emerald')" id="card-theme-emerald" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#041310] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            Emerald Matrix
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">Forest</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#0e3028] p-2.5 rounded-xl border border-emerald-800/40">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-emerald-300 font-bold">#0e3028</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-teal-400 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-green-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-emerald-950 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Sangat adem untuk shift pemantauan malam.</div>
+                </div>
+
+                <!-- 4. Obsidian Amber -->
+                <div onclick="selectThemePalette('amber')" id="card-theme-amber" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#111113] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                            Obsidian Amber
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono">Solar</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#222227] p-2.5 rounded-xl border border-amber-900/40">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-amber-300 font-bold">#222227</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-amber-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-orange-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-yellow-400 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-zinc-800 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Hitam pekat, status &amp; alarm langsung kontras.</div>
+                </div>
+
+                <!-- 5. Midnight Violet -->
+                <div onclick="selectThemePalette('violet')" id="card-theme-violet" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#0c0817] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                            Midnight Violet
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono">Cyberpunk</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#1c1334] p-2.5 rounded-xl border border-purple-900/40">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-purple-300 font-bold">#1c1334</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-purple-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-fuchsia-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-violet-400 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-indigo-950 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Futuristik dengan aksen ungu neon elegan.</div>
+                </div>
+
+                <!-- 6. Crimson Red -->
+                <div onclick="selectThemePalette('crimson')" id="card-theme-crimson" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#14080a] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                            Crimson Red
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono">Alert NOC</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#2a1117] p-2.5 rounded-xl border border-rose-900/40">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-rose-300 font-bold">#2a1117</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-red-600 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-orange-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-zinc-900 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Gaya Blood Moon untuk respon cepat &amp; tegas.</div>
+                </div>
+
+                <!-- 7. Nordic Arctic -->
+                <div onclick="selectThemePalette('arctic')" id="card-theme-arctic" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#06121a] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                            Nordic Arctic
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-mono">Glacier</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#10293c] p-2.5 rounded-xl border border-sky-900/40">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-sky-300 font-bold">#10293c</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-sky-400 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-cyan-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-slate-900 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Biru es jernih &amp; nyaman dibaca lama.</div>
+                </div>
+
+                <!-- 8. Tokyo Night / Synthwave -->
+                <div onclick="selectThemePalette('synthwave')" id="card-theme-synthwave" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#100e1d] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-pink-500"></span>
+                            Tokyo Night
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-mono">Synthwave</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#231f3d] p-2.5 rounded-xl border border-pink-900/40">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-pink-300 font-bold">#231f3d</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-pink-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-purple-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-slate-900 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Estetika neon retro Tokyo yang artistik.</div>
+                </div>
+
+                <!-- 9. Royal Luxury -->
+                <div onclick="selectThemePalette('luxury')" id="card-theme-luxury" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-800 bg-[#121110] text-white relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-100 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                            Royal Luxury
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 font-mono">Gold</span>
+                    </div>
+                    <div class="space-y-1.5 bg-[#262320] p-2.5 rounded-xl border border-yellow-900/40">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Card:</span>
+                            <span class="font-mono text-yellow-300 font-bold">#262320</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-amber-600 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-stone-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-stone-900 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-400">Arang gelap mewah berpadu aksen emas hangat.</div>
+                </div>
+
+                <!-- 10. Clean Snow (Light Mode) -->
+                <div onclick="selectThemePalette('light')" id="card-theme-light" class="theme-card cursor-pointer rounded-2xl p-3.5 border-2 border-slate-200 dark:border-slate-700 bg-white text-slate-900 relative group">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <span class="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                            Clean Snow
+                        </span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono">Light Mode</span>
+                    </div>
+                    <div class="space-y-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-500">Card:</span>
+                            <span class="font-mono text-blue-600 font-bold">#ffffff</span>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <span class="w-3.5 h-3.5 rounded-full bg-blue-600 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-slate-300 shadow-sm"></span>
+                            <span class="w-3.5 h-3.5 rounded-full bg-white border border-slate-300 shadow-sm"></span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[10px] text-slate-500">Mode terang minimalis untuk ruangan berpenerangan cukup.</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Pilihan Font & Skala Ukuran Font -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Font Size / UI Density Scale -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white font-outfit flex items-center gap-2">
+                        <i data-lucide="type" class="w-5 h-5 text-blue-500"></i>
+                        <span>Ukuran Font &amp; Densitas UI</span>
+                    </h3>
+                    <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1">Sesuaikan kepadatan tampilan dashboard dengan resolusi layar Anda.</p>
+                    
+                    <div class="grid grid-cols-3 gap-3 mt-6">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="font_size_radio" value="compact" onchange="previewFontSize('compact')" class="peer sr-only">
+                            <div class="p-3.5 text-center rounded-2xl border-2 border-slate-200 dark:border-slate-800 peer-checked:border-blue-500 peer-checked:bg-blue-50/50 dark:peer-checked:bg-blue-950/30 transition">
+                                <span class="text-xs font-bold block text-slate-800 dark:text-slate-200">Ringkas</span>
+                                <span class="text-[10px] text-slate-400 mt-0.5 block">13.5px (NOC dense)</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="font_size_radio" value="normal" checked onchange="previewFontSize('normal')" class="peer sr-only">
+                            <div class="p-3.5 text-center rounded-2xl border-2 border-slate-200 dark:border-slate-800 peer-checked:border-blue-500 peer-checked:bg-blue-50/50 dark:peer-checked:bg-blue-950/30 transition">
+                                <span class="text-xs font-bold block text-slate-800 dark:text-slate-200">Standar</span>
+                                <span class="text-[10px] text-slate-400 mt-0.5 block">15px (Default)</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="font_size_radio" value="large" onchange="previewFontSize('large')" class="peer sr-only">
+                            <div class="p-3.5 text-center rounded-2xl border-2 border-slate-200 dark:border-slate-800 peer-checked:border-blue-500 peer-checked:bg-blue-50/50 dark:peer-checked:bg-blue-950/30 transition">
+                                <span class="text-xs font-bold block text-slate-800 dark:text-slate-200">Nyaman</span>
+                                <span class="text-[10px] text-slate-400 mt-0.5 block">16.5px (Besar)</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs text-slate-500 dark:text-slate-400">
+                    💡 <span class="font-medium text-slate-700 dark:text-slate-300">Mode Ringkas (Compact):</span> Menampilkan hingga 25% lebih banyak data tabel pengguna &amp; log sesi tanpa perlu scroll.
+                </div>
+            </div>
+
+            <!-- Pilihan Font Family -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white font-outfit flex items-center gap-2">
+                        <i data-lucide="case-sensitive" class="w-5 h-5 text-emerald-500"></i>
+                        <span>Pilihan Jenis Font (Typography)</span>
+                    </h3>
+                    <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-1">Pilih kombinasi font heading &amp; body UI yang Anda sukai.</p>
+
+                    <div class="space-y-3 mt-6">
+                        <label class="block cursor-pointer">
+                            <input type="radio" name="font_family_radio" value="default" checked onchange="previewFontFamily('default')" class="peer sr-only">
+                            <div class="p-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-800 peer-checked:border-emerald-500 peer-checked:bg-emerald-50/40 dark:peer-checked:bg-emerald-950/20 transition flex items-center justify-between">
+                                <div>
+                                    <span class="text-xs md:text-sm font-bold block text-slate-800 dark:text-slate-200">Outfit &amp; Inter (Rekomendasi)</span>
+                                    <span class="text-[11px] text-slate-400">Modern geometric heading + clean UI body</span>
+                                </div>
+                                <span class="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-semibold">Aa Bb 123</span>
+                            </div>
+                        </label>
+
+                        <label class="block cursor-pointer">
+                            <input type="radio" name="font_family_radio" value="jakarta" onchange="previewFontFamily('jakarta')" class="peer sr-only">
+                            <div class="p-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-800 peer-checked:border-emerald-500 peer-checked:bg-emerald-50/40 dark:peer-checked:bg-emerald-950/20 transition flex items-center justify-between">
+                                <div>
+                                    <span class="text-xs md:text-sm font-bold block text-slate-800 dark:text-slate-200">Plus Jakarta Sans</span>
+                                    <span class="text-[11px] text-slate-400">Sangat rapi, elegan, &amp; legibilitas tinggi</span>
+                                </div>
+                                <span class="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-semibold">Aa Bb 123</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                    <button type="button" onclick="saveAppearanceSettings()" class="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold rounded-xl transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2">
+                        <i data-lucide="check-check" class="w-4 h-4"></i>
+                        <span>Simpan Preferensi Tampilan</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Live Preview Component Box -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+                <span>Live Preview Tampilan (Komponen &amp; Data)</span>
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Total User Aktif</span>
+                    <div class="text-2xl font-black text-slate-900 dark:text-white mt-1 tabular-nums">1,248</div>
+                    <span class="inline-flex items-center gap-1 text-[11px] text-emerald-500 mt-2 font-medium">
+                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i> +12% vs minggu lalu
+                    </span>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Format IP &amp; MAC (Monospace)</span>
+                    <div class="font-mono text-sm text-blue-600 dark:text-cyan-400 mt-1.5 font-medium">100.64.10.45</div>
+                    <div class="font-mono text-xs text-slate-500 dark:text-slate-400 mt-1">48:8F:5A:21:BC:08</div>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 flex flex-col justify-between">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Badge Indikator</span>
+                    <div class="flex flex-wrap gap-1.5 mt-2">
+                        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">ONLINE</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20">OFFLINE</span>
+                        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">WARNING</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 2: PROFIL ISP & RADIUS                                            -->
+    <!-- ===================================================================== -->
+    <div id="tabContent-isp" class="tab-pane hidden space-y-6">
+        <form id="ispSettingsForm" onsubmit="saveIspSettings(event)" class="space-y-6">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800">
+                <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white font-outfit">Identitas ISP &amp; Portal</h3>
+                        <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Nama dan kontak penyedia jaringan yang tampil pada header dan laporan.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Nama ISP / Perusahaan</label>
+                        <input type="text" id="setting_isp_name" value="{{ settings.get('isp_name', 'Daranett ISP') }}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Judul Aplikasi / Sistem</label>
+                        <input type="text" id="setting_app_title" value="{{ settings.get('app_title', 'Daranett RADIUS Manager') }}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Hotline / WhatsApp NOC Support</label>
+                        <input type="text" id="setting_support_hotline" value="{{ settings.get('support_hotline', '+62 812-3456-7890') }}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email Support / Admin</label>
+                        <input type="email" id="setting_support_email" value="{{ settings.get('support_email', 'noc@daranett.net') }}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Zona Waktu (Timezone)</label>
+                        <select id="setting_timezone" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                            <option value="Asia/Jakarta" {% if settings.get('timezone') == 'Asia/Jakarta' %}selected{% endif %}>WIB - Asia/Jakarta (UTC+7)</option>
+                            <option value="Asia/Makassar" {% if settings.get('timezone') == 'Asia/Makassar' %}selected{% endif %}>WITA - Asia/Makassar (UTC+8)</option>
+                            <option value="Asia/Jayapura" {% if settings.get('timezone') == 'Asia/Jayapura' %}selected{% endif %}>WIT - Asia/Jayapura (UTC+9)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Simbol Mata Uang / Currency</label>
+                        <input type="text" id="setting_currency_symbol" value="{{ settings.get('currency_symbol', 'Rp') }}" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800">
+                <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white font-outfit">Parameter Default RADIUS Accounting</h3>
+                        <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Konfigurasi interval kirim status paket antara MikroTik NAS dan FreeRADIUS.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Default Acct-Interim-Interval (Detik)</label>
+                        <input type="number" id="setting_radius_interim_interval" value="{{ settings.get('radius_interim_interval', '300') }}" min="60" max="3600" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <span class="text-[11px] text-slate-400 mt-1 block">Standar: 300 detik (5 menit). Waktu update statistik kuota &amp; durasi.</span>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Default Session-Timeout (Detik)</label>
+                        <input type="number" id="setting_radius_default_timeout" value="{{ settings.get('radius_default_timeout', '86400') }}" min="300" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <span class="text-[11px] text-slate-400 mt-1 block">Standar: 86400 detik (24 jam) untuk masa sewa sesi sebelum re-auth.</span>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end">
+                    <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold rounded-xl transition shadow-lg shadow-blue-500/25 flex items-center gap-2">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        <span>Simpan Pengaturan ISP</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 3: PEMELIHARAAN & HEALTH                                          -->
+    <!-- ===================================================================== -->
+    <div id="tabContent-maintenance" class="tab-pane hidden space-y-6">
+        
+        <!-- Live System Telemetry -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white font-outfit flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-5 h-5 text-cyan-500"></i>
+                        <span>Resource Server &amp; Database Health</span>
+                    </h3>
+                    <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Pantauan beban CPU, memori RAM, disk, serta kondisi service server secara langsung.</p>
+                </div>
+                <button type="button" onclick="fetchHealthMetrics()" class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium transition flex items-center gap-1.5">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span>Segarkan</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- CPU -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                    <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                        <span>Beban CPU</span>
+                        <span id="healthCpuVal" class="font-bold text-slate-800 dark:text-slate-200 tabular-nums">-%</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-2.5 overflow-hidden">
+                        <div id="healthCpuBar" class="meter-bar h-full bg-cyan-500 rounded-full" style="width: 0%;"></div>
+                    </div>
+                    <span id="healthCpuCores" class="text-[10px] text-slate-400 mt-2 block">- Cores Terdeteksi</span>
+                </div>
+
+                <!-- RAM -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                    <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                        <span>Memori RAM</span>
+                        <span id="healthMemVal" class="font-bold text-slate-800 dark:text-slate-200 tabular-nums">-%</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-2.5 overflow-hidden">
+                        <div id="healthMemBar" class="meter-bar h-full bg-blue-500 rounded-full" style="width: 0%;"></div>
+                    </div>
+                    <span id="healthMemDetail" class="text-[10px] text-slate-400 mt-2 block">- MB / - MB</span>
+                </div>
+
+                <!-- Disk -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                    <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                        <span>Disk Storage</span>
+                        <span id="healthDiskVal" class="font-bold text-slate-800 dark:text-slate-200 tabular-nums">-%</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-2.5 overflow-hidden">
+                        <div id="healthDiskBar" class="meter-bar h-full bg-emerald-500 rounded-full" style="width: 0%;"></div>
+                    </div>
+                    <span id="healthDiskDetail" class="text-[10px] text-slate-400 mt-2 block">- GB Terpakai</span>
+                </div>
+
+                <!-- Status Services -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 flex flex-col justify-between">
+                    <div class="text-xs text-slate-500 dark:text-slate-400">Status Layanan Inti</div>
+                    <div class="space-y-1.5 mt-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-600 dark:text-slate-300 font-medium">PostgreSQL:</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">ONLINE</span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-slate-600 dark:text-slate-300 font-medium">Redis Cache:</span>
+                            <span id="healthRedisBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">CONNECTED</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pemeliharaan Database & Sesi -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Card 1: Cleanup Stale Sessions -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                <div>
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center mb-4">
+                        <i data-lucide="brush" class="w-6 h-6"></i>
+                    </div>
+                    <h4 class="text-base font-bold text-slate-900 dark:text-white font-outfit">Pembersihan Sesi Gantung (Stale Sessions)</h4>
+                    <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                        Menutup sesi pelanggan yang sudah tidak mengirimkan paket akuntansi (*accounting update*) selama lebih dari 10 menit akibat pemadaman listrik perangkat atau kendala link. Sesi akan ditandai secara rapi sebagai <code class="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">Lost-Carrier</code>.
+                    </p>
+                    <div class="mt-4 p-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 rounded-xl flex items-center justify-between text-xs">
+                        <span class="text-amber-800 dark:text-amber-300 font-medium">Terdeteksi Sesi Gantung:</span>
+                        <span id="staleSessionsCount" class="font-bold font-mono text-amber-700 dark:text-amber-400 text-sm">0 Sesi</span>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button type="button" onclick="runStaleCleanup()" class="w-full px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs md:text-sm font-semibold rounded-xl transition shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2">
+                        <i data-lucide="zap" class="w-4 h-4"></i>
+                        <span>Bersihkan Sesi Gantung Sekarang</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card 2: Inspeksi Duplikat Sesi -->
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                <div>
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center mb-4">
+                        <i data-lucide="copy-check" class="w-6 h-6"></i>
+                    </div>
+                    <h4 class="text-base font-bold text-slate-900 dark:text-white font-outfit">Inspeksi &amp; Pembersihan Sesi Duplikat</h4>
+                    <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                        Mendeteksi jika ada akun pelanggan yang tercatat login secara ganda (*multiple active sessions*) pada tabel RADIUS. Sistem dapat otomatis mempertahankan sesi terbaru dan menutup sesi usang.
+                    </p>
+                    <div class="mt-4 p-3 bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-900/40 rounded-xl flex items-center justify-between text-xs">
+                        <span class="text-indigo-800 dark:text-indigo-300 font-medium">Akun Dengan Sesi Duplikat:</span>
+                        <span id="dupeSessionsCount" class="font-bold font-mono text-indigo-700 dark:text-indigo-400 text-sm">0 Akun</span>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex flex-col sm:flex-row gap-3">
+                    <button type="button" onclick="checkDuplicates()" class="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs md:text-sm font-semibold rounded-xl transition flex items-center justify-center gap-2">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                        <span>Cek Duplikat</span>
+                    </button>
+                    <button type="button" onclick="cleanupDuplicates()" class="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm font-semibold rounded-xl transition shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2">
+                        <i data-lucide="shield-alert" class="w-4 h-4"></i>
+                        <span>Tutup Duplikat Lama</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Card 3: Cache Management -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 rounded-2xl bg-rose-500/15 text-rose-500 flex items-center justify-center shrink-0">
+                    <i data-lucide="trash-2" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h4 class="text-base font-bold text-slate-900 dark:text-white font-outfit">Bersihkan Cache Sesi &amp; Brute-Force Lockout</h4>
+                    <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Hapus cache percobaan login gagal di Redis dan segarkan session store.</p>
+                </div>
+            </div>
+            <button type="button" onclick="clearSystemCache()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs md:text-sm font-semibold rounded-xl transition shadow-lg shadow-rose-500/25 shrink-0 flex items-center justify-center gap-2">
+                <i data-lucide="flame" class="w-4 h-4"></i>
+                <span>Flush Redis Cache</span>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 4: KEAMANAN & SESI                                                -->
+    <!-- ===================================================================== -->
+    <div id="tabContent-security" class="tab-pane hidden space-y-6">
+        <form id="securitySettingsForm" onsubmit="saveSecuritySettings(event)" class="space-y-6">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800">
+                <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white font-outfit">Proteksi Brute-Force &amp; Masa Sesi</h3>
+                        <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Aturan pembatasan percobaan login salah serta batas waktu tidak aktif (*inactivity timeout*).</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Maksimal Percobaan Login Gagal</label>
+                        <input type="number" id="setting_brute_force_max_attempts" value="{{ settings.get('brute_force_max_attempts', '5') }}" min="3" max="20" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <span class="text-[11px] text-slate-400 mt-1 block">Jika tercapai, IP penyerang akan dilaporkan ke Telegram bot.</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Durasi Penguncian IP (Menit)</label>
+                        <input type="number" id="setting_brute_force_lock_minutes" value="{{ settings.get('brute_force_lock_minutes', '10') }}" min="5" max="120" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <span class="text-[11px] text-slate-400 mt-1 block">Masa penangguhan hit counter login setelah salah password.</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Batas Waktu Sesi Inactivity (Menit)</label>
+                        <input type="number" id="setting_session_idle_timeout" value="{{ settings.get('session_idle_timeout', '60') }}" min="15" max="1440" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <span class="text-[11px] text-slate-400 mt-1 block">Sesi web admin akan logout otomatis jika tidak ada aktivitas.</span>
+                    </div>
+
+                    <div class="flex flex-col justify-between">
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Kebijakan Multi-Factor Authentication (MFA)</label>
+                        <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+                            <span class="text-xs text-slate-600 dark:text-slate-300">Konfigurasi OTP Per-Admin</span>
+                            <a href="/profile" class="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">Buka Profil Saya &rarr;</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end">
+                    <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold rounded-xl transition shadow-lg shadow-blue-500/25 flex items-center gap-2">
+                        <i data-lucide="shield-check" class="w-4 h-4"></i>
+                        <span>Simpan Kebijakan Keamanan</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tab switching logic
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            btn.classList.add('text-slate-300');
+        });
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.add('hidden');
+        });
+
+        const activeBtn = document.getElementById('tabBtn-' + tabId);
+        const activePane = document.getElementById('tabContent-' + tabId);
+        if (activeBtn && activePane) {
+            activeBtn.classList.add('active');
+            activeBtn.classList.remove('text-slate-300');
+            activePane.classList.remove('hidden');
+        }
+
+        if (tabId === 'maintenance') {
+            fetchHealthMetrics();
+        }
+    }
+
+    // =========================================================================
+    // THEME & APPEARANCE PREVIEW & SAVE
+    // =========================================================================
+    let currentSelectedPalette = localStorage.getItem('ui_palette') || 'cyber';
+    let currentSelectedFontSize = localStorage.getItem('ui_fontsize') || 'normal';
+    let currentSelectedFontFamily = localStorage.getItem('ui_font') || 'default';
+
+    const PALETTE_NAMES = {
+        cyber: 'Cyber Slate (NOC Cyan)',
+        cobalt: 'Enterprise Cobalt (Navy)',
+        emerald: 'Emerald Matrix (Forest)',
+        amber: 'Obsidian Amber (Solar Gold)',
+        violet: 'Midnight Violet (Cyberpunk)',
+        crimson: 'Crimson Red (Blood Moon)',
+        arctic: 'Nordic Arctic (Glacier Blue)',
+        synthwave: 'Tokyo Night (Synthwave)',
+        luxury: 'Royal Luxury (Black & Gold)',
+        light: 'Clean Snow (Light Mode)'
+    };
+
+    function initAppearanceUI() {
+        // Highlight active palette card
+        document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('selected'));
+        const activeCard = document.getElementById('card-theme-' + currentSelectedPalette);
+        if (activeCard) activeCard.classList.add('selected');
+
+        const badge = document.getElementById('activeThemeBadge');
+        if (badge && PALETTE_NAMES[currentSelectedPalette]) {
+            badge.innerText = 'Aktif: ' + PALETTE_NAMES[currentSelectedPalette];
+        }
+
+        // Check font size radio
+        const fontRadio = document.querySelector(`input[name="font_size_radio"][value="${currentSelectedFontSize}"]`);
+        if (fontRadio) fontRadio.checked = true;
+
+        // Check font family radio
+        const fontFamRadio = document.querySelector(`input[name="font_family_radio"][value="${currentSelectedFontFamily}"]`);
+        if (fontFamRadio) fontFamRadio.checked = true;
+    }
+
+    function selectThemePalette(paletteName) {
+        currentSelectedPalette = paletteName;
+        document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('selected'));
+        const card = document.getElementById('card-theme-' + paletteName);
+        if (card) card.classList.add('selected');
+
+        // Apply immediately across entire application DOM
+        if (window.applyGlobalTheme) {
+            window.applyGlobalTheme(paletteName);
+        }
+
+        const badge = document.getElementById('activeThemeBadge');
+        if (badge && PALETTE_NAMES[paletteName]) {
+            badge.innerText = 'Aktif: ' + PALETTE_NAMES[paletteName];
+        }
+
+        // Show fast feedback toast
+        const toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1600,
+            timerProgressBar: true
+        });
+        toast.fire({
+            icon: 'success',
+            title: `Tema beralih: ${PALETTE_NAMES[paletteName] || paletteName}`
+        });
+    }
+
+    function previewFontSize(size) {
+        currentSelectedFontSize = size;
+        if (window.applyGlobalFontSize) {
+            window.applyGlobalFontSize(size);
+        }
+    }
+
+    function previewFontFamily(family) {
+        currentSelectedFontFamily = family;
+        if (window.applyGlobalFontFamily) {
+            window.applyGlobalFontFamily(family);
+        }
+    }
+
+    async function saveAppearanceSettings() {
+        localStorage.setItem('ui_palette', currentSelectedPalette);
+        localStorage.setItem('ui_fontsize', currentSelectedFontSize);
+        localStorage.setItem('ui_font', currentSelectedFontFamily);
+
+        try {
+            await apiCall('/api/settings', {
+                method: 'POST',
+                body: JSON.stringify({
+                    default_ui_theme: currentSelectedPalette,
+                    default_font_size: currentSelectedFontSize,
+                    default_ui_font: currentSelectedFontFamily
+                })
+            });
+        } catch (err) {
+            console.error('Error saving appearance to backend:', err);
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Preferensi Disimpan!',
+            text: `Tema ${PALETTE_NAMES[currentSelectedPalette] || currentSelectedPalette} dan ukuran font telah diterapkan permanen.`,
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }
+
+    // =========================================================================
+    // ISP & SYSTEM SETTINGS SAVE
+    // =========================================================================
+    async function saveIspSettings(e) {
+        e.preventDefault();
+        const payload = {
+            isp_name: document.getElementById('setting_isp_name').value.trim(),
+            app_title: document.getElementById('setting_app_title').value.trim(),
+            support_hotline: document.getElementById('setting_support_hotline').value.trim(),
+            support_email: document.getElementById('setting_support_email').value.trim(),
+            timezone: document.getElementById('setting_timezone').value,
+            currency_symbol: document.getElementById('setting_currency_symbol').value.trim(),
+            radius_interim_interval: document.getElementById('setting_radius_interim_interval').value,
+            radius_default_timeout: document.getElementById('setting_radius_default_timeout').value
+        };
+
+        const res = await apiCall('/api/settings', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        if (res && res.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Tersimpan!',
+                text: res.message || 'Pengaturan ISP berhasil diperbarui.'
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menyimpan',
+                text: res.error || 'Terjadi kesalahan sistem.'
+            });
+        }
+    }
+
+    // =========================================================================
+    // SECURITY SETTINGS SAVE
+    // =========================================================================
+    async function saveSecuritySettings(e) {
+        e.preventDefault();
+        const payload = {
+            brute_force_max_attempts: document.getElementById('setting_brute_force_max_attempts').value,
+            brute_force_lock_minutes: document.getElementById('setting_brute_force_lock_minutes').value,
+            session_idle_timeout: document.getElementById('setting_session_idle_timeout').value
+        };
+
+        const res = await apiCall('/api/settings', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        if (res && res.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Kebijakan Diperbarui!',
+                text: res.message || 'Parameter keamanan berhasil disimpan.'
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menyimpan',
+                text: res.error || 'Terjadi kesalahan sistem.'
+            });
+        }
+    }
+
+    // =========================================================================
+    // MAINTENANCE & SYSTEM HEALTH
+    // =========================================================================
+    async function fetchHealthMetrics() {
+        try {
+            const res = await apiCall('/api/settings/system-health');
+            if (res && res.success) {
+                // CPU
+                document.getElementById('healthCpuVal').innerText = res.cpu_percent + '%';
+                document.getElementById('healthCpuBar').style.width = res.cpu_percent + '%';
+                document.getElementById('healthCpuCores').innerText = res.cpu_cores + ' Cores Terdeteksi';
+
+                // RAM
+                document.getElementById('healthMemVal').innerText = res.memory_percent + '%';
+                document.getElementById('healthMemBar').style.width = res.memory_percent + '%';
+                document.getElementById('healthMemDetail').innerText = res.memory_used_mb + ' MB / ' + res.memory_total_mb + ' MB';
+
+                // Disk
+                document.getElementById('healthDiskVal').innerText = res.disk_percent + '%';
+                document.getElementById('healthDiskBar').style.width = res.disk_percent + '%';
+                document.getElementById('healthDiskDetail').innerText = res.disk_used_gb + ' GB / ' + res.disk_total_gb + ' GB';
+
+                // Stale sessions
+                document.getElementById('staleSessionsCount').innerText = res.stale_sessions + ' Sesi';
+            }
+        } catch (err) {
+            console.error('Error fetching health metrics:', err);
+        }
+    }
+
+    async function runStaleCleanup() {
+        const confirm = await Swal.fire({
+            title: 'Bersihkan Sesi Gantung?',
+            text: 'Sesi yang tidak mengirim acct-update >10 menit akan ditutup dengan status Lost-Carrier.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#f59e0b',
+            confirmButtonText: 'Ya, Bersihkan Sekarang',
+            cancelButtonText: 'Batal'
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        const res = await apiCall('/api/settings/maintenance/cleanup-stale', { method: 'POST' });
+        if (res && res.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Pembersihan Selesai!',
+                text: res.message || `${res.cleaned_count} sesi telah ditutup.`
+            });
+            fetchHealthMetrics();
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal',
+                text: res.error || 'Terjadi kesalahan saat membersihkan sesi.'
+            });
+        }
+    }
+
+    async function checkDuplicates() {
+        const res = await apiCall('/api/settings/maintenance/duplicates');
+        if (res && res.success) {
+            document.getElementById('dupeSessionsCount').innerText = res.total + ' Akun';
+            if (res.total === 0) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Bagus!',
+                    text: 'Tidak ada sesi duplikat terdeteksi pada database RADIUS.'
+                });
+            } else {
+                let listHtml = '<div class="text-left max-h-48 overflow-y-auto text-xs space-y-1 mt-3">';
+                res.duplicates.forEach(d => {
+                    listHtml += `<div class="p-2 bg-slate-100 dark:bg-slate-800 rounded font-mono"><b>${d.username}</b>: ${d.session_count} sesi aktif (MAC: ${d.mac_addresses})</div>`;
+                });
+                listHtml += '</div>';
+
+                Swal.fire({
+                    title: `Ditemukan ${res.total} Akun Duplikat!`,
+                    html: listHtml,
+                    icon: 'warning'
+                });
+            }
+        }
+    }
+
+    async function cleanupDuplicates() {
+        const confirm = await Swal.fire({
+            title: 'Tutup Sesi Duplikat Lama?',
+            text: 'Sistem akan mempertahankan sesi terbaru untuk setiap pengguna dan menutup sesi lama.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#6366f1',
+            confirmButtonText: 'Ya, Tutup Duplikat',
+            cancelButtonText: 'Batal'
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        const res = await apiCall('/api/settings/maintenance/cleanup-duplicates', { method: 'POST' });
+        if (res && res.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: res.message
+            });
+            checkDuplicates();
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal',
+                text: res.error || 'Terjadi kesalahan.'
+            });
+        }
+    }
+
+    async function clearSystemCache() {
+        const res = await apiCall('/api/settings/maintenance/clear-cache', { method: 'POST' });
+        if (res && res.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Cache Dibersihkan!',
+                text: res.message
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal',
+                text: res.error || 'Gagal membersihkan cache.'
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initAppearanceUI();
+        lucide.createIcons();
+    });
+</script>
+{% endblock %}

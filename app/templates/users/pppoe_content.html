@@ -106,13 +106,13 @@
             </p>
             <div class="flex space-x-2">
                 <button onclick="changePage(currentPage - 1)" id="prevPage" class="p-2.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                    <i class="fas fa-chevron-left"></i>
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
                 </button>
                 <div id="pageNumbers" class="flex space-x-2">
                     <!-- Page numbers will be loaded here -->
                 </div>
                 <button onclick="changePage(currentPage + 1)" id="nextPage" class="p-2.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                    <i class="fas fa-chevron-right"></i>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
             </div>
         </div>
@@ -125,12 +125,12 @@
         <div class="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-slate-750 pb-4">
             <div class="flex items-center">
                 <div class="w-11 h-11 icon-gradient-add-user rounded-2xl flex items-center justify-center mr-4 shadow-lg shadow-purple-500/10">
-                    <i class="fas fa-user-plus text-white text-base"></i>
+                    <i data-lucide="user-plus" class="w-5 h-5 text-white"></i>
                 </div>
                 <h3 class="text-lg font-bold text-slate-800 dark:text-white">Tambah Pelanggan PPPoE Baru</h3>
             </div>
             <button onclick="closeAddUserModal()" class="w-9 h-9 bg-slate-50 dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-500 hover:text-rose-600 rounded-xl transition-all flex items-center justify-center">
-                <i class="fas fa-times"></i>
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
 
@@ -144,7 +144,7 @@
                     <div class="border border-slate-150 dark:border-slate-700/60 rounded-2xl p-5 bg-slate-50/50 dark:bg-slate-900/20 modal-section-card">
                         <h4 class="text-sm font-extrabold text-slate-800 dark:text-slate-100 mb-4 flex items-center uppercase tracking-wider">
                             <div class="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mr-2">
-                                <i class="fas fa-user text-[10px]"></i>
+                                <i data-lucide="user" class="w-3 h-3"></i>
                             </div>
                             Informasi Dasar
                         </h4>
@@ -172,7 +172,7 @@
                     <div class="border border-slate-150 dark:border-slate-700/60 rounded-2xl p-5 bg-slate-50/50 dark:bg-slate-900/20 modal-section-card">
                         <h4 class="text-sm font-extrabold text-slate-800 dark:text-slate-100 mb-4 flex items-center uppercase tracking-wider">
                             <div class="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mr-2">
-                                <i class="fas fa-network-wired text-[10px]"></i>
+                                <i data-lucide="network" class="w-3 h-3"></i>
                             </div>
                             Konfigurasi IP (IPv4 & IPv6)
                         </h4>
@@ -204,7 +204,7 @@
                     <div class="border border-slate-150 dark:border-slate-700/60 rounded-2xl p-5 bg-slate-50/50 dark:bg-slate-900/20 modal-section-card">
                         <h4 class="text-sm font-extrabold text-slate-800 dark:text-slate-100 mb-4 flex items-center uppercase tracking-wider">
                             <div class="w-6 h-6 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center mr-2">
-                                <i class="fas fa-cog text-[10px]"></i>
+                                <i data-lucide="settings" class="w-3 h-3"></i>
                             </div>
                             Pengaturan Tambahan
                         </h4>
@@ -238,7 +238,7 @@
                     <div class="border border-slate-150 dark:border-slate-700/60 rounded-2xl p-5 bg-slate-50/50 dark:bg-slate-900/20 modal-section-card flex-1">
                         <h4 class="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center uppercase tracking-wider">
                             <div class="w-6 h-6 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center mr-2">
-                                <i class="fas fa-tachometer-alt text-[10px]"></i>
+                                <i data-lucide="gauge" class="w-3 h-3"></i>
                             </div>
                             Bandwidth Control (Gaya MikroTik)
                         </h4>
@@ -312,7 +312,7 @@
                                     <label class="text-xs font-bold text-slate-700 dark:text-slate-200">MikroTik Rate-Limit String:</label>
                                     <button type="button" onclick="copyRateLimit()" 
                                             class="text-[10px] bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-400 px-3 py-1.5 rounded-lg font-bold transition-all">
-                                        <i class="fas fa-copy mr-1"></i>Salin String
+                                        <i data-lucide="copy" class="w-3 h-3 inline mr-1"></i>Salin String
                                     </button>
                                 </div>
                                 <input type="text" id="rateLimitPreview" name="rate_limit" readonly 
@@ -333,7 +333,7 @@
                 <button type="submit" 
                         class="flex-[2] px-4 py-3 text-white rounded-xl font-bold text-sm transition-all shadow-lg transform hover:scale-[1.02] hover:opacity-90 active:scale-[0.98]"
                         style="background:linear-gradient(135deg,#667eea,#764ba2);">
-                    <i class="fas fa-user-plus mr-2"></i>Buat Pelanggan
+                    <i data-lucide="user-plus" class="w-4 h-4 inline mr-2"></i>Buat Pelanggan
                 </button>
             </div>
         </form>
@@ -346,12 +346,12 @@
         <div class="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-slate-755 pb-4">
             <div class="flex items-center">
                 <div class="w-11 h-11 icon-gradient-edit-user rounded-2xl flex items-center justify-center mr-4 shadow-lg shadow-purple-500/10">
-                    <i class="fas fa-user-edit text-white text-base"></i>
+                    <i data-lucide="user-pen" class="w-5 h-5 text-white"></i>
                 </div>
                 <h3 class="text-lg font-bold text-slate-800 dark:text-white">Edit Pelanggan PPPoE</h3>
             </div>
             <button onclick="closeEditUserModal()" class="w-9 h-9 bg-slate-50 dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-500 hover:text-rose-600 rounded-xl transition-all flex items-center justify-center">
-                <i class="fas fa-times"></i>
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
 
@@ -367,7 +367,7 @@
                     <div class="border border-slate-150 dark:border-slate-700/60 rounded-2xl p-5 bg-slate-50/50 dark:bg-slate-900/20 modal-section-card">
                         <h4 class="text-sm font-extrabold text-slate-850 dark:text-slate-100 mb-4 flex items-center uppercase tracking-wider">
                             <div class="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center mr-2">
-                                <i class="fas fa-user text-[10px]"></i>
+                                <i data-lucide="user" class="w-3 h-3"></i>
                             </div>
                             Informasi Dasar
                         </h4>
@@ -392,7 +392,7 @@
                     <div class="border border-slate-150 dark:border-slate-700/60 rounded-2xl p-5 bg-slate-50/50 dark:bg-slate-900/20 modal-section-card">
                         <h4 class="text-sm font-extrabold text-slate-850 dark:text-slate-100 mb-4 flex items-center uppercase tracking-wider">
                             <div class="w-6 h-6 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mr-2">
-                                <i class="fas fa-network-wired text-[10px]"></i>
+                                <i data-lucide="network" class="w-3 h-3"></i>
                             </div>
                             Konfigurasi IP (IPv4 & IPv6)
                         </h4>
@@ -424,7 +424,7 @@
                     <div class="border border-slate-150 dark:border-slate-700/60 rounded-2xl p-5 bg-slate-50/50 dark:bg-slate-900/20 modal-section-card">
                         <h4 class="text-sm font-extrabold text-slate-850 dark:text-slate-100 mb-4 flex items-center uppercase tracking-wider">
                             <div class="w-6 h-6 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center mr-2">
-                                <i class="fas fa-cog text-[10px]"></i>
+                                <i data-lucide="settings" class="w-3 h-3"></i>
                             </div>
                             Pengaturan Tambahan
                         </h4>
@@ -458,7 +458,7 @@
                     <div class="border border-slate-150 dark:border-slate-700/60 rounded-2xl p-5 bg-slate-50/50 dark:bg-slate-900/20 modal-section-card flex-1">
                         <h4 class="text-sm font-bold text-slate-850 dark:text-slate-100 mb-4 flex items-center uppercase tracking-wider">
                             <div class="w-6 h-6 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center mr-2">
-                                <i class="fas fa-tachometer-alt text-[10px]"></i>
+                                <i data-lucide="gauge" class="w-3 h-3"></i>
                             </div>
                             Bandwidth Control (Gaya MikroTik)
                         </h4>
@@ -532,7 +532,7 @@
                                     <label class="text-xs font-bold text-slate-700 dark:text-slate-200">MikroTik Rate-Limit String:</label>
                                     <button type="button" onclick="copyEditRateLimit()" 
                                             class="text-[10px] bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-400 px-3 py-1.5 rounded-lg font-bold transition-all">
-                                        <i class="fas fa-copy mr-1"></i>Salin String
+                                        <i data-lucide="copy" class="w-3 h-3 inline mr-1"></i>Salin String
                                     </button>
                                 </div>
                                 <input type="text" id="editRateLimitPreview" name="rate_limit" readonly 
@@ -552,7 +552,7 @@
                 </button>
                 <button type="submit" 
                         class="flex-[2] px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-650 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg transform hover:scale-[1.02] active:scale-[0.98]">
-                    <i class="fas fa-save mr-2"></i>Simpan Perubahan
+                    <i data-lucide="save" class="w-4 h-4 inline mr-2"></i>Simpan Perubahan
                 </button>
             </div>
         </form>
@@ -564,7 +564,7 @@
     <div class="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700/80 rounded-[28px] shadow-2xl p-6 w-full max-w-sm">
         <div class="flex items-center mb-4 border-b border-slate-100 dark:border-slate-750 pb-3">
             <div class="w-11 h-11 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg shadow-rose-500/15">
-                <i class="fas fa-trash text-white text-base"></i>
+                <i data-lucide="trash-2" class="w-5 h-5 text-white"></i>
             </div>
             <h3 class="text-lg font-bold text-slate-850 dark:text-white">Hapus Pelanggan</h3>
         </div>
@@ -584,7 +584,7 @@
         <div class="px-5 py-4 flex justify-between items-center" style="border-bottom:1px solid rgba(255,255,255,0.07)">
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
-                    <i class="fas fa-satellite-dish text-white text-sm"></i>
+                    <i data-lucide="radio" class="w-4 h-4 text-white"></i>
                 </div>
                 <div>
                     <p class="text-sm font-bold text-white">ACS Device Info</p>
@@ -596,21 +596,21 @@
                     style="background:rgba(255,255,255,0.06);color:#64748b"
                     onmouseover="this.style.background='rgba(239,68,68,0.15)';this.style.color='#f87171'"
                     onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#64748b'">
-                <i class="fas fa-times text-xs"></i>
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
 
         <div class="p-5 max-h-[80vh] overflow-y-auto" style="scrollbar-width:thin;scrollbar-color:#334155 transparent">
             <!-- Loading -->
             <div id="deviceInfoLoading" class="text-center py-14">
-                <i class="fas fa-spinner fa-spin text-3xl mb-3" style="color:#6366f1"></i>
+                <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
                 <p class="text-sm" style="color:#64748b">Menghubungi GenieACS...</p>
             </div>
 
             <!-- Not found -->
             <div id="deviceInfoNotFound" class="hidden text-center py-14">
                 <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:rgba(255,255,255,0.05)">
-                    <i class="fas fa-unlink text-2xl" style="color:#334155"></i>
+                    <i data-lucide="unlink" class="w-8 h-8" style="color:#334155"></i>
                 </div>
                 <p class="text-sm font-semibold text-white mb-1">Device tidak ditemukan</p>
                 <p id="deviceInfoNotFoundMsg" class="text-xs" style="color:#64748b"></p>
@@ -624,7 +624,7 @@
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,0.15)">
-                                <i class="fas fa-signal text-white text-base"></i>
+                                <i data-lucide="signal" class="w-5 h-5 text-white"></i>
                             </div>
                             <div>
                                 <p class="text-xs font-semibold mb-0.5" style="color:rgba(255,255,255,0.6)">Fiber RX Power</p>
@@ -640,7 +640,7 @@
                             <div id="di_rx_gauge_fill" class="hud-gauge-fill" style="width: 0%"></div>
                         </div>
                         <div class="flex justify-between text-[9px]" style="color:rgba(255,255,255,0.45)">
-                            <span>Sinyal Lemah (<-27 dBm)</span>
+                            <span>Sinyal Lemah (&lt;-27 dBm)</span>
                             <span>Optimal (-15 to -24 dBm)</span>
                         </div>
                     </div>
@@ -685,25 +685,25 @@
                 <div class="grid grid-cols-2 gap-2">
                     <div class="rounded-xl p-3" style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15)">
                         <p class="text-[9px] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1" style="color:#34d399">
-                            <i class="fas fa-network-wired"></i> PPPoE IP Address
+                            <i data-lucide="network" class="w-3 h-3"></i> PPPoE IP Address
                         </p>
                         <p id="di_pppoe_ip" class="text-xs font-bold text-white font-mono"></p>
                     </div>
                     <div class="rounded-xl p-3" style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15)">
                         <p class="text-[9px] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1" style="color:#34d399">
-                            <i class="fas fa-clock"></i> PPP Uptime
+                            <i data-lucide="clock" class="w-3 h-3"></i> PPP Uptime
                         </p>
                         <p id="di_ppp_uptime" class="text-xs font-bold text-white"></p>
                     </div>
                     <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
                         <p class="text-[9px] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1" style="color:#64748b">
-                            <i class="fas fa-power-off"></i> Uptime ONT
+                            <i data-lucide="power" class="w-3 h-3"></i> Uptime ONT
                         </p>
                         <p id="di_device_uptime" class="text-xs font-bold text-white"></p>
                     </div>
                     <div class="rounded-xl p-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
                         <p class="text-[9px] font-semibold uppercase tracking-wider mb-1 flex items-center gap-1" style="color:#64748b">
-                            <i class="fas fa-sync"></i> Informasi Terakhir
+                            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Informasi Terakhir
                         </p>
                         <p id="di_last_inform" class="text-xs font-bold text-white"></p>
                     </div>

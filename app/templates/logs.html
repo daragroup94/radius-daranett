@@ -100,7 +100,7 @@
                 <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Authentication attempts logged</p>
             </div>
             <div class="w-12 h-12 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center text-amber-500 dark:text-amber-400 shadow-sm shadow-amber-500/5 flex-shrink-0">
-                <i class="fas fa-history text-xl"></i>
+                <i data-lucide="history" class="w-5 h-5"></i>
             </div>
         </div>
 
@@ -113,7 +113,7 @@
                 <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Successful user sessions</p>
             </div>
             <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-500 dark:text-emerald-400 shadow-sm shadow-emerald-500/5 flex-shrink-0">
-                <i class="fas fa-check-circle text-xl"></i>
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
             </div>
         </div>
 
@@ -126,7 +126,7 @@
                 <p class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Failed login attempts</p>
             </div>
             <div class="w-12 h-12 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center text-rose-500 dark:text-rose-400 shadow-sm shadow-rose-500/5 flex-shrink-0">
-                <i class="fas fa-times-circle text-xl"></i>
+                <i data-lucide="x-circle" class="w-5 h-5"></i>
             </div>
         </div>
     </div>
@@ -147,7 +147,7 @@
             <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto">
                 <!-- Search Box -->
                 <div class="relative flex-1 sm:flex-initial min-w-[200px]">
-                    <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
                     <input type="text" id="logSearch" placeholder="Cari username..."
                            class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-750 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-outfit">
                 </div>
@@ -181,7 +181,7 @@
                 <!-- Refresh Button -->
                 <button onclick="currentPage=1;loadLogs()" id="refreshButton"
                         class="text-white px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] flex items-center gap-1.5 self-stretch font-outfit">
-                    <i class="fas fa-sync-alt text-[10px]"></i>Refresh
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Refresh
                 </button>
             </div>
         </div>
@@ -202,12 +202,12 @@
             <div class="flex gap-2">
                 <button onclick="changePage(currentPage-1)" id="prevPage"
                         class="px-3.5 py-2 bg-slate-100 dark:bg-slate-750 text-slate-600 dark:text-slate-350 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition-all">
-                    <i class="fas fa-chevron-left text-[9px]"></i>
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
                 </button>
                 <span id="pageInfo" class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 font-bold bg-slate-50 dark:bg-slate-750/50 rounded-xl border border-slate-100 dark:border-slate-750"></span>
                 <button onclick="changePage(currentPage+1)" id="nextPage"
                         class="px-3.5 py-2 bg-slate-100 dark:bg-slate-750 text-slate-600 dark:text-slate-350 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700/80 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition-all">
-                    <i class="fas fa-chevron-right text-[9px]"></i>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
             </div>
         </div>
@@ -229,37 +229,37 @@
         const configs = {
             'PPPoE': {
                 badge: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200/30 dark:border-blue-800/30',
-                icon: 'fas fa-ethernet',
+                icon: 'cable',
                 label: 'PPPoE'
             },
             'Hotspot': {
                 badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200/30 dark:border-amber-800/30',
-                icon: 'fas fa-wifi',
+                icon: 'wifi',
                 label: 'Hotspot'
             },
             'IPoE': {
                 badge: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-200/30 dark:border-cyan-800/30',
-                icon: 'fas fa-network-wired',
+                icon: 'network',
                 label: 'IPoE'
             },
             'VPN': {
                 badge: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200/30 dark:border-purple-800/30',
-                icon: 'fas fa-shield-alt',
+                icon: 'shield',
                 label: 'VPN'
             },
             '802.1X': {
                 badge: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-200/30 dark:border-pink-800/30',
-                icon: 'fas fa-key',
+                icon: 'key',
                 label: '802.1X'
             },
             'Wireless': {
                 badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/30 dark:border-emerald-800/30',
-                icon: 'fas fa-broadcast-tower',
+                icon: 'radio',
                 label: 'Wireless'
             },
             'MikroTik Admin': {
                 badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200/30 dark:border-rose-800/30',
-                icon: 'fas fa-user-shield',
+                icon: 'user-check',
                 label: 'MikroTik Admin'
             }
         };
@@ -275,7 +275,7 @@
                 bg: 'bg-gradient-to-r from-emerald-500/5 to-emerald-500/0 dark:from-emerald-500/10 dark:to-emerald-500/0',
                 border: 'border-l-4 border-l-emerald-500 border-y-slate-150 border-r-slate-150 dark:border-y-slate-700/80 dark:border-r-slate-700/80',
                 iconBg: 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20',
-                icon: 'fas fa-check-circle',
+                icon: 'check-circle',
                 badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/30 dark:border-emerald-800/30',
                 glow: 'hover:shadow-[0_0_15px_rgba(16,185,129,0.08)]'
             };
@@ -284,7 +284,7 @@
                 bg: 'bg-gradient-to-r from-rose-500/5 to-rose-500/0 dark:from-rose-500/10 dark:to-rose-500/0',
                 border: 'border-l-4 border-l-rose-500 border-y-slate-150 border-r-slate-150 dark:border-y-slate-700/80 dark:border-r-slate-700/80',
                 iconBg: 'bg-rose-500 text-white shadow-sm shadow-rose-500/20',
-                icon: 'fas fa-times-circle',
+                icon: 'x-circle',
                 badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200/30 dark:border-rose-800/30',
                 glow: 'hover:shadow-[0_0_15px_rgba(244,63,94,0.08)]'
             };
@@ -293,7 +293,7 @@
                 bg: 'bg-gradient-to-r from-amber-500/5 to-amber-500/0 dark:from-amber-500/10 dark:to-amber-500/0',
                 border: 'border-l-4 border-l-amber-500 border-y-slate-150 border-r-slate-150 dark:border-y-slate-700/80 dark:border-r-slate-700/80',
                 iconBg: 'bg-amber-500 text-white shadow-sm shadow-amber-500/20',
-                icon: 'fas fa-question-circle',
+                icon: 'help-circle',
                 badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200/30 dark:border-amber-800/30',
                 glow: 'hover:shadow-[0_0_15px_rgba(245,158,11,0.08)]'
             };
@@ -376,27 +376,28 @@
                     <div class="${t.bg} rounded-2xl p-4 border ${t.border} ${t.glow} transition-all duration-300 hover:scale-[1.005] animate-pulse">
                         <div class="flex items-center gap-4">
                             <div class="w-10 h-10 ${t.iconBg} rounded-xl flex items-center justify-center flex-shrink-0">
-                                <i class="${t.icon} text-lg"></i>
+                                <i data-lucide="${t.icon}" class="w-5 h-5"></i>
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="flex flex-wrap items-center gap-2 mb-1">
                                     <span class="font-bold text-slate-800 dark:text-white text-sm tracking-tight">${log.username}</span>
                                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${t.badge}">${log.reply || 'Unknown'}</span>
                                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${s.badge} flex items-center gap-1">
-                                        <i class="${s.icon} text-[9px]"></i>
+                                        <i data-lucide="${s.icon}" class="w-3 h-3"></i>
                                         <span>${s.label}</span>
                                     </span>
                                 </div>
                                 <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                                    <span class="flex items-center"><i class="fas fa-clock mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
-                                    ${log.callingstationid ? `<span class="flex items-center"><i class="fas fa-laptop mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
-                                    ${log.calledstationid ? `<span class="flex items-center"><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.calledstationid}</span>` : ''}
+                                    <span class="flex items-center"><i data-lucide="clock" class="w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
+                                    ${log.callingstationid ? `<span class="flex items-center"><i data-lucide="laptop" class="w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
+                                    ${log.calledstationid ? `<span class="flex items-center"><i data-lucide="server" class="w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.calledstationid}</span>` : ''}
                                 </div>
                             </div>
                         </div>
                     </div>`;
                     
                     logsList.insertAdjacentHTML('afterbegin', logHtml);
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
                     
                     // Remove animation class after a short delay
                     setTimeout(() => {
@@ -471,7 +472,8 @@
             const data = await res.json();
 
             if (data.error) {
-                logsList.innerHTML = `<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-triangle text-3xl mb-3"></i><p class="font-bold text-sm">${data.error}</p></div>`;
+                logsList.innerHTML = `<div class="text-center py-12 text-red-500"><i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-3"></i><p class="font-bold text-sm">${data.error}</p></div>`;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
@@ -487,7 +489,8 @@
 
             const logs = data.logs || [];
             if (logs.length === 0) {
-                logsList.innerHTML = `<div class="text-center py-12 text-slate-450 dark:text-slate-500"><i class="fas fa-file-alt text-3xl mb-3 opacity-30"></i><p class="font-semibold text-xs">Tidak ada log ditemukan</p></div>`;
+                logsList.innerHTML = `<div class="text-center py-12 text-slate-450 dark:text-slate-500"><i data-lucide="file-text" class="w-8 h-8 mx-auto mb-3 opacity-30"></i><p class="font-semibold text-xs">Tidak ada log ditemukan</p></div>`;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
@@ -499,29 +502,31 @@
                 <div class="${t.bg} rounded-2xl p-4 border ${t.border} ${t.glow} transition-all duration-300 hover:scale-[1.005]">
                     <div class="flex items-center gap-4">
                         <div class="w-10 h-10 ${t.iconBg} rounded-xl flex items-center justify-center flex-shrink-0">
-                            <i class="${t.icon} text-lg"></i>
+                            <i data-lucide="${t.icon}" class="w-5 h-5"></i>
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-wrap items-center gap-2 mb-1">
                                 <span class="font-bold text-slate-800 dark:text-white text-sm tracking-tight">${log.username}</span>
                                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${t.badge}">${log.reply || 'Unknown'}</span>
                                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${s.badge} flex items-center gap-1">
-                                    <i class="${s.icon} text-[9px]"></i>
+                                    <i data-lucide="${s.icon}" class="w-3 h-3"></i>
                                     <span>${s.label}</span>
                                 </span>
                             </div>
                             <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                                <span class="flex items-center"><i class="fas fa-clock mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
-                                ${log.callingstationid ? `<span class="flex items-center"><i class="fas fa-laptop mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
-                                ${log.calledstationid ? `<span class="flex items-center"><i class="fas fa-server mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.calledstationid}</span>` : ''}
+                                <span class="flex items-center"><i data-lucide="clock" class="w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.authdate}</span>
+                                ${log.callingstationid ? `<span class="flex items-center"><i data-lucide="laptop" class="w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.callingstationid}</span>` : ''}
+                                ${log.calledstationid ? `<span class="flex items-center"><i data-lucide="server" class="w-3.5 h-3.5 mr-1.5 text-slate-400 dark:text-slate-500"></i>${log.calledstationid}</span>` : ''}
                             </div>
                         </div>
                     </div>
                 </div>`;
             }).join('');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
 
         } catch (e) {
-            logsList.innerHTML = `<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-triangle text-3xl mb-3"></i><p class="font-bold text-sm">${e.message}</p></div>`;
+            logsList.innerHTML = `<div class="text-center py-12 text-red-500"><i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-3"></i><p class="font-bold text-sm">${e.message}</p></div>`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 

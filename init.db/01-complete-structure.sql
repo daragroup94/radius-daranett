@@ -658,6 +658,16 @@ CREATE INDEX radreply_username ON public.radreply USING btree (username, attribu
 --
 
 CREATE INDEX radusergroup_username ON public.radusergroup USING btree (username);
+CREATE INDEX IF NOT EXISTS radusergroup_lower_username_idx ON public.radusergroup USING btree (lower(username));
+
+CREATE INDEX IF NOT EXISTS radpostauth_authdate_id_idx ON public.radpostauth USING btree (authdate DESC, id DESC);
+CREATE INDEX IF NOT EXISTS radpostauth_username_idx ON public.radpostauth USING btree (username);
+CREATE INDEX IF NOT EXISTS radpostauth_reply_idx ON public.radpostauth USING btree (reply);
+
+CREATE INDEX IF NOT EXISTS idx_radacct_clean_username ON public.radacct (REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g')) WHERE acctstoptime IS NULL;
+CREATE INDEX IF NOT EXISTS idx_radusergroup_clean_username ON public.radusergroup (REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g'));
+CREATE INDEX IF NOT EXISTS idx_hotspot_clean_username ON public.hotspot_vouchers (REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g'));
+CREATE INDEX IF NOT EXISTS ont_signal_history_user_rec_idx ON public.ont_signal_history (username, recorded_at DESC);
 
 
 -- Unique constraints for ON CONFLICT queries in application
@@ -679,3 +689,38 @@ VALUES ('admin', 'scrypt:32768:8:1$vFRJwsglT5kUjd3Y$f8990331324d261ba54588e58e25
 -- Set sequence values
 SELECT setval('public.admin_users_id_seq', 5, true);
 SELECT setval('public.nas_id_seq', 4, true);
+
+-- =============================================================================
+-- AUTOMATIC DUPLICATE SESSION CLEANUP TRIGGER
+-- =============================================================================
+CREATE INDEX IF NOT EXISTS radacct_active_username_idx 
+ON public.radacct (LOWER(username)) 
+WHERE acctstoptime IS NULL;
+
+CREATE OR REPLACE FUNCTION public.radacct_close_duplicate_sessions()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.acctstoptime IS NULL AND NEW.username IS NOT NULL AND NEW.username <> '' THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM public.radusergroup 
+            WHERE LOWER(username) = LOWER(NEW.username) 
+              AND groupname IN ('mikrotik-full', 'mikrotik-write', 'mikrotik-read')
+        ) THEN
+            UPDATE public.radacct
+            SET acctstoptime = COALESCE(acctupdatetime, acctstarttime, NOW()),
+                acctterminatecause = 'Lost-Carrier'
+            WHERE LOWER(username) = LOWER(NEW.username)
+              AND acctstoptime IS NULL
+              AND radacctid != COALESCE(NEW.radacctid, 0)
+              AND acctuniqueid != NEW.acctuniqueid;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_radacct_close_duplicates ON public.radacct;
+CREATE TRIGGER trg_radacct_close_duplicates
+AFTER INSERT ON public.radacct
+FOR EACH ROW
+EXECUTE FUNCTION public.radacct_close_duplicate_sessions();

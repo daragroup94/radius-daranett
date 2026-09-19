@@ -1,11 +1,23 @@
+import os
 from datetime import datetime
 from flask import Blueprint, render_template, jsonify, request, session
 from decorators import login_required
 from database import execute_query
+from helpers import log_admin_activity
 from services.telegram import send_telegram_notification
 from services.mikrotik_coa import send_coa_disconnect
 
 sessions_bp = Blueprint('sessions', __name__)
+
+def get_nas_secret(nas_ip):
+    try:
+        nas = execute_query("SELECT secret FROM nas WHERE nasname = %s LIMIT 1", (str(nas_ip),))
+        if nas and nas[0].get('secret'):
+            return nas[0]['secret']
+    except Exception:
+        pass
+    return os.getenv('DEFAULT_RADIUS_SECRET', 'radiussecret')
+
 
 @sessions_bp.route('/sessions')
 @login_required
@@ -220,8 +232,7 @@ def api_disconnect_session(session_id):
             return jsonify({'success': False, 'error': 'Session not found'}), 404
 
         nas_ip = session_data[0]['nasipaddress']
-        nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (nas_ip,))
-        secret = nas[0]['secret'] if nas else 'radiussecret'
+        secret = get_nas_secret(nas_ip)
 
         # Kirim CoA Disconnect ke MikroTik
         coa_sent = send_coa_disconnect(nas_ip, session_id, secret, framed_ip=session_data[0].get('framedipaddress'))
@@ -234,6 +245,7 @@ def api_disconnect_session(session_id):
         """, (session_id,), fetch=False)
 
         msg = 'Session disconnected (CoA sent to NAS)' if coa_sent else 'Session marked disconnected (CoA failed, user may still be online)'
+        log_admin_activity('disconnect_session', target=session_id, details=f"NAS: {nas_ip}, User: {session_data[0].get('username')}")
         send_telegram_notification(f"🔌 <b>Session Disconnected</b>\nUsername: {session_data[0].get('username', '-')}\nNAS: {nas_ip}\nBy: {session.get('username','admin')}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         return jsonify({'success': True, 'message': msg, 'coa_sent': coa_sent})
     except Exception as e:
@@ -250,8 +262,7 @@ def api_disconnect_user_sessions(username):
 
         coa_success = 0
         for s in sessions:
-            nas = execute_query("SELECT secret FROM nas WHERE nasname = %s", (s['nasipaddress'],))
-            secret = nas[0]['secret'] if nas else 'radiussecret'
+            secret = get_nas_secret(s['nasipaddress'])
             if send_coa_disconnect(s['nasipaddress'], s['acctsessionid'], secret, framed_ip=s.get('framedipaddress')):
                 coa_success += 1
             execute_query("""
@@ -259,6 +270,8 @@ def api_disconnect_user_sessions(username):
                 SET acctstoptime = NOW(), acctterminatecause = 'Admin-Reset'
                 WHERE acctsessionid = %s
             """, (s['acctsessionid'],), fetch=False)
+
+        log_admin_activity('disconnect_user_sessions', target=username, details=f"Count: {len(sessions)}, CoA sent: {coa_success}")
 
         return jsonify({
             'success': True,
@@ -306,14 +319,15 @@ def api_disconnect_expired():
         coa_ok = 0
         for s in expired_sessions:
             nas_ip = str(s['nasipaddress'])
-            nas_row = execute_query("SELECT secret FROM nas WHERE nasname = %s LIMIT 1", (nas_ip,))
-            secret = nas_row[0]['secret'] if nas_row else 'testing123'
+            secret = get_nas_secret(nas_ip)
             if send_coa_disconnect(nas_ip, s['acctsessionid'], secret):
                 coa_ok += 1
             execute_query("""
                 UPDATE radacct SET acctstoptime = NOW(), acctterminatecause = 'Session-Timeout'
                 WHERE acctsessionid = %s AND acctstoptime IS NULL
             """, (s['acctsessionid'],), fetch=False)
+
+        log_admin_activity('disconnect_expired_sessions', target=f"{len(expired_sessions)} sessions", details=f"CoA sent: {coa_ok}")
 
         return jsonify({
             'success': True,

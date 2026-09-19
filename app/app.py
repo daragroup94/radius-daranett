@@ -1,4 +1,14 @@
 import os
+
+# Non-blocking async eventlet & psycopg2 patching
+try:
+    import eventlet
+    eventlet.monkey_patch()
+    from psycogreen.eventlet import patch_psycopg
+    patch_psycopg()
+except ImportError:
+    pass
+
 from flask import Flask, jsonify, request
 from flask_wtf.csrf import CSRFError
 from config import Config
@@ -49,6 +59,7 @@ from routes.backup import backup_bp
 from routes.integrations import integrations_bp
 from routes.users import users_bp
 from routes.network_map import network_map_bp
+from routes.settings import settings_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
@@ -60,6 +71,7 @@ app.register_blueprint(backup_bp)
 app.register_blueprint(integrations_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(network_map_bp)
+app.register_blueprint(settings_bp)
 
 
 
@@ -96,6 +108,16 @@ def handle_csrf_error(e):
 @app.route('/health')
 def health():
     return 'OK'
+
+@app.route('/sw.js')
+def service_worker():
+    response = app.send_static_file('sw.js')
+    response.headers['Content-Type'] = 'application/javascript'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
 
 # Start SocketIO Background Workers
 from services.session_tasks import (

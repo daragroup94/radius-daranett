@@ -17,10 +17,10 @@
         
         let html = `<div class="flex flex-wrap items-center gap-1.5">
             <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/20 speed-tag" title="Download Speed">
-                <i class="fas fa-arrow-down mr-1.5 text-[10px] text-blue-500"></i> ${down}
+                <i data-lucide="arrow-down" class="w-3 h-3 mr-1 text-blue-500 inline-block"></i> ${down}
             </span>
             <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/20 speed-tag" title="Upload Speed">
-                <i class="fas fa-arrow-up mr-1.5 text-[10px] text-indigo-500"></i> ${up}
+                <i data-lucide="arrow-up" class="w-3 h-3 mr-1 text-indigo-500 inline-block"></i> ${up}
             </span>`;
         
         // Priority (if present)
@@ -39,7 +39,7 @@
         
         // Burst (if present and not 0/0)
         if (parts.length >= 2 && parts[1] !== '0/0') {
-            html += `<span class="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30" title="Burst Aktif"><i class="fas fa-bolt mr-1 text-emerald-500"></i> Burst</span>`;
+            html += `<span class="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30" title="Burst Aktif"><i data-lucide="zap" class="w-2.5 h-2.5 mr-1 text-emerald-500 inline-block"></i> Burst</span>`;
         }
         
         html += '</div>';
@@ -240,7 +240,7 @@
                     usersList.innerHTML = `
                         <div class="text-center py-20 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
                             <div class="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                                <i class="fas fa-search text-slate-400 text-2xl"></i>
+                                <i data-lucide="search" class="w-8 h-8 text-slate-400"></i>
                             </div>
                             <p class="text-slate-800 dark:text-slate-200 font-bold text-lg mb-1">Pencarian Tidak Ditemukan</p>
                             <p class="text-slate-500 text-xs">Tidak ada pelanggan PPPoE yang cocok dengan "${searchQuery}"</p>
@@ -250,29 +250,30 @@
                     usersList.innerHTML = `
                         <div class="text-center py-20 bg-slate-50/50 dark:bg-slate-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
                             <div class="w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-850 dark:to-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md">
-                                <i class="fas fa-users text-slate-400 text-2xl"></i>
+                                <i data-lucide="users" class="w-8 h-8 text-slate-400"></i>
                             </div>
                             <p class="text-slate-800 dark:text-slate-200 font-bold text-lg mb-1">Belum Ada Pelanggan</p>
                             <p class="text-slate-500 text-xs mb-5">Silakan tambahkan pelanggan PPPoE pertama Anda untuk memulai.</p>
                             <button onclick="openAddUserModal()" class="bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-700 hover:to-indigo-750 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all">
-                                <i class="fas fa-user-plus mr-2"></i>Tambah Pelanggan Pertama
+                                <i data-lucide="user-plus" class="w-4 h-4 mr-2 inline-block"></i>Tambah Pelanggan Pertama
                             </button>
                         </div>
                     `;
                 }
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
             let html = `
                 <div class="overflow-x-auto min-w-full">
-                    <table class="w-full text-left border-collapse align-middle">
+                    <table class="w-full min-w-[760px] text-left border-collapse align-middle">
                         <thead>
                             <tr class="border-b border-slate-100 dark:border-slate-750 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                                <th class="pb-3 pt-1 px-4 font-extrabold">PELANGGAN</th>
-                                <th class="pb-3 pt-1 px-4 font-extrabold">STATUS</th>
-                                <th class="pb-3 pt-1 px-4 font-extrabold">ALAMAT IP</th>
-                                <th class="pb-3 pt-1 px-4 font-extrabold">RATE LIMIT (BW)</th>
-                                <th class="pb-3 pt-1 px-4 font-extrabold text-right">AKSI</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold whitespace-nowrap">PELANGGAN</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold whitespace-nowrap">STATUS</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold whitespace-nowrap">ALAMAT IP</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold whitespace-nowrap">RATE LIMIT (BW)</th>
+                                <th class="pb-3 pt-1 px-4 font-extrabold text-right whitespace-nowrap min-w-[200px]">AKSI</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100/60 dark:divide-slate-750/60">
@@ -283,61 +284,69 @@
                     ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/45 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30"><span class="w-1.5 h-1.5 bg-emerald-500 rounded-full online-indicator-dot"></span>Online</span>'
                     : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-50 dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60">Offline</span>';
                 
+                const uname = user.username || '';
+                const safeUname = uname.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const userId = user.id || 0;
+
                 const throttleBtns = isOnline
-                    ? '<button onclick="throttleUser(\'' + user.username + '\')" class="w-8 h-8 bg-amber-50 hover:bg-amber-500 dark:bg-amber-950/20 dark:hover:bg-amber-600 text-amber-600 hover:text-white dark:text-amber-400 dark:hover:text-white rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm" title="Throttle Speed"><i class="fas fa-tachometer-alt text-xs"></i></button>'
-                    + '<button onclick="unthrottleUser(\'' + user.username + '\')" class="w-8 h-8 bg-emerald-50 hover:bg-emerald-500 dark:bg-emerald-950/20 dark:hover:bg-emerald-600 text-emerald-600 hover:text-white dark:text-emerald-400 dark:hover:text-white rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm" title="Kembalikan Kecepatan"><i class="fas fa-rocket text-xs"></i></button>'
+                    ? '<button onclick="throttleUser(\'' + safeUname + '\')" class="table-action-btn bg-amber-50 hover:bg-amber-500 dark:bg-amber-950/40 dark:hover:bg-amber-600 text-amber-600 hover:text-white dark:text-amber-400 dark:hover:text-white border border-amber-200/50 dark:border-amber-800/40 transition-all duration-200 shadow-sm" title="Throttle Speed"><i data-lucide="gauge" class="w-4 h-4"></i></button>'
+                    + '<button onclick="unthrottleUser(\'' + safeUname + '\')" class="table-action-btn bg-emerald-50 hover:bg-emerald-500 dark:bg-emerald-950/40 dark:hover:bg-emerald-600 text-emerald-600 hover:text-white dark:text-emerald-400 dark:hover:text-white border border-emerald-200/50 dark:border-emerald-800/40 transition-all duration-200 shadow-sm" title="Kembalikan Kecepatan"><i data-lucide="rocket" class="w-4 h-4"></i></button>'
                     : '';
-                const userId = user.id;
-                const uname = user.username;
                 
                 const leftBorderClass = isOnline 
                     ? 'border-l-[4px] border-l-emerald-500 dark:border-l-emerald-600' 
                     : 'border-l-[4px] border-l-slate-250 dark:border-l-slate-700';
 
                 let ipDisplay = '<div class="flex flex-col gap-0.5">';
-                ipDisplay += '<span class="text-xs font-mono text-slate-600 dark:text-slate-400"><i class="fas fa-network-wired text-slate-400 mr-1.5"></i>' + (user.ip_address || 'Dynamic (IPv4)') + '</span>';
+                ipDisplay += '<span class="text-xs font-mono text-slate-600 dark:text-slate-400 flex items-center gap-1.5"><i data-lucide="network" class="w-3.5 h-3.5 text-slate-400"></i>' + (user.ip_address || 'Dynamic (IPv4)') + '</span>';
                 if (user.ipv6_prefix || user.delegated_ipv6_prefix) {
                     if (user.ipv6_prefix) {
-                        ipDisplay += '<span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1" title="Framed IPv6 Prefix"><i class="fas fa-link text-[9px] text-slate-400"></i>' + user.ipv6_prefix + '</span>';
+                        ipDisplay += '<span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1" title="Framed IPv6 Prefix"><i data-lucide="link" class="w-2.5 h-2.5 text-slate-400"></i>' + user.ipv6_prefix + '</span>';
                     }
                     if (user.delegated_ipv6_prefix) {
-                        ipDisplay += '<span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1" title="Delegated IPv6 Prefix (PD)"><i class="fas fa-share-alt text-[9px] text-slate-400"></i>' + user.delegated_ipv6_prefix + '</span>';
+                        ipDisplay += '<span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1" title="Delegated IPv6 Prefix (PD)"><i data-lucide="share-2" class="w-2.5 h-2.5 text-slate-400"></i>' + user.delegated_ipv6_prefix + '</span>';
                     }
                 }
                 ipDisplay += '</div>';
 
                 html += '<tr class="row-card-item transition-all duration-200 ' + leftBorderClass + '">'
-                    + '<td class="py-3 px-4">'
+                    + '<td class="py-3 px-4 whitespace-nowrap">'
                     + '<div class="flex items-center gap-3">'
-                    + '<div class="w-8 h-8 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0" style="background:linear-gradient(135deg,#667eea,#764ba2);"><i class="fas fa-user text-white text-xs"></i></div>'
+                    + '<div class="w-8 h-8 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0" style="background:linear-gradient(135deg,#667eea,#764ba2);"><i data-lucide="user" class="w-4 h-4 text-white"></i></div>'
                     + '<span class="font-bold text-slate-800 dark:text-slate-250 text-sm truncate">' + uname + '</span>'
                     + '</div>'
                     + '</td>'
-                    + '<td class="py-3 px-4">' + statusBadge + '</td>'
-                    + '<td class="py-3 px-4">' + ipDisplay + '</td>'
-                    + '<td class="py-3 px-4">' + parseRateLimit(user.rate_limit || 'Not set') + '</td>'
-                    + '<td class="py-3 px-4 text-right">'
-                    + '<div class="flex gap-1.5 justify-end">'
-                    + '<button onclick="showDeviceInfo(\'' + uname + '\')" class="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs transition-all duration-200 hover:scale-105 shadow-sm" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);" title="Info Perangkat (GenieACS)"><i class="fas fa-satellite-dish"></i></button>'
-                    + '<button onclick="editUser(\'' + uname + '\')" class="w-8 h-8 bg-blue-50 hover:bg-blue-500 dark:bg-blue-950/20 dark:hover:bg-blue-600 text-blue-600 hover:text-white dark:text-blue-400 dark:hover:text-white rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm" title="Edit Akun"><i class="fas fa-edit text-xs"></i></button>'
+                    + '<td class="py-3 px-4 whitespace-nowrap">' + statusBadge + '</td>'
+                    + '<td class="py-3 px-4 whitespace-nowrap">' + ipDisplay + '</td>'
+                    + '<td class="py-3 px-4 whitespace-nowrap">' + parseRateLimit(user.rate_limit || 'Not set') + '</td>'
+                    + '<td class="py-3 px-4 text-right whitespace-nowrap min-w-[200px]">'
+                    + '<div class="flex items-center gap-1.5 justify-end flex-nowrap">'
+                    + '<button onclick="showDeviceInfo(\'' + safeUname + '\')" class="table-action-btn text-white transition-all duration-200 hover:scale-105 shadow-sm" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);" title="Info Perangkat (GenieACS)"><i data-lucide="radio" class="w-4 h-4"></i></button>'
+                    + '<button onclick="editUser(\'' + safeUname + '\')" class="table-action-btn bg-blue-50 hover:bg-blue-500 dark:bg-blue-950/40 dark:hover:bg-blue-600 text-blue-600 hover:text-white dark:text-blue-400 dark:hover:text-white border border-blue-200/50 dark:border-blue-800/40 transition-all duration-200 shadow-sm" title="Edit Akun"><i data-lucide="edit" class="w-4 h-4"></i></button>'
                     + throttleBtns
-                    + '<button onclick="deleteUser(' + userId + ', \'' + uname + '\')" class="w-8 h-8 bg-rose-50 hover:bg-rose-500 dark:bg-rose-950/20 dark:hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-400 dark:hover:text-white rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm" title="Hapus"><i class="fas fa-trash text-xs"></i></button>'
+                    + '<button onclick="deleteUser(' + userId + ', \'' + safeUname + '\')" class="table-action-btn bg-rose-50 hover:bg-rose-500 dark:bg-rose-950/40 dark:hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-400 dark:hover:text-white border border-rose-200/50 dark:border-rose-800/40 transition-all duration-200 shadow-sm" title="Hapus"><i data-lucide="trash-2" class="w-4 h-4"></i></button>'
                     + '</div>'
                     + '</td>'
                     + '</tr>';
             });
             html += '</tbody></table></div>';
             usersList.innerHTML = html;
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
             loadPppoeStats();
         } catch (error) {
             console.error('Error loading users:', error);
             usersList.innerHTML = `
                 <div class="text-center py-20 bg-rose-50/20 dark:bg-rose-950/10 rounded-2xl border border-dashed border-rose-200 dark:border-rose-900/30">
-                    <i class="fas fa-exclamation-triangle text-rose-500 text-3xl mb-3"></i>
+                    <i data-lucide="alert-triangle" class="w-10 h-10 text-rose-500 mx-auto mb-3"></i>
                     <p class="text-slate-800 dark:text-slate-200 font-bold text-lg mb-1">Gagal Memuat Pelanggan</p>
                     <p class="text-slate-500 text-xs">${error.message}</p>
                 </div>
             `;
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
         }
     }
 
@@ -511,7 +520,7 @@
         e.preventDefault();
         const submitBtn = this.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+        submitBtn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Menyimpan...';
         submitBtn.disabled = true;
 
         try {
@@ -546,7 +555,7 @@
         e.preventDefault();
         const submitBtn = this.querySelector('button[type="submit"]');
         const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+        submitBtn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Menyimpan...';
         submitBtn.disabled = true;
 
         try {

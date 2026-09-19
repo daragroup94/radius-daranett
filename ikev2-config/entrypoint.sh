@@ -8,9 +8,10 @@ echo "Enabling IP Forwarding..."
 echo 1 > /proc/sys/net/ipv4/ip_forward || true
 
 # Setup iptables for NAT
-echo "Configuring NAT for VPN subnet 10.10.10.0/24..."
-iptables -t nat -C POSTROUTING -s 10.10.10.0/24 -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.10.10.0/24 -o eth0 -j MASQUERADE
-iptables -C FORWARD -s 10.10.10.0/24 -j ACCEPT 2>/dev/null || iptables -A FORWARD -s 10.10.10.0/24 -j ACCEPT
+echo "Configuring NAT for VPN subnet 10.203.80.0/24..."
+iptables -t nat -C POSTROUTING -s 10.203.80.0/24 -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.203.80.0/24 -o eth0 -j MASQUERADE
+iptables -C FORWARD -s 10.203.80.0/24 -j ACCEPT 2>/dev/null || iptables -A FORWARD -s 10.203.80.0/24 -j ACCEPT
+iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
 # Prepare certificate directories
 mkdir -p /etc/ipsec.d/private /etc/ipsec.d/certs /etc/ipsec.d/cacerts /etc/ipsec.d/crls /etc/ipsec.d/acerts
@@ -74,8 +75,8 @@ conn ikev2-vpn
     right=%any
     rightid=%any
     rightauth=eap-radius
-    rightsourceip=%radius
-    rightdns=8.8.8.8,1.1.1.1
+    rightsourceip=%radius,10.203.80.0/24
+    rightdns=1.1.1.1,8.8.8.8
     rightsendcert=never
     eap_identity=%identity
 EOF

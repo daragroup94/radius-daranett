@@ -196,6 +196,50 @@ def init_db_schema():
             )
         """, fetch=False)
 
+        # 12. system_settings
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.system_settings (
+                key VARCHAR(100) PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """, fetch=False)
+
+        # 13. ont_signal_history
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.ont_signal_history (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(64) NOT NULL,
+                rx_power NUMERIC(6, 2),
+                recorded_at TIMESTAMP DEFAULT NOW()
+            )
+        """, fetch=False)
+
+        # 14. admin_activity_log
+        execute_query("""
+            CREATE TABLE IF NOT EXISTS public.admin_activity_log (
+                id SERIAL PRIMARY KEY,
+                admin_username VARCHAR(100),
+                action VARCHAR(100) NOT NULL,
+                target VARCHAR(255),
+                ip_address VARCHAR(45),
+                details TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """, fetch=False)
+
+        # 15. Performance & functional indexes
+        execute_query("CREATE INDEX IF NOT EXISTS radpostauth_authdate_id_idx ON public.radpostauth USING btree (authdate DESC, id DESC)", fetch=False)
+        execute_query("CREATE INDEX IF NOT EXISTS radpostauth_username_idx ON public.radpostauth USING btree (username)", fetch=False)
+        execute_query("CREATE INDEX IF NOT EXISTS radpostauth_reply_idx ON public.radpostauth USING btree (reply)", fetch=False)
+        execute_query("CREATE INDEX IF NOT EXISTS radusergroup_lower_username_idx ON public.radusergroup USING btree (lower(username))", fetch=False)
+        execute_query("CREATE INDEX IF NOT EXISTS idx_radacct_clean_username ON public.radacct (REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g')) WHERE acctstoptime IS NULL", fetch=False)
+        execute_query("CREATE INDEX IF NOT EXISTS idx_radusergroup_clean_username ON public.radusergroup (REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g'))", fetch=False)
+        execute_query("CREATE INDEX IF NOT EXISTS idx_hotspot_clean_username ON public.hotspot_vouchers (REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g'))", fetch=False)
+        execute_query("CREATE INDEX IF NOT EXISTS ont_signal_history_user_rec_idx ON public.ont_signal_history (username, recorded_at DESC)", fetch=False)
+        execute_query("CREATE INDEX IF NOT EXISTS idx_admin_activity_log_created ON public.admin_activity_log (created_at DESC)", fetch=False)
+
+
         print("[database] Database schema initialized/verified successfully.")
     except Exception as e:
         print(f"[database] Error initializing database schema: {str(e)}")

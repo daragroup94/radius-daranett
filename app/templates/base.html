@@ -11,14 +11,58 @@
     <title>{% block title %}RADIUS Manager{% endblock %}</title>
 
     <script>
-        // Synchronously check theme and apply class before render to prevent flickering
-        (function() {
-            const savedTheme = localStorage.getItem('theme');
-            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
-                document.documentElement.classList.add('dark');
-            } else {
+        // Global Theme and Appearance Engine
+        window.AVAILABLE_PALETTES = ['cyber', 'cobalt', 'emerald', 'amber', 'violet', 'crimson', 'arctic', 'synthwave', 'luxury', 'light'];
+
+        window.applyGlobalTheme = function(palette) {
+            if (!palette || !window.AVAILABLE_PALETTES.includes(palette)) palette = 'cyber';
+            window.AVAILABLE_PALETTES.forEach(p => document.documentElement.classList.remove('theme-' + p));
+            document.documentElement.classList.add('theme-' + palette);
+            localStorage.setItem('ui_palette', palette);
+
+            if (palette === 'light') {
                 document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        };
+
+        window.applyGlobalFontSize = function(scale) {
+            ['compact', 'normal', 'large'].forEach(s => document.documentElement.classList.remove('font-scale-' + s));
+            document.documentElement.classList.add('font-scale-' + (scale || 'normal'));
+            localStorage.setItem('ui_fontsize', scale || 'normal');
+        };
+
+        window.applyGlobalFontFamily = function(font) {
+            document.documentElement.classList.remove('font-jakarta');
+            if (font === 'jakarta') {
+                document.documentElement.classList.add('font-jakarta');
+            }
+            localStorage.setItem('ui_font', font || 'default');
+        };
+
+        // Synchronously run before DOM render to prevent flickering
+        (function() {
+            const savedPalette = localStorage.getItem('ui_palette') || 'cyber';
+            window.AVAILABLE_PALETTES.forEach(p => document.documentElement.classList.remove('theme-' + p));
+            document.documentElement.classList.add('theme-' + savedPalette);
+
+            if (savedPalette === 'light') {
+                document.documentElement.classList.remove('dark');
+            } else {
+                document.documentElement.classList.add('dark');
+            }
+
+            const fontScale = localStorage.getItem('ui_fontsize') || 'normal';
+            document.documentElement.classList.add('font-scale-' + fontScale);
+
+            const fontFamily = localStorage.getItem('ui_font') || 'default';
+            if (fontFamily === 'jakarta') {
+                document.documentElement.classList.add('font-jakarta');
             }
         })();
     </script>
@@ -26,11 +70,11 @@
     <!-- Tailwind CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
 
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <!-- Lucide Icons (Self-Hosted) -->
+    <script src="{{ url_for('static', filename='js/lucide.min.js') }}"></script>
 
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Font Awesome (Self-Hosted with Local Webfonts) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome/all.min.css') }}">
     <!-- Socket.io -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <!-- ECharts Library -->
@@ -44,7 +88,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <style>
         * {
@@ -56,35 +100,208 @@
             letter-spacing: -0.025em;
         }
 
+        code, pre, .font-mono, .ip-address {
+            font-family: 'JetBrains Mono', monospace !important;
+            font-feature-settings: "tnum";
+        }
+
+        /* Font Scaling (UI Density) */
+        html.font-scale-compact { font-size: 13.5px; }
+        html.font-scale-normal { font-size: 15px; }
+        html.font-scale-large { font-size: 16.5px; }
+
+        /* Font Family Overrides */
+        html.font-jakarta, html.font-jakarta * {
+            font-family: 'Plus Jakarta Sans', sans-serif !important;
+        }
+        html.font-jakarta code, html.font-jakarta pre, html.font-jakarta .font-mono {
+            font-family: 'JetBrains Mono', monospace !important;
+        }
+
+        /* ============================================================ */
+        /* DYNAMIC THEME SYSTEM (10 DISTINCT THEME PALETTES)           */
+        /* ============================================================ */
+        :root {
+            --theme-bg-main: #0f172a;
+            --theme-bg-sidebar: #1e293b;
+            --theme-bg-card: #1e293b;
+            --theme-bg-card-subtle: #0f172a;
+            --theme-border: #334155;
+            --theme-border-subtle: #1e293b;
+            --theme-header: rgba(30, 41, 59, 0.98);
+            --theme-accent: #06b6d4;
+            --theme-accent-glow: rgba(6, 182, 212, 0.25);
+            --theme-text-primary: #f8fafc;
+            --theme-text-secondary: #94a3b8;
+        }
+
+        /* 1. Cyber Slate (Default Tech NOC) */
+        html.theme-cyber {
+            --theme-bg-main: #0b1120;
+            --theme-bg-sidebar: #111b2e;
+            --theme-bg-card: #162238;
+            --theme-bg-card-subtle: #0d1527;
+            --theme-border: #223352;
+            --theme-header: rgba(17, 27, 46, 0.98);
+            --theme-accent: #06b6d4;
+        }
+
+        /* 2. Enterprise Cobalt (Deep Navy / Corporate) */
+        html.theme-cobalt {
+            --theme-bg-main: #070c18;
+            --theme-bg-sidebar: #0d172a;
+            --theme-bg-card: #12203b;
+            --theme-bg-card-subtle: #091122;
+            --theme-border: #1c3057;
+            --theme-header: rgba(13, 23, 42, 0.98);
+            --theme-accent: #6366f1;
+        }
+
+        /* 3. Emerald Matrix (Forest Dark / Low Eye-Strain) */
+        html.theme-emerald {
+            --theme-bg-main: #041310;
+            --theme-bg-sidebar: #08211b;
+            --theme-bg-card: #0e3028;
+            --theme-bg-card-subtle: #061914;
+            --theme-border: #15473c;
+            --theme-header: rgba(8, 33, 27, 0.98);
+            --theme-accent: #10b981;
+        }
+
+        /* 4. Obsidian Amber (Dark Onyx & Solar Amber) */
+        html.theme-amber {
+            --theme-bg-main: #111113;
+            --theme-bg-sidebar: #18181c;
+            --theme-bg-card: #222227;
+            --theme-bg-card-subtle: #141417;
+            --theme-border: #35353d;
+            --theme-header: rgba(24, 24, 28, 0.98);
+            --theme-accent: #f59e0b;
+        }
+
+        /* 5. Midnight Violet / Cyberpunk (Neon Purple) */
+        html.theme-violet {
+            --theme-bg-main: #0c0817;
+            --theme-bg-sidebar: #130d24;
+            --theme-bg-card: #1c1334;
+            --theme-bg-card-subtle: #0f0a1d;
+            --theme-border: #2f1f58;
+            --theme-header: rgba(19, 13, 36, 0.98);
+            --theme-accent: #a855f7;
+        }
+
+        /* 6. Crimson Red / High Alert (Blood Moon NOC) */
+        html.theme-crimson {
+            --theme-bg-main: #14080a;
+            --theme-bg-sidebar: #1f0c10;
+            --theme-bg-card: #2a1117;
+            --theme-bg-card-subtle: #17090d;
+            --theme-border: #451a24;
+            --theme-header: rgba(31, 12, 16, 0.98);
+            --theme-accent: #ef4444;
+        }
+
+        /* 7. Nordic Arctic (Deep Ice Blue) */
+        html.theme-arctic {
+            --theme-bg-main: #06121a;
+            --theme-bg-sidebar: #0a1c29;
+            --theme-bg-card: #10293c;
+            --theme-bg-card-subtle: #081621;
+            --theme-border: #1b3f5c;
+            --theme-header: rgba(10, 28, 41, 0.98);
+            --theme-accent: #38bdf8;
+        }
+
+        /* 8. Tokyo Night / Synthwave (Storm Violet & Hot Pink) */
+        html.theme-synthwave {
+            --theme-bg-main: #100e1d;
+            --theme-bg-sidebar: #18152b;
+            --theme-bg-card: #231f3d;
+            --theme-bg-card-subtle: #131124;
+            --theme-border: #3a3262;
+            --theme-header: rgba(24, 21, 43, 0.98);
+            --theme-accent: #ec4899;
+        }
+
+        /* 9. Royal Luxury / Black & Gold (Onyx Velvet) */
+        html.theme-luxury {
+            --theme-bg-main: #121110;
+            --theme-bg-sidebar: #1b1916;
+            --theme-bg-card: #262320;
+            --theme-bg-card-subtle: #151412;
+            --theme-border: #3d3833;
+            --theme-header: rgba(27, 25, 22, 0.98);
+            --theme-accent: #eab308;
+        }
+
+        /* 10. Clean Snow / Light Minimalist */
+        html.theme-light {
+            --theme-bg-main: #f1f5f9;
+            --theme-bg-sidebar: #ffffff;
+            --theme-bg-card: #ffffff;
+            --theme-bg-card-subtle: #f8fafc;
+            --theme-border: #e2e8f0;
+            --theme-header: rgba(255, 255, 255, 0.98);
+            --theme-accent: #2563eb;
+            --theme-text-primary: #0f172a;
+            --theme-text-secondary: #64748b;
+        }
+
         /* Lucide Icon Styling */
         .lucide { width: 20px; height: 20px; stroke-width: 1.75; }
         .lucide-lg { width: 22px; height: 22px; }
         .lucide-xl { width: 24px; height: 24px; }
 
-        /* Dark Mode Support */
-        .dark body, html.dark body { background-color: #0f172a !important; color: #f1f5f9 !important; }
-        .dark .sidebar, html.dark .sidebar { background-color: #1e293b !important; border-color: #334155 !important; }
-        .dark .main-content, html.dark .main-content { background-color: #0f172a !important; background: #0f172a !important; }
-        .dark .header-light, html.dark .header-light { background: rgba(30, 41, 59, 0.98) !important; border-color: #334155 !important; }
+        /* Dynamic Theme Application (Dark Mode & Themes) */
+        .dark body, html.dark body { 
+            background-color: var(--theme-bg-main) !important; 
+            color: var(--theme-text-primary) !important; 
+        }
+        .dark .sidebar, html.dark .sidebar { 
+            background-color: var(--theme-bg-sidebar) !important; 
+            border-color: var(--theme-border) !important; 
+        }
+        .dark .main-content, html.dark .main-content { 
+            background-color: var(--theme-bg-main) !important; 
+            background: var(--theme-bg-main) !important; 
+        }
+        .dark .header-light, html.dark .header-light { 
+            background: var(--theme-header) !important; 
+            border-color: var(--theme-border) !important; 
+        }
         .dark .header-light h1, html.dark .header-light h1 { color: #f1f5f9 !important; }
         .dark .header-light p, html.dark .header-light p { color: #94a3b8 !important; }
-        .dark .dashboard-card, .dark .stat-card, .dark .modern-card, html.dark .dashboard-card, html.dark .stat-card, html.dark .modern-card { 
-            background-color: #1e293b !important; border-color: #334155 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important; 
+        
+        .dark .dashboard-card, .dark .stat-card, .dark .modern-card, 
+        html.dark .dashboard-card, html.dark .stat-card, html.dark .modern-card,
+        html.dark [class*="dark:bg-slate-900"], html.dark [class*="dark:bg-slate-950"] { 
+            background-color: var(--theme-bg-card) !important; 
+            border-color: var(--theme-border) !important; 
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25) !important; 
         }
+
+        html.dark [class*="dark:bg-slate-800"], html.dark .bg-slate-800 {
+            background-color: var(--theme-bg-card-subtle) !important;
+        }
+
+        html.dark [class*="dark:border-slate-800"], html.dark [class*="dark:border-slate-700"] {
+            border-color: var(--theme-border) !important;
+        }
+
         .dark .nav-text, html.dark .nav-text { color: #94a3b8 !important; }
         .dark .nav-item:hover .nav-text, .dark .nav-item.active .nav-text, html.dark .nav-item:hover .nav-text, html.dark .nav-item.active .nav-text { color: #f1f5f9 !important; }
         .dark .nav-item:hover, html.dark .nav-item:hover { background: rgba(255, 255, 255, 0.05) !important; }
         .dark .nav-item.active, html.dark .nav-item.active { background: rgba(59, 130, 246, 0.15) !important; }
         .dark .card-title, html.dark .card-title { color: #f1f5f9 !important; }
         .dark .card-value, html.dark .card-value { color: #ffffff !important; }
-        .dark .border-slate-200, html.dark .border-slate-200 { border-color: #334155 !important; }
-        .dark .bg-slate-100, html.dark .bg-slate-100 { background-color: #0f172a !important; }
-        .dark .sidebar-user, html.dark .sidebar-user { background-color: #1e293b !important; border-color: #334155 !important; }
-        .dark .table-light, html.dark .table-light { background: #1e293b !important; }
-        .dark .table-light th, html.dark .table-light th { background: #0f172a !important; color: #94a3b8 !important; border-color: #334155 !important; }
-        .dark .table-light td, html.dark .table-light td { color: #cbd5e1 !important; border-color: #334155 !important; }
-        .dark .table-light tr:hover td, html.dark .table-light tr:hover td { background: #1e293b !important; }
-        .dark .input-light, html.dark .input-light { background: #0f172a !important; border-color: #334155 !important; color: #f1f5f9 !important; }
+        .dark .border-slate-200, html.dark .border-slate-200 { border-color: var(--theme-border) !important; }
+        .dark .bg-slate-100, html.dark .bg-slate-100 { background-color: var(--theme-bg-card-subtle) !important; }
+        .dark .sidebar-user, html.dark .sidebar-user { background-color: var(--theme-bg-card) !important; border-color: var(--theme-border) !important; }
+        .dark .table-light, html.dark .table-light, html.dark table { background: var(--theme-bg-card) !important; }
+        .dark .table-light th, html.dark .table-light th, html.dark table th { background: var(--theme-bg-main) !important; color: #94a3b8 !important; border-color: var(--theme-border) !important; }
+        .dark .table-light td, html.dark .table-light td, html.dark table td { color: #cbd5e1 !important; border-color: var(--theme-border) !important; }
+        .dark .table-light tr:hover td, html.dark .table-light tr:hover td, html.dark table tr:hover td { background: var(--theme-bg-card-subtle) !important; }
+        .dark .input-light, html.dark .input-light { background: var(--theme-bg-main) !important; border-color: var(--theme-border) !important; color: #f1f5f9 !important; }
         .dark .text-slate-500, html.dark .text-slate-500 { color: #94a3b8 !important; }
         .dark .text-slate-800, html.dark .text-slate-800 { color: #f1f5f9 !important; }
 
@@ -102,11 +319,38 @@
         /* Bulletproof Form elements in Dark Mode */
         html.dark input, html.dark select, html.dark textarea {
             color: #ffffff !important;
-            background-color: #0f172a !important;
-            border-color: #334155 !important;
+            background-color: var(--theme-bg-main) !important;
+            border-color: var(--theme-border) !important;
         }
         html.dark input::placeholder, html.dark textarea::placeholder {
             color: #64748b !important;
+        }
+
+        /* Light Theme Special Handling */
+        html.theme-light body {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+        html.theme-light .sidebar {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+        }
+        html.theme-light .header-light {
+            background: rgba(255, 255, 255, 0.98) !important;
+            border-color: #e2e8f0 !important;
+        }
+        html.theme-light .header-light h1 { color: #0f172a !important; }
+        html.theme-light .header-light p { color: #64748b !important; }
+        html.theme-light .dashboard-card, html.theme-light .stat-card, html.theme-light .modern-card,
+        html.theme-light [class*="dark:bg-slate-900"], html.theme-light [class*="dark:bg-slate-800"] {
+            background-color: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            color: #0f172a !important;
+        }
+        html.theme-light input, html.theme-light select, html.theme-light textarea {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #0f172a !important;
         }
         
         /* NOC Operations Header Gradient Override (Tailwind-Build Proof) */
@@ -891,10 +1135,6 @@
                         <div class="subitem-dot"></div>
                         <span class="nav-text text-sm">Visual IPAM</span>
                     </a>
-                    <a href="/topology" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/topology' %}active{% endif %}">
-                        <div class="subitem-dot"></div>
-                        <span class="nav-text text-sm">Topologi Sistem</span>
-                    </a>
                     <a href="/network-map" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/network-map' %}active{% endif %}">
                         <div class="subitem-dot"></div>
                         <span class="nav-text text-sm">Peta Jaringan</span>
@@ -921,6 +1161,14 @@
                     <span class="tooltip">Settings</span>
                 </button>
                 <div class="nav-submenu pl-6 border-l border-slate-200 dark:border-slate-800 ml-5 space-y-0.5 mt-1">
+                    <a href="/settings" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/settings' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Pengaturan Sistem</span>
+                    </a>
+                    <a href="/settings/admins" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/settings/admins' %}active{% endif %}">
+                        <div class="subitem-dot"></div>
+                        <span class="nav-text text-sm">Manajemen Admin</span>
+                    </a>
                     <a href="/backup" class="nav-subitem flex items-center space-x-3 px-3 py-2 cursor-pointer {% if request.path == '/backup' %}active{% endif %}">
                         <div class="subitem-dot"></div>
                         <span class="nav-text text-sm">Backup &amp; Restore</span>
@@ -1325,8 +1573,17 @@
 
         if (themeToggleBtn) {
             themeToggleBtn.addEventListener('click', () => {
-                const isDark = document.documentElement.classList.toggle('dark');
-                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                const currentPalette = localStorage.getItem('ui_palette') || 'cyber';
+                if (currentPalette === 'light') {
+                    window.applyGlobalTheme('cyber');
+                } else {
+                    const isDark = document.documentElement.classList.contains('dark');
+                    if (isDark) {
+                        window.applyGlobalTheme('light');
+                    } else {
+                        window.applyGlobalTheme(currentPalette || 'cyber');
+                    }
+                }
             });
         }
         
@@ -1336,8 +1593,17 @@
         // Service Worker Registration
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js').then(registration => {
-                    console.log('SW registered: ', registration);
+                // Bersihkan registrasi lama dengan scope /static/ jika ada
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    for (let registration of registrations) {
+                        if (registration.scope.endsWith('/static/')) {
+                            registration.unregister();
+                        }
+                    }
+                });
+
+                navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
+                    console.log('SW registered with root scope: ', registration);
                 }).catch(registrationError => {
                     console.log('SW registration failed: ', registrationError);
                 });

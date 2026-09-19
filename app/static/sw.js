@@ -1,9 +1,12 @@
-const CACHE_NAME = 'radius-manager-v3';
+const CACHE_NAME = 'radius-manager-v5';
 const ASSETS_TO_CACHE = [
   '/static/css/output.css',
   '/static/js/lucide.min.js',
   '/static/js/echarts.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+  '/static/fontawesome/all.min.css',
+  '/static/fontawesome/webfonts/fa-solid-900.woff2',
+  '/static/fontawesome/webfonts/fa-regular-400.woff2',
+  '/static/fontawesome/webfonts/fa-brands-400.woff2',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&display=swap'
 ];
 

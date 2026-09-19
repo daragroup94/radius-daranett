@@ -141,7 +141,7 @@
                 <option value="">Memuat Pool...</option>
             </select>
             <button onclick="loadIPAMData()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-750 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg transition-all hover:scale-[1.02] whitespace-nowrap">
-                <i class="fas fa-sync mr-1.5"></i>
+                <i data-lucide="refresh-cw" class="w-4 h-4 mr-1.5"></i>
                 <span>Refresh</span>
             </button>
         </div>
@@ -151,7 +151,7 @@
     <div id="conflictBanner" class="hidden bg-white dark:bg-slate-800 border-l-4 border-l-rose-500 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm space-y-4">
         <div class="flex items-center space-x-3">
             <div class="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-450 flex items-center justify-center shadow-sm">
-                <i class="fas fa-exclamation-triangle text-lg"></i>
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
             </div>
             <div>
                 <h4 class="font-extrabold text-sm tracking-tight text-slate-800 dark:text-white">Deteksi Bentrok / Pencurian IP Static</h4>
@@ -255,7 +255,7 @@
         <!-- Render visual IP grid -->
         <div id="gridContainer" class="ip-grid min-h-[150px]">
             <div class="col-span-full text-center py-16 text-slate-400">
-                <i class="fas fa-network-wired text-4xl mb-3 opacity-30 animate-pulse"></i>
+                <i data-lucide="network" class="w-10 h-10 mx-auto mb-3 opacity-30 animate-pulse"></i>
                 <p class="font-semibold text-xs">Memuat informasi IPAM...</p>
             </div>
         </div>
@@ -266,7 +266,7 @@
         <div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-100 dark:border-slate-750 pb-5 mb-5">
             <div class="flex items-center gap-3.5">
                 <div id="inspectIcon" class="w-12 h-12 rounded-2xl flex items-center justify-center text-lg shadow-sm">
-                    <i class="fas fa-search"></i>
+                    <i data-lucide="search" class="w-6 h-6"></i>
                 </div>
                 <div>
                     <h3 class="text-base font-extrabold text-slate-800 dark:text-white" id="inspectIPTitle">Detail Inspeksi IP</h3>
@@ -275,7 +275,7 @@
             </div>
             <div class="mt-4 md:mt-0 flex gap-2">
                 <button id="pingInspectBtn" onclick="runInspectPing()" class="bg-indigo-600 hover:bg-indigo-750 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md flex items-center space-x-2 transition-all hover:scale-[1.01]">
-                    <i class="fas fa-ping-pong mr-1.5"></i>
+                    <i data-lucide="activity" class="w-4 h-4 mr-1.5"></i>
                     <span>Ping Target</span>
                 </button>
                 <button onclick="closeInspector()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-650 dark:text-slate-300 px-4 py-2.5 rounded-2xl text-xs font-bold">
@@ -336,10 +336,11 @@
             if (!data.success) {
                 grid.innerHTML = `
                     <div class="col-span-full text-center py-16 text-red-500">
-                        <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                        <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-3"></i>
                         <p class="font-bold text-xs">Gagal: ${data.error || 'Server error'}</p>
                     </div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
@@ -356,10 +357,11 @@
         } catch (e) {
             grid.innerHTML = `
                 <div class="col-span-full text-center py-16 text-red-500">
-                    <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                    <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-3"></i>
                     <p class="font-bold text-xs">Error: ${e.message}</p>
                 </div>
             `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 
@@ -419,11 +421,12 @@
         if (!pool.render_grid) {
             grid.innerHTML = `
                 <div class="col-span-full text-center py-16 text-slate-400">
-                    <i class="fas fa-info-circle text-4xl mb-3 opacity-30"></i>
+                    <i data-lucide="info" class="w-10 h-10 mx-auto mb-3 opacity-30"></i>
                     <p class="font-semibold text-xs">Subnet ini terlalu besar untuk dirender secara visual (> 1024 IP host).</p>
                     <p class="text-[10px] text-slate-500 mt-1">Utilisasi tetap dipantau melalui widget statistik di atas.</p>
                 </div>
             `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
             return;
         }
 
@@ -480,7 +483,7 @@
             pingBtn.disabled = true;
             pingBtn.className = 'bg-slate-100 dark:bg-slate-800 text-slate-400 px-4 py-2.5 rounded-2xl text-xs font-bold cursor-not-allowed';
             icon.className = 'w-12 h-12 rounded-2xl flex items-center justify-center text-lg bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300';
-            icon.innerHTML = '<i class="fas fa-network-wired"></i>';
+            icon.innerHTML = '<i data-lucide="network" class="w-6 h-6"></i>';
         } else if (status === 'used') {
             statusText.textContent = 'Terpakai (Used)';
             statusText.className = 'text-rose-600 dark:text-rose-450 font-bold';
@@ -488,7 +491,7 @@
             pingBtn.disabled = false;
             pingBtn.className = 'bg-indigo-650 hover:bg-indigo-750 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md flex items-center space-x-2 transition-all hover:scale-[1.01]';
             icon.className = 'w-12 h-12 rounded-2xl flex items-center justify-center text-lg bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-450';
-            icon.innerHTML = '<i class="fas fa-user-check"></i>';
+            icon.innerHTML = '<i data-lucide="user-check" class="w-6 h-6"></i>';
         } else {
             statusText.textContent = 'Tersedia (Free)';
             statusText.className = 'text-emerald-600 dark:text-emerald-450 font-bold';
@@ -496,8 +499,9 @@
             pingBtn.disabled = false;
             pingBtn.className = 'bg-indigo-650 hover:bg-indigo-750 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md flex items-center space-x-2 transition-all hover:scale-[1.01]';
             icon.className = 'w-12 h-12 rounded-2xl flex items-center justify-center text-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-450';
-            icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+            icon.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i>';
         }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         
         card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -521,7 +525,8 @@
         const consoleEl = document.getElementById('inspectPingConsole');
 
         pingBtn.disabled = true;
-        pingBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Pinging...';
+        pingBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 mr-1.5 inline-block animate-spin"></i>Pinging...';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         consoleEl.innerHTML = `<p class="text-slate-400 font-mono">Pinging ${selectedInspectIP} dari router ${routerName}...</p>`;
 
         try {
@@ -553,7 +558,8 @@
         } finally {
             setTimeout(() => {
                 pingBtn.disabled = false;
-                pingBtn.innerHTML = '<i class="fas fa-ping-pong mr-1.5"></i>Ping Target';
+                pingBtn.innerHTML = '<i data-lucide="activity" class="w-4 h-4 mr-1.5 inline-block"></i>Ping Target';
+                if (typeof lucide !== 'undefined') lucide.createIcons();
             }, 600);
         }
     }

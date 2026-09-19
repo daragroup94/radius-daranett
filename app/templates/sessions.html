@@ -90,15 +90,7 @@
         </div>
     </div>
 
-    <!-- Tab switcher: RADIUS vs Mikrotik Live -->
-    <div class="flex gap-2.5 mb-2">
-        <button id="tabRadius" class="tab-btn active px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm hover:shadow" onclick="switchTab('radius')">
-            <i class="fas fa-database mr-2"></i>RADIUS Sessions
-        </button>
-        <button id="tabMikrotik" class="tab-btn px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700/50" onclick="switchTab('mikrotik')">
-            <i class="fas fa-router mr-2"></i>Mikrotik Live
-        </button>
-    </div>
+
 
     <!-- ===== RADIUS TAB ===== -->
     <div id="panelRadius">
@@ -111,17 +103,17 @@
                     <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Pemantauan data sesi aktif langsung dari RADIUS Accounting.</p>
                 </div>
                 <div class="flex gap-2 flex-wrap">
-                    <button onclick="loadSessions()" class="text-white px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
-                        <i class="fas fa-sync-alt mr-1"></i>Refresh
+                    <button onclick="loadSessions()" class="text-white px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] inline-flex items-center">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5"></i>Refresh
                     </button>
-                    <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="text-white px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
-                        <i class="fas fa-play mr-1"></i>Auto
+                    <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" class="text-white px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] inline-flex items-center">
+                        <i data-lucide="play" class="w-3.5 h-3.5 mr-1.5"></i>Auto
                     </button>
-                    <button onclick="disconnectAllDuplicates()" id="disconnectDupBtn" class="hidden text-white px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
-                        <i class="fas fa-user-times mr-1"></i>Putus Ganda
+                    <button onclick="disconnectAllDuplicates()" id="disconnectDupBtn" class="hidden text-white px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] inline-flex items-center">
+                        <i data-lucide="user-x" class="w-3.5 h-3.5 mr-1.5"></i>Putus Ganda
                     </button>
-                    <button onclick="cleanupSessions()" class="text-white px-4 py-2.5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
-                        <i class="fas fa-broom mr-1"></i>Cleanup
+                    <button onclick="cleanupSessions()" class="text-white px-4 py-2.5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02] inline-flex items-center">
+                        <i data-lucide="brush" class="w-3.5 h-3.5 mr-1.5"></i>Cleanup
                     </button>
                 </div>
             </div>
@@ -187,7 +179,7 @@
       <!-- Filters -->
       <div class="flex flex-wrap gap-3 mb-4">
         <div class="relative flex-1 min-w-[200px]">
-          <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
           <input type="text" id="searchInput" placeholder="Cari username..."
             class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
             onkeyup="filterSessions()">
@@ -218,108 +210,7 @@
     </div>
   </div>
 
-  <!-- ===== MIKROTIK LIVE TAB ===== -->
-  <div id="panelMikrotik" class="hidden">
-    <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-6 shadow-sm">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 border-b border-slate-100 dark:border-slate-700/50 pb-5">
-        <div class="flex items-center gap-3">
-          <div class="icon-wrapper-noc bg-gradient-to-tr from-amber-500 to-orange-600 shadow-lg shadow-orange-500/15 floating-icon">
-            <i class="fas fa-router text-white"></i>
-          </div>
-          <div>
-            <h3 class="text-base font-bold text-slate-850 dark:text-white">Mikrotik Live Traffic</h3>
-            <p class="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">Real-time dari RouterOS API · <span id="mkLastUpdate" class="text-emerald-500 font-bold">-</span></p>
-          </div>
-        </div>
-        <div class="flex gap-2 flex-wrap items-center">
-          <span id="mkStatusBadge" class="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">Idle</span>
-          <button onclick="loadMikrotik()" class="text-white px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
-            <i class="fas fa-sync-alt mr-1"></i>Refresh
-          </button>
-          <button onclick="toggleMkAuto()" id="mkAutoBtn" class="text-white px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl text-xs font-bold shadow-md transition-all hover:scale-[1.02]">
-            <i class="fas fa-play mr-1"></i>Auto (3s)
-          </button>
-        </div>
-      </div>
-
-      <!-- Mikrotik Stats -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <!-- Online -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
-          <div class="icon-wrapper-noc icon-gradient-dur shadow-md shadow-orange-500/10">
-            <i data-lucide="users" class="lucide icon-noc text-white"></i>
-          </div>
-          <div>
-            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Online</p>
-            <p id="mkTotal" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit">0</p>
-          </div>
-        </div>
-
-        <!-- Total RX -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
-          <div class="icon-wrapper-noc icon-gradient-dl shadow-md shadow-emerald-500/10">
-            <i data-lucide="download" class="lucide icon-noc text-white"></i>
-          </div>
-          <div>
-            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total RX</p>
-            <p id="mkTotalRx" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit truncate max-w-[150px]">0 bps</p>
-          </div>
-        </div>
-
-        <!-- Total TX -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
-          <div class="icon-wrapper-noc icon-gradient-total shadow-md shadow-blue-500/10">
-            <i data-lucide="upload" class="lucide icon-noc text-white"></i>
-          </div>
-          <div>
-            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total TX</p>
-            <p id="mkTotalTx" class="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit truncate max-w-[150px]">0 bps</p>
-          </div>
-        </div>
-
-        <!-- Router -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm stat-card-glow flex items-center gap-4">
-          <div class="icon-wrapper-noc icon-gradient-ul shadow-md shadow-purple-500/10">
-            <i data-lucide="server" class="lucide icon-noc text-white"></i>
-          </div>
-          <div class="min-w-0 flex-1">
-            <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Router</p>
-            <p id="mkRouters" class="text-base font-bold text-slate-800 dark:text-white mt-0.5 font-outfit truncate">-</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Search Mikrotik -->
-      <div class="flex flex-wrap gap-3 mb-4">
-        <div class="relative flex-1 min-w-[200px]">
-          <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-          <input type="text" id="mkSearch" placeholder="Cari username..."
-            class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-            oninput="renderMikrotik()">
-        </div>
-        <select id="mkFilterRouter" onchange="onRouterChange()" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-bold">
-          <option value="">Memuat router...</option>
-        </select>
-        <select id="mkSort" onchange="renderMikrotik()" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all">
-          <option value="rx_desc">RX Speed ↓</option>
-          <option value="tx_desc">TX Speed ↓</option>
-          <option value="name_asc">Username A-Z</option>
-          <option value="uptime_desc">Uptime ↓</option>
-        </select>
-      </div>
-
-      <!-- Mikrotik List -->
-      <div id="mkList" class="w-full">
-        <div class="col-span-full text-center py-16 text-slate-450 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-6 shadow-sm">
-          <i class="fas fa-router text-5xl mb-4 opacity-30 text-slate-400"></i>
-          <p class="font-semibold text-sm text-slate-500 dark:text-slate-400">Klik Refresh atau aktifkan Auto untuk mulai monitoring</p>
-          <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Pastikan sudah menambahkan integrasi Mikrotik di menu <a href="/integrations" class="text-emerald-500 hover:underline">Integrations</a></p>
-        </div>
-      </div>
-    </div>
-  </div>
 
 </div>
 {% endblock %}
@@ -327,31 +218,6 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-// ===== SHARED =====
-let currentTab = 'radius';
-function switchTab(tab) {
-  currentTab = tab;
-  document.getElementById('panelRadius').classList.toggle('hidden', tab !== 'radius');
-  document.getElementById('panelMikrotik').classList.toggle('hidden', tab !== 'mikrotik');
-  
-  const tabRad = document.getElementById('tabRadius');
-  const tabMik = document.getElementById('tabMikrotik');
-  
-  tabRad.classList.toggle('active', tab === 'radius');
-  tabRad.classList.toggle('bg-slate-100', tab !== 'radius');
-  tabRad.classList.toggle('dark:bg-slate-800', tab !== 'radius');
-  tabRad.classList.toggle('text-slate-600', tab !== 'radius');
-  tabRad.classList.toggle('dark:text-slate-300', tab !== 'radius');
-  
-  tabMik.classList.toggle('active', tab === 'mikrotik');
-  tabMik.classList.toggle('bg-slate-100', tab !== 'mikrotik');
-  tabMik.classList.toggle('dark:bg-slate-800', tab !== 'mikrotik');
-  tabMik.classList.toggle('text-slate-600', tab !== 'mikrotik');
-  tabMik.classList.toggle('dark:text-slate-300', tab !== 'mikrotik');
-  
-  if (tab === 'mikrotik' && mkData.length === 0) loadMkRouters();
-}
-
 // ===== RADIUS TAB =====
 let allSessions = [], duplicateUsernames = new Set();
 let autoRefreshInterval = null, isAutoRefresh = false;
@@ -371,7 +237,8 @@ async function loadSessions() {
 }
 
 function showError(id, msg) {
-  document.getElementById(id).innerHTML = `<div class="text-center py-16 text-red-500"><i class="fas fa-exclamation-triangle text-4xl mb-3"></i><p class="font-bold">${msg}</p></div>`;
+  document.getElementById(id).innerHTML = `<div class="text-center py-16 text-red-500"><i data-lucide="alert-triangle" class="w-10 h-10 mb-3 mx-auto"></i><p class="font-bold">${msg}</p></div>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function updateStats(sessions, dupes) {
@@ -412,7 +279,8 @@ function sortAndRender(list) {
 function renderSessions(sessions) {
   const el = document.getElementById('sessionsList');
   if (!sessions.length) {
-    el.innerHTML = `<div class="text-center py-16 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-6 shadow-sm"><i class="fas fa-plug text-5xl mb-4 opacity-30"></i><p class="font-semibold text-sm">Tidak ada sesi aktif</p></div>`;
+    el.innerHTML = `<div class="text-center py-16 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-6 shadow-sm"><i data-lucide="plug" class="w-12 h-12 mb-4 opacity-30 mx-auto"></i><p class="font-semibold text-sm">Tidak ada sesi aktif</p></div>`;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
   
@@ -446,7 +314,7 @@ function renderSessions(sessions) {
         <td class="py-3 px-4">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 bg-gradient-to-tr from-emerald-500 to-teal-650 text-white relative">
-              <i class="fas fa-user text-white text-xs"></i>
+              <i data-lucide="user" class="w-4 h-4"></i>
               <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-white pulse-dot"></span>
             </div>
             <div class="flex flex-col">
@@ -460,13 +328,13 @@ function renderSessions(sessions) {
         </td>
         <td class="py-3 px-4">
           <div class="flex flex-col text-xs text-slate-600 dark:text-slate-300">
-            <span class="font-mono"><i class="fas fa-network-wired text-slate-400 dark:text-slate-500 mr-1"></i>${s.framedipaddress||'Dynamic'}</span>
-            <span class="text-[10px] text-slate-400 dark:text-slate-500"><i class="fas fa-server text-slate-400 dark:text-slate-500 mr-1.5"></i>${s.nasipaddress}</span>
+            <span class="font-mono flex items-center gap-1"><i data-lucide="network" class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500"></i>${s.framedipaddress||'Dynamic'}</span>
+            <span class="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5"><i data-lucide="server" class="w-3.5 h-3.5"></i>${s.nasipaddress}</span>
           </div>
         </td>
         <td class="py-3 px-4">
-          <span class="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-100/50 dark:border-indigo-900/30">
-            <i class="fas fa-clock text-indigo-400 mr-1.5"></i>
+          <span class="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-100/50 dark:border-indigo-900/30 flex items-center gap-1.5 w-fit">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-400"></i>
             <span class="session-timer font-bold" data-secs="${s.acctsessiontime||0}">${fmtDur(s.acctsessiontime||0)}</span>
           </span>
         </td>
@@ -484,7 +352,7 @@ function renderSessions(sessions) {
         <td class="py-3 px-4 text-right">
           <button onclick="disconnectSession('${s.acctsessionid}','${s.username}')"
             class="w-8 h-8 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-500 dark:hover:bg-rose-600 hover:text-white text-rose-600 dark:text-rose-450 rounded-lg transition-all inline-flex items-center justify-center border border-rose-100/50 dark:border-rose-900/30" title="Disconnect">
-            <i class="fas fa-plug text-xs"></i>
+            <i data-lucide="plug" class="w-4 h-4"></i>
           </button>
         </td>
       </tr>
@@ -497,6 +365,7 @@ function renderSessions(sessions) {
     </div>
   `;
   el.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function toggleDuplicateFilter() {
@@ -509,11 +378,11 @@ function toggleAutoRefresh() {
   const btn = document.getElementById('autoRefreshBtn');
   if (isAutoRefresh) {
     clearInterval(autoRefreshInterval); isAutoRefresh = false;
-    btn.innerHTML = '<i class="fas fa-play mr-1"></i>Auto';
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 mr-1.5 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>Auto';
     btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
   } else {
     autoRefreshInterval = setInterval(loadSessions, 10000); isAutoRefresh = true;
-    btn.innerHTML = '<i class="fas fa-stop mr-1"></i>Stop';
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 mr-1.5 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Stop';
     btn.style.background = 'linear-gradient(135deg,#ef4444,#be123c)';
     showNotification('Auto refresh aktif (10s)', 'success');
   }
@@ -551,266 +420,6 @@ async function loadNasFilter() {
   } catch(e) {}
 }
 
-// ===== MIKROTIK LIVE TAB =====
-let mkData = [], mkAutoInterval = null, mkIsAuto = false;
-const mkHistory = {};
-const MK_HISTORY_MAX = 20;
-const sparkCharts = {};
-const mkByteCache = {};
-
-async function loadMkRouters() {
-  try {
-    const igs = await apiCall('/api/integrations');
-    const sel = document.getElementById('mkFilterRouter');
-    const mikrotiks = (igs||[]).filter(i => i.type === 'mikrotik' && i.is_active);
-    if (!mikrotiks.length) { sel.innerHTML = '<option value="">Tidak ada router</option>'; return; }
-    sel.innerHTML = mikrotiks.map(i => `<option value="${i.id}">${i.name} (${i.host})</option>`).join('');
-    // auto-load first router
-    loadMikrotik();
-  } catch(e) {}
-}
-
-function onRouterChange() {
-  // Reset byte cache when switching router so delta starts fresh
-  Object.keys(mkByteCache).forEach(k => delete mkByteCache[k]);
-  Object.keys(mkHistory).forEach(k => delete mkHistory[k]);
-  // Clear cards
-  document.getElementById('mkList').innerHTML = '';
-  Object.keys(sparkCharts).forEach(k => { try { sparkCharts[k].destroy(); } catch(e){} delete sparkCharts[k]; });
-  loadMikrotik();
-}
-
-async function loadMikrotik() {
-  const badge = document.getElementById('mkStatusBadge');
-  badge.textContent = 'Loading...'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700';
-  const routerId = document.getElementById('mkFilterRouter').value;
-  if (!routerId) return;
-  try {
-    const tBefore = performance.now();
-    const res = await apiCall(`/api/mikrotik/active?router_id=${routerId}`);
-    const tAfter = performance.now();
-    const tNow = (tBefore + tAfter) / 2;
-
-    if (!res.success) { badge.textContent = 'Error'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700'; return; }
-
-    mkData = (res.data || []).map(s => {
-      if (s.error) return s;
-      const key = `${s.router_host}:${s.name}`;
-      let rx_rate = 0, tx_rate = 0;
-      if (mkByteCache[key]) {
-        const dt = (tNow - mkByteCache[key].t) / 1000;
-        if (dt > 0.5) {
-          rx_rate = Math.max(0, Math.round((s.rx_byte - mkByteCache[key].rx) / dt * 8));
-          tx_rate = Math.max(0, Math.round((s.tx_byte - mkByteCache[key].tx) / dt * 8));
-        }
-      }
-      mkByteCache[key] = { t: tNow, rx: s.rx_byte, tx: s.tx_byte };
-      return { ...s, rx_rate, tx_rate };
-    });
-
-    mkData.forEach(s => {
-      if (s.error) return;
-      if (!mkHistory[s.name]) mkHistory[s.name] = [];
-      mkHistory[s.name].push(s.rx_rate || 0);
-      if (mkHistory[s.name].length > MK_HISTORY_MAX) mkHistory[s.name].shift();
-    });
-
-    const valid = mkData.filter(s=>!s.error);
-    const routerName = document.getElementById('mkFilterRouter').selectedOptions[0]?.text || '-';
-    document.getElementById('mkTotal').textContent = valid.length;
-    document.getElementById('mkTotalRx').textContent = fmtBps(valid.reduce((a,s)=>a+(s.rx_rate||0),0));
-    document.getElementById('mkTotalTx').textContent = fmtBps(valid.reduce((a,s)=>a+(s.tx_rate||0),0));
-    document.getElementById('mkRouters').textContent = routerName;
-    document.getElementById('mkLastUpdate').textContent = new Date().toLocaleTimeString('id-ID');
-    badge.textContent = `${valid.length} Online`; badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700';
-    renderMikrotik();
-  } catch(e) {
-    badge.textContent = 'Error'; badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700';
-  }
-}
-
-function renderMikrotik() {
-  const q = document.getElementById('mkSearch').value.toLowerCase();
-  const sortBy = document.getElementById('mkSort').value;
-  let list = mkData.filter(s => !s.error && s.name.toLowerCase().includes(q));
-  if (sortBy==='rx_desc') list.sort((a,b)=>(b.rx_rate||0)-(a.rx_rate||0));
-  else if (sortBy==='tx_desc') list.sort((a,b)=>(b.tx_rate||0)-(a.tx_rate||0));
-  else if (sortBy==='name_asc') list.sort((a,b)=>a.name.localeCompare(b.name));
-  else if (sortBy==='uptime_desc') list.sort((a,b)=>mkUptimeSec(b.uptime)-mkUptimeSec(a.uptime));
-
-  const errors = mkData.filter(s=>s.error);
-  const el = document.getElementById('mkList');
-
-  if (!list.length && !errors.length) {
-    Object.keys(sparkCharts).forEach(k => { try { sparkCharts[k].destroy(); } catch(e){} delete sparkCharts[k]; });
-    el.innerHTML = `<div class="text-center py-16 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-6 shadow-sm"><i class="fas fa-router text-5xl mb-4 opacity-30"></i><p class="font-semibold">Tidak ada koneksi aktif</p></div>`;
-    return;
-  }
-
-  // Ensure the table structure is initialized in el
-  let tbody = el.querySelector('#mkListTableBody');
-  if (!tbody) {
-    el.innerHTML = `
-      <div class="overflow-x-auto min-w-full bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-150 dark:border-slate-700/50 p-4 shadow-sm">
-        <table class="w-full text-left border-collapse align-middle">
-          <thead>
-            <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              <th class="pb-3 pt-1 px-4 font-extrabold">USER & ROUTER</th>
-              <th class="pb-3 pt-1 px-4 font-extrabold">IP / MAC</th>
-              <th class="pb-3 pt-1 px-4 font-extrabold">UPTIME</th>
-              <th class="pb-3 pt-1 px-4 font-extrabold">KECEPAN AKTIF</th>
-              <th class="pb-3 pt-1 px-4 font-extrabold">TRAFIK TOTAL</th>
-              <th class="pb-3 pt-1 px-4 font-extrabold text-right">SPARKLINE</th>
-            </tr>
-          </thead>
-          <tbody id="mkListTableBody" class="divide-y divide-slate-50 dark:divide-slate-700/50">
-          </tbody>
-        </table>
-      </div>
-    `;
-    tbody = el.querySelector('#mkListTableBody');
-  }
-
-  // Determine which rows need to be added/removed
-  const neededIds = new Set(list.map(s => `mk_row_${s.name.replace(/[^a-z0-9]/gi,'_')}`));
-  // Remove rows no longer in list
-  Array.from(tbody.querySelectorAll('[data-mk-row]')).forEach(row => {
-    if (!neededIds.has(row.id)) {
-      const cid = row.querySelector('canvas')?.id;
-      if (cid && sparkCharts[cid]) { try { sparkCharts[cid].destroy(); } catch(e){} delete sparkCharts[cid]; }
-      row.remove();
-    }
-  });
-  const maxRx = Math.max(...list.map(s=>s.rx_rate||0), 1);
-  const maxTx = Math.max(...list.map(s=>s.tx_rate||0), 1);
-
-  // Update-in-place: add new rows, update existing, remove stale
-  list.forEach(s => {
-    const cardId = `mk_row_${s.name.replace(/[^a-z0-9]/gi,'_')}`;
-    const canvasId = `spark_${s.name.replace(/[^a-z0-9]/gi,'_')}`;
-    const rxPct = Math.round((s.rx_rate||0)/maxRx*100);
-    const txPct = Math.round((s.tx_rate||0)/maxTx*100);
-    let row = document.getElementById(cardId);
-
-    if (!row) {
-      row = document.createElement('tr');
-      row.id = cardId;
-      row.setAttribute('data-mk-row', '1');
-      row.className = 'hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors';
-      row.innerHTML = `
-        <td class="py-3 px-4">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-tr from-amber-500 to-orange-600 text-white shadow-sm flex-shrink-0 relative">
-              <i class="fas fa-user text-white text-xs"></i>
-              <span class="w-2 h-2 bg-emerald-500 rounded-full border border-white absolute -top-0.5 -right-0.5"></span>
-            </div>
-            <div class="flex flex-col">
-              <span class="font-bold text-slate-800 dark:text-white text-sm truncate">${s.name}</span>
-              <div class="flex gap-1.5 mt-0.5">
-                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30">${s.router}</span>
-                <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700/80">${s.service||'pppoe'}</span>
-              </div>
-            </div>
-          </div>
-        </td>
-        <td class="py-3 px-4">
-          <div class="flex flex-col text-xs text-slate-600 dark:text-slate-300 font-medium">
-            <span class="font-mono"><i class="fas fa-network-wired text-slate-400 dark:text-slate-500 mr-1"></i>${s.address||'-'}</span>
-            <span class="text-[10px] text-slate-400 dark:text-slate-500 font-mono"><i class="fas fa-ethernet text-slate-400 dark:text-slate-500 mr-1.5"></i>${s.caller_id||'-'}</span>
-          </div>
-        </td>
-        <td class="py-3 px-4">
-          <span class="text-xs font-mono font-bold text-purple-650 bg-purple-50/50 px-2 py-0.5 rounded border border-purple-100/50">
-            <i class="fas fa-clock text-purple-400 mr-1.5"></i>${s.uptime||'-'}
-          </span>
-        </td>
-        <td class="py-3 px-4">
-          <div class="flex flex-col w-40 gap-1">
-            <div class="flex justify-between text-[10px] font-bold">
-              <span class="mk-rx-val text-emerald-600">↓ ${fmtBps(s.rx_rate||0)}</span>
-              <span class="mk-tx-val text-blue-600">↑ ${fmtBps(s.tx_rate||0)}</span>
-            </div>
-            <div class="w-full bg-slate-100 dark:bg-slate-700/60 h-1.5 rounded-full overflow-hidden">
-              <div class="mk-rx-bar speed-bar-fill h-full rounded-full" style="width:${rxPct}%;background:linear-gradient(90deg,#10b981,#34d399)"></div>
-            </div>
-            <div class="w-full bg-slate-100 dark:bg-slate-700/60 h-1.5 rounded-full overflow-hidden">
-              <div class="mk-tx-bar speed-bar-fill h-full rounded-full" style="width:${txPct}%;background:linear-gradient(90deg,#3b82f6,#818cf8)"></div>
-            </div>
-          </div>
-        </td>
-        <td class="py-3 px-4">
-          <div class="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-            <span>↓ <span class="mk-rx-byte text-emerald-500 font-semibold">${fmtBytes(s.rx_byte||0)}</span></span>
-            <span>↑ <span class="mk-tx-byte text-blue-500 font-semibold">${fmtBytes(s.tx_byte||0)}</span></span>
-          </div>
-        </td>
-        <td class="py-3 px-4 text-right">
-          <div class="inline-block w-24 h-10"><canvas id="${canvasId}" class="spark-canvas" width="96" height="40"></canvas></div>
-        </td>
-      `;
-      tbody.appendChild(row);
-    } else {
-      row.querySelector('.mk-rx-bar').style.width = rxPct + '%';
-      row.querySelector('.mk-tx-bar').style.width = txPct + '%';
-      row.querySelector('.mk-rx-val').textContent = '↓ ' + fmtBps(s.rx_rate||0);
-      row.querySelector('.mk-tx-val').textContent = '↑ ' + fmtBps(s.tx_rate||0);
-      row.querySelector('.mk-rx-byte').textContent = fmtBytes(s.rx_byte||0);
-      row.querySelector('.mk-tx-byte').textContent = fmtBytes(s.tx_byte||0);
-    }
-
-    // Sparkline: update if exists, create if new
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const hist = mkHistory[s.name] || [0];
-    if (sparkCharts[canvasId]) {
-      sparkCharts[canvasId].data.labels = hist.map((_,i)=>i);
-      sparkCharts[canvasId].data.datasets[0].data = [...hist];
-      sparkCharts[canvasId].update('none');
-    } else {
-      const orphan = Chart.getChart(canvas);
-      if (orphan) orphan.destroy();
-      sparkCharts[canvasId] = new Chart(canvas, {
-        type: 'line',
-        data: { labels: hist.map((_,i)=>i), datasets: [{ data: [...hist], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4 }] },
-        options: { responsive: false, animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false, min: 0 } } }
-      });
-    }
-  });
-
-  // Error banner
-  let errBanner = el.querySelector('.mk-err-banner');
-  if (errors.length) {
-    const msg = '<b>Router errors:</b> ' + errors.map(e=>`${e.router}: ${e.error}`).join(' | ');
-    if (!errBanner) { errBanner = document.createElement('div'); errBanner.className='mk-err-banner mt-3 p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-600'; el.appendChild(errBanner); }
-    errBanner.innerHTML = msg;
-  } else if (errBanner) errBanner.remove();
-}
-
-function toggleMkAuto() {
-  const btn = document.getElementById('mkAutoBtn');
-  if (mkIsAuto) {
-    clearInterval(mkAutoInterval); mkIsAuto = false;
-    btn.innerHTML = '<i class="fas fa-play mr-1"></i>Auto (3s)';
-    btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
-  } else {
-    loadMikrotik();
-    mkAutoInterval = setInterval(loadMikrotik, 3000); mkIsAuto = true;
-    btn.innerHTML = '<i class="fas fa-stop mr-1"></i>Stop';
-    btn.style.background = 'linear-gradient(135deg,#ef4444,#be123c)';
-    showNotification('Live monitoring aktif (3s)', 'success');
-  }
-}
-
-function mkUptimeSec(uptime) {
-  if (!uptime) return 0;
-  let s=0;
-  const m = uptime.match(/(\d+)w/); if(m) s+=parseInt(m[1])*604800;
-  const d = uptime.match(/(\d+)d/); if(d) s+=parseInt(d[1])*86400;
-  const h = uptime.match(/(\d+)h/); if(h) s+=parseInt(h[1])*3600;
-  const mi = uptime.match(/(\d+)m/); if(mi) s+=parseInt(mi[1])*60;
-  const sc = uptime.match(/(\d+)s/); if(sc) s+=parseInt(sc[1]);
-  return s;
-}
 
 // ===== HELPERS =====
 function fmtBytes(b) {

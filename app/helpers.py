@@ -238,3 +238,22 @@ def close_cached_mikrotik(host, port, username):
         except Exception:
             pass
 
+
+def log_admin_activity(action, target=None, details=None):
+    """Mencatat aktivitas admin ke dalam tabel admin_activity_log."""
+    try:
+        from flask import session, request
+        from database import execute_query
+        admin_username = session.get('username', 'system') if session else 'system'
+        ip_addr = request.headers.get('X-Forwarded-For', request.remote_addr) if request else None
+        if ip_addr and ',' in ip_addr:
+            ip_addr = ip_addr.split(',')[0].strip()
+        execute_query(
+            "INSERT INTO admin_activity_log (admin_username, action, target, ip_address, details, created_at) VALUES (%s, %s, %s, %s, %s, NOW())",
+            (admin_username, action, str(target) if target else None, ip_addr, str(details) if details else None),
+            fetch=False
+        )
+    except Exception:
+        pass
+
+

@@ -91,7 +91,7 @@
                     </tr>
                 </thead>
                 <tbody id="x8021xTableBody" class="divide-y divide-slate-50 dark:divide-slate-750">
-                    <tr><td colspan="7" class="text-center py-10 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading...</td></tr>
+                    <tr><td colspan="7" class="text-center py-10 text-slate-400"><span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Loading...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -105,12 +105,12 @@
             <div class="flex gap-1">
                 <button onclick="x8021xChangePage(x8021xPage-1)" id="x8021xPrev"
                         class="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                    <i class="fas fa-chevron-left text-xs"></i>
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
                 </button>
                 <div id="x8021xPageNums" class="flex gap-1"></div>
                 <button onclick="x8021xChangePage(x8021xPage+1)" id="x8021xNext"
                         class="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                    <i class="fas fa-chevron-right text-xs"></i>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
             </div>
         </div>
@@ -122,10 +122,10 @@
     <div class="modern-card rounded-3xl shadow-2xl p-6 w-full max-w-md bg-white">
         <div class="flex justify-between items-center mb-5">
             <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
-                <i class="fas fa-plus text-blue-500"></i> Add 802.1X User
+                <i data-lucide="plus" class="w-5 h-5 text-blue-500"></i> Add 802.1X User
             </h3>
-            <button onclick="closeAddModal()" class="w-8 h-8 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-lg transition-all">
-                <i class="fas fa-times text-xs"></i>
+            <button onclick="closeAddModal()" class="w-8 h-8 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-lg transition-all flex items-center justify-center">
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
         <form id="addForm" class="space-y-3" onsubmit="submitAdd(event)">
@@ -172,10 +172,10 @@
     <div class="modern-card rounded-3xl shadow-2xl p-6 w-full max-w-md bg-white">
         <div class="flex justify-between items-center mb-5">
             <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
-                <i class="fas fa-edit text-blue-500"></i> Edit: <span id="editUserLabel" class="text-blue-600 font-bold"></span>
+                <i data-lucide="edit" class="w-5 h-5 text-blue-500"></i> Edit: <span id="editUserLabel" class="text-blue-600 font-bold"></span>
             </h3>
-            <button onclick="closeEditModal()" class="w-8 h-8 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-lg transition-all">
-                <i class="fas fa-times text-xs"></i>
+            <button onclick="closeEditModal()" class="w-8 h-8 bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 rounded-lg transition-all flex items-center justify-center">
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
         <form id="editForm" class="space-y-3" onsubmit="submitEdit(event)">

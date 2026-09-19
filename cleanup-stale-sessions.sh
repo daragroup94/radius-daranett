@@ -6,12 +6,12 @@ TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 echo "[$TIMESTAMP] Starting stale sessions cleanup..." >> $LOGFILE
 
-# Mark sessions as stale if no update received in the last 3 minutes
+# Mark sessions as stale if no update received in the last 10 minutes
 RESULT=$(docker exec -i freeradius-db psql -U radius -d radius <<EOSQL
 UPDATE radacct
 SET acctstoptime = COALESCE(acctupdatetime, acctstarttime, NOW()), acctterminatecause = 'Lost-Carrier'
 WHERE acctstoptime IS NULL
-  AND (acctupdatetime < NOW() - INTERVAL '3 minutes' OR (acctupdatetime IS NULL AND acctstarttime < NOW() - INTERVAL '3 minutes'));
+  AND (acctupdatetime < NOW() - INTERVAL '10 minutes' OR (acctupdatetime IS NULL AND acctstarttime < NOW() - INTERVAL '10 minutes'));
 EOSQL
 )
 

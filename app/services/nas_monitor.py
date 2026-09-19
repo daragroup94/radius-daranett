@@ -65,9 +65,14 @@ def check_odp_outages():
                 ic.id as odp_id,
                 ic.name as odp_name,
                 COUNT(cc.customer_username) as total_clients,
-                SUM(CASE WHEN (SELECT COUNT(*) FROM radacct a WHERE a.username = cc.customer_username AND a.acctstoptime IS NULL) = 0 THEN 1 ELSE 0 END) as offline_clients
+                SUM(CASE WHEN act.username IS NULL THEN 1 ELSE 0 END) as offline_clients
             FROM cable_connections cc
             JOIN infrastructure_coordinates ic ON ic.id = cc.odp_id
+            LEFT JOIN (
+                SELECT DISTINCT LOWER(username) AS username 
+                FROM radacct 
+                WHERE acctstoptime IS NULL
+            ) act ON act.username = LOWER(cc.customer_username)
             GROUP BY ic.id, ic.name
         """) or []
         

@@ -7,7 +7,7 @@ let x8021xSearchTimeout = null;
 async function loadx8021xUsers() {
     const searchVal = document.getElementById('x8021xSearch').value;
     const tbody = document.getElementById('x8021xTableBody');
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading data...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-gray-400"><span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Loading data...</td></tr>`;
 
     try {
         const data = await apiCall(`/api/8021x/users?page=${x8021xPage}&limit=${x8021xLimit}&search=${encodeURIComponent(searchVal)}`);
@@ -38,24 +38,24 @@ async function loadx8021xUsers() {
                 <tr class="hover:bg-slate-50/50 transition-colors">
                     <td class="py-3 px-4">
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 bg-gradient-to-tr from-teal-500 to-emerald-600"><i class="fas fa-lock text-white text-xs"></i></div>
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 bg-gradient-to-tr from-teal-500 to-emerald-600"><i data-lucide="lock" class="w-4 h-4 text-white"></i></div>
                             <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(u.username)}</span>
                         </div>
                     </td>
                     <td class="py-3 px-4"><span class="text-xs font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">${escapeHtml(u.password)}</span></td>
-                    <td class="py-3 px-4"><span class="text-xs font-mono text-slate-600"><i class="fas fa-network-wired text-slate-400 mr-1.5"></i>${escapeHtml(u.ip_address || 'Dynamic')}</span></td>
+                    <td class="py-3 px-4"><span class="text-xs font-mono text-slate-600"><i data-lucide="network" class="w-3.5 h-3.5 text-slate-400 mr-1.5 inline"></i>${escapeHtml(u.ip_address || 'Dynamic')}</span></td>
                     <td class="py-3 px-4"><span class="text-xs text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">${escapeHtml(u.framed_pool || '—')}</span></td>
-                    <td class="py-3 px-4"><span class="text-xs font-mono text-indigo-650 bg-indigo-50/60 px-2 py-0.5 rounded border border-indigo-100/50"><i class="fas fa-tachometer-alt text-indigo-400 mr-1.5"></i>${escapeHtml(u.rate_limit || '—')}</span></td>
+                    <td class="py-3 px-4"><span class="text-xs font-mono text-indigo-650 bg-indigo-50/60 px-2 py-0.5 rounded border border-indigo-100/50"><i data-lucide="gauge" class="w-3.5 h-3.5 text-indigo-400 mr-1.5 inline"></i>${escapeHtml(u.rate_limit || '—')}</span></td>
                     <td class="py-3 px-4">${statusBadge}</td>
                     <td class="py-3 px-4 text-right">
                         <div class="flex justify-end gap-1.5">
                             <button onclick="openEditModal('${escapeHtml(u.username)}', '${escapeHtml(u.ip_address || '')}', '${escapeHtml(u.framed_pool || '')}', '${escapeHtml(u.rate_limit || '')}')" 
                                     class="w-8 h-8 bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Edit User">
-                                <i class="fas fa-edit text-xs"></i>
+                                <i data-lucide="edit" class="w-4 h-4"></i>
                             </button>
                             <button onclick="deleteUser('${escapeHtml(u.username)}')" 
                                     class="w-8 h-8 bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white rounded-lg transition-colors flex items-center justify-center shadow-sm" title="Hapus User">
-                                <i class="fas fa-trash text-xs"></i>
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
                         </div>
                     </td>
@@ -63,12 +63,15 @@ async function loadx8021xUsers() {
             `;
         }).join('');
 
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
         const start = (x8021xPage - 1) * x8021xLimit + 1;
         const end = Math.min(start + data.users.length - 1, x8021xTotal);
         updatePagination(start, end, x8021xTotal);
 
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-red-500 font-bold"><i class="fas fa-exclamation-triangle mr-2"></i>Error: ${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-red-500 font-bold"><i data-lucide="alert-triangle" class="w-4 h-4 mr-2 inline"></i>Error: ${e.message}</td></tr>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
 

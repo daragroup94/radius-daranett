@@ -386,11 +386,11 @@
         
         <div class="z-10 flex gap-2 flex-wrap">
             <button onclick="startAddInfrastructure()" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 shadow-md hover:scale-[1.02] text-xs cursor-pointer">
-                <i class="fas fa-plus"></i>
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                 <span>Tambah OLT/ODC/ODP</span>
             </button>
             <button onclick="loadMapData()" class="bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 border border-white/10 hover:scale-[1.02] text-xs cursor-pointer">
-                <i class="fas fa-sync-alt" id="refreshMapIcon"></i>
+                <i data-lucide="refresh-cw" id="refreshMapIcon" class="w-3.5 h-3.5"></i>
                 <span>Refresh Data</span>
             </button>
         </div>
@@ -400,7 +400,7 @@
     <div id="setLocBanner" class="hidden map-banner-info p-4 rounded-3xl shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 border">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                <i class="fas fa-map-marker-alt text-lg"></i>
+                <i data-lucide="map-pin" class="text-lg w-5 h-5"></i>
             </div>
             <div class="min-w-0">
                 <p class="text-xs font-bold text-slate-800 dark:text-white">Menentukan Lokasi Baru</p>
@@ -414,7 +414,7 @@
                    class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500">
             <button onclick="getCurrentGPSLocation()" type="button" title="Gunakan GPS Perangkat Saat Ini"
                     class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-750 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center cursor-pointer border border-slate-200 dark:border-slate-700/80 gap-1.5 flex-shrink-0">
-                <i class="fas fa-location-arrow"></i>
+                <i data-lucide="navigation" class="w-3.5 h-3.5"></i>
                 <span class="hidden sm:inline">Gunakan GPS</span>
             </button>
         </div>
@@ -431,7 +431,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-700/50">
             <div class="flex items-center gap-3 flex-shrink-0">
                 <div class="w-10 h-10 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                    <i class="fas fa-plus-circle text-lg"></i>
+                    <i data-lucide="plus-circle" class="text-lg w-5 h-5"></i>
                 </div>
                 <div class="min-w-0">
                     <p class="text-xs font-bold text-slate-800 dark:text-white">Tambah Infrastruktur Baru</p>
@@ -454,22 +454,22 @@
                     <label class="block text-[9px] font-extrabold text-slate-400 uppercase mb-1">Ikon Peta</label>
                     <select id="infraIconInput" onchange="updateInfraTempIcon()"
                             class="px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
-                        <option value="fa-network-wired">💻 Network Wired (Default OLT)</option>
-                        <option value="fa-broadcast-tower">📡 Broadcast Tower</option>
-                        <option value="fa-server">🖥️ Server (Central)</option>
-                        <option value="fa-ethernet">🔌 Ethernet Port</option>
-                        <option value="fa-route">🛣️ Router / Route</option>
-                        <option value="fa-box">📦 Box / Cabinet (Default ODC)</option>
-                        <option value="fa-hdd">💾 HDD Rack</option>
-                        <option value="fa-toolbox">🧰 Toolbox / Cabinet</option>
-                        <option value="fa-cubes">🧱 Nodes / Cubes</option>
-                        <option value="fa-code-branch">🌿 Branch Node (Default OIT)</option>
-                        <option value="fa-project-diagram">🔀 Project Diagram / Splitter</option>
-                        <option value="fa-sitemap">🌿 Sitemap (Default ODP)</option>
-                        <option value="fa-share-alt">🔀 Share Node / Splitter</option>
-                        <option value="fa-plug">🔌 Plug / Connect</option>
-                        <option value="fa-wifi">📶 WiFi Signal</option>
-                        <option value="fa-map-pin">📍 Map Pin</option>
+                        <option value="network">💻 Network Wired (Default OLT)</option>
+                        <option value="radio">📡 Broadcast Tower</option>
+                        <option value="server">🖥️ Server (Central)</option>
+                        <option value="cable">🔌 Ethernet Port</option>
+                        <option value="route">🛣️ Router / Route</option>
+                        <option value="box">📦 Box / Cabinet (Default ODC)</option>
+                        <option value="hard-drive">💾 HDD Rack</option>
+                        <option value="briefcase">🧰 Toolbox / Cabinet</option>
+                        <option value="boxes">🧱 Nodes / Cubes</option>
+                        <option value="git-branch">🌿 Branch Node (Default OIT)</option>
+                        <option value="git-merge">🔀 Project Diagram / Splitter</option>
+                        <option value="share-2">🌿 Sitemap (Default ODP)</option>
+                        <option value="share-2">🔀 Share Node / Splitter</option>
+                        <option value="plug">🔌 Plug / Connect</option>
+                        <option value="wifi">📶 WiFi Signal</option>
+                        <option value="map-pin">📍 Map Pin</option>
                     </select>
                 </div>
             </div>
@@ -495,7 +495,7 @@
                            placeholder="Paste koordinat / link Google Maps..."
                            oninput="handleInfraCoordInput()"
                            class="w-full pl-8 pr-3.5 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700/60 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                    <i class="fas fa-map-marker-alt absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 text-[10px]"></i>
+                    <i data-lucide="map-pin" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 w-3 h-3"></i>
                 </div>
             </div>
         </div>
@@ -509,7 +509,7 @@
         <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
                 <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <i class="fas fa-crosshairs text-indigo-400 text-[9px]"></i>
+                    <i data-lucide="crosshair" class="text-indigo-400 w-3 h-3"></i>
                     <span id="infraCoordDisplay">Belum ada koordinat — klik peta atau isi kolom di atas</span>
                 </span>
             </div>
@@ -524,7 +524,7 @@
     <div id="drawCableBanner" class="hidden map-banner-info p-4 rounded-3xl shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all duration-300 border border-emerald-300 dark:border-emerald-800/80">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md flex-shrink-0">
-                <i class="fas fa-plug text-lg animate-pulse"></i>
+                <i data-lucide="plug" class="text-lg w-5 h-5 animate-pulse"></i>
             </div>
             <div class="min-w-0">
                 <p class="text-xs font-bold text-slate-800 dark:text-white">Menggambar Rute Kabel Fiber</p>
@@ -535,10 +535,10 @@
             <!-- Auto-Snap Checkbox -->
             <label class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 cursor-pointer select-none text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-950/40 transition-all">
                 <input type="checkbox" id="chkAutoSnap" checked class="rounded text-emerald-600 focus:ring-emerald-500 dark:bg-slate-800 border-slate-300 dark:border-slate-600 w-3.5 h-3.5 cursor-pointer">
-                <i class="fas fa-directions"></i><span>Auto-Snap Jalan</span>
+                <i data-lucide="navigation" class="w-3 h-3"></i><span>Auto-Snap Jalan</span>
             </label>
             <button onclick="undoDrawCablePoint()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-750 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border border-slate-200 dark:border-slate-700/80">
-                <i class="fas fa-undo text-[10px]"></i><span>Undo</span>
+                <i data-lucide="undo" class="w-3 h-3"></i><span>Undo</span>
             </button>
             <button onclick="cancelDrawCable()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-750 dark:hover:bg-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer">Batal</button>
             <button id="btnSaveCable" onclick="saveCablePath()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">Simpan Rute</button>
@@ -550,7 +550,7 @@
         
         <!-- Toggle Button to Open Sidebar Panel -->
         <button id="btnOpenSidebar" onclick="toggleSidebar(true)" class="hidden lg:flex absolute top-4 left-4 z-[1001] w-10 h-10 rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-slate-200/40 dark:border-slate-800/60 shadow-lg items-center justify-center text-slate-700 dark:text-slate-200 hover:text-indigo-500 hover:scale-105 active:scale-95 transition-all cursor-pointer pointer-events-auto" title="Tampilkan Panel Kontrol">
-            <i class="fas fa-bars"></i>
+            <i data-lucide="menu" class="w-4 h-4"></i>
         </button>
 
         <!-- Floating Sidebar Panel (Overlay on Left Side, 280px wide) -->
@@ -560,10 +560,10 @@
                 <!-- Main Header -->
                 <div class="flex items-center justify-between pb-3 border-b border-slate-200/30 dark:border-slate-800/40 mb-3 flex-shrink-0 select-none">
                     <span class="text-xs font-black text-slate-800 dark:text-slate-105 uppercase tracking-wider flex items-center gap-1.5">
-                        <i class="fas fa-network-wired text-indigo-500"></i>Panel Kontrol NOC
+                        <i data-lucide="network" class="text-indigo-500 w-3.5 h-3.5"></i>Panel Kontrol NOC
                     </span>
                     <button onclick="toggleSidebar(false)" title="Sembunyikan Panel" class="w-6 h-6 rounded-lg hover:bg-slate-100/50 dark:hover:bg-slate-800/50 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors focus:outline-none cursor-pointer">
-                        <i class="fas fa-chevron-left text-[10px]"></i>
+                        <i data-lucide="chevron-left" class="w-3 h-3"></i>
                     </button>
                 </div>
 
@@ -574,56 +574,56 @@
                     <div class="border border-slate-200/30 dark:border-slate-800/40 rounded-2xl overflow-hidden bg-white/40 dark:bg-slate-900/40 flex-shrink-0">
                         <button onclick="toggleSection('filterSection')" class="flex items-center justify-between w-full p-3 bg-slate-50/50 dark:bg-slate-950/20 focus:outline-none group select-none">
                             <span class="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Filter Tampilan Map</span>
-                            <i id="filterSectionChevron" class="fas fa-chevron-up text-slate-400 transition-transform duration-300"></i>
+                            <i id="filterSectionChevron" data-lucide="chevron-up" class="text-slate-400 transition-transform duration-300 w-3.5 h-3.5"></i>
                         </button>
                         
                         <div id="filterSectionContent" class="p-3.5 space-y-3 transition-all duration-300">
                             <div class="space-y-2">
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowNas" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-blue-500 border-slate-300 rounded focus:ring-blue-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-server text-blue-500 text-[9px]"></i>NAS Router</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="server" class="text-blue-500 w-3 h-3"></i>NAS Router</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowGood" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-emerald-500 border-slate-300 rounded focus:ring-emerald-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-circle text-emerald-500 text-[9px]"></i>Sinyal Bagus</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="circle" class="text-emerald-500 w-3 h-3"></i>Sinyal Bagus</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowWarning" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-amber-550 border-slate-350 rounded focus:ring-amber-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-circle text-amber-500 text-[9px]"></i>Sinyal Lemah</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="circle" class="text-amber-500 w-3 h-3"></i>Sinyal Lemah</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowBad" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-rose-500 border-slate-300 rounded focus:ring-rose-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-circle text-rose-500 text-[9px]"></i>Sinyal Buruk</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="circle" class="text-rose-500 w-3 h-3"></i>Sinyal Buruk</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowOffline" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-slate-400 border-slate-300 rounded focus:ring-slate-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-circle text-slate-400 text-[9px]"></i>User Offline</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="circle" class="text-slate-400 w-3 h-3"></i>User Offline</span>
                                 </label>
                             </div>
                             <div class="border-t border-slate-100 dark:border-slate-800/40 pt-3 space-y-2">
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowOlt" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-purple-655 border-slate-300 rounded focus:ring-purple-450">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-network-wired text-purple-650 text-[9px]"></i>OLT Pusat</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="network" class="text-purple-650 w-3 h-3"></i>OLT Pusat</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowOdc" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-cyan-500 border-slate-300 rounded focus:ring-cyan-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-box text-cyan-500 text-[9px]"></i>ODC Cabinet</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="box" class="text-cyan-500 w-3 h-3"></i>ODC Cabinet</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowOit" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-amber-500 border-slate-300 rounded focus:ring-amber-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-code-branch text-amber-500 text-[9px]"></i>OIT Inline Tap</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="git-branch" class="text-amber-500 w-3 h-3"></i>OIT Inline Tap</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowOdp" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-emerald-500 border-slate-300 rounded focus:ring-emerald-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-sitemap text-emerald-500 text-[9px]"></i>ODP Splitter</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="share-2" class="text-emerald-500 w-3 h-3"></i>ODP Splitter</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowCoverage" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-emerald-500 border-slate-300 rounded focus:ring-emerald-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-dot-circle text-emerald-500 text-[9px]"></i>Cakupan ODP (150m)</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="radio" class="text-emerald-500 w-3 h-3"></i>Cakupan ODP (150m)</span>
                                 </label>
                                 <label class="flex items-center space-x-2.5 cursor-pointer">
                                     <input type="checkbox" id="chkShowTopology" checked onchange="updateFilters()" class="w-3.5 h-3.5 text-indigo-500 border-slate-300 rounded focus:ring-indigo-400">
-                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i class="fas fa-project-diagram text-indigo-500 text-[9px]"></i>Kabel FTTH NOC</span>
+                                    <span class="text-[10.5px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><i data-lucide="git-merge" class="text-indigo-500 w-3 h-3"></i>Kabel FTTH NOC</span>
                                 </label>
                             </div>
                         </div>
@@ -633,7 +633,7 @@
                     <div class="border border-slate-200/30 dark:border-slate-800/40 rounded-2xl overflow-hidden bg-white/40 dark:bg-slate-900/40 flex-1 flex flex-col">
                         <button onclick="toggleSection('clientSection')" class="flex items-center justify-between w-full p-3 bg-slate-50/50 dark:bg-slate-955/20 focus:outline-none group select-none flex-shrink-0">
                             <span class="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Daftar Pelanggan</span>
-                            <i id="clientSectionChevron" class="fas fa-chevron-up text-slate-400 transition-transform duration-300"></i>
+                            <i id="clientSectionChevron" data-lucide="chevron-up" class="text-slate-400 transition-transform duration-300 w-3.5 h-3.5"></i>
                         </button>
                         
                         <div id="clientSectionContent" class="p-3 flex-1 flex flex-col overflow-hidden transition-all duration-300">
@@ -649,7 +649,7 @@
                             
                             <!-- Search bar -->
                             <div class="relative mb-2.5 flex-shrink-0">
-                                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[9px]"></i>
+                                <i data-lucide="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3 h-3"></i>
                                 <input type="text" id="unmappedSearch" placeholder="Cari user..." oninput="filterUnmappedList()"
                                        class="w-full pl-7 pr-2.5 py-1 bg-slate-50/50 dark:bg-slate-955/50 border border-slate-205 dark:border-slate-800 rounded-lg text-[10px] font-bold text-slate-850 dark:text-white placeholder-slate-400 focus:outline-none">
                             </div>
@@ -673,13 +673,13 @@
                        onkeydown="if(event.key === 'Enter') searchLocation()"
                        class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none">
                 <button onclick="searchLocation()" class="px-3.5 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-md">
-                    <i class="fas fa-search text-[10px]"></i>
+                    <i data-lucide="search" class="w-3 h-3"></i>
                 </button>
             </div>
 
             <!-- Reset Trace button (hidden by default) -->
             <div id="btnResetTrace" class="hidden absolute top-4 right-4 z-[1001] bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-2xl border-2 border-white dark:border-rose-500/30 flex items-center space-x-2 font-extrabold transition-all duration-200 cursor-pointer text-xs shadow-[0_10px_25px_-5px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95" onclick="resetTrace()">
-                <i class="fas fa-undo"></i>
+                <i data-lucide="undo" class="w-4 h-4"></i>
                 <span>Reset Rute Kabel</span>
             </div>
             
@@ -688,7 +688,7 @@
                 <div class="flex items-center justify-between mb-2">
                     <p class="text-[10px] font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wide">Jenis Kabel Fiber</p>
                     <button onclick="document.getElementById('cableLegend').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-xs">
-                        <i class="fas fa-times"></i>
+                        <i data-lucide="x" class="w-3 h-3"></i>
                     </button>
                 </div>
                 <div class="space-y-1.5 text-[9px] font-semibold">
@@ -745,6 +745,32 @@
     let mapData = { nas: [], clients: [], infra: [], cables: [] };
     let clientMarkers = {}; // Keep track of client markers
     let infraMarkers = {}; // Keep track of OLT/ODC/ODP markers
+
+    function getLucideIconName(icon, type) {
+        const faMap = {
+            'fa-network-wired': 'network',
+            'fa-box': 'box',
+            'fa-code-branch': 'git-branch',
+            'fa-sitemap': 'share-2',
+            'fa-server': 'server',
+            'fa-map-pin': 'map-pin',
+            'fa-router': 'router',
+            'fa-wifi': 'wifi',
+            'network-wired': 'network',
+            'code-branch': 'git-branch',
+            'sitemap': 'share-2'
+        };
+        if (icon && faMap[icon]) return faMap[icon];
+        if (icon && !icon.startsWith('fa-')) return icon;
+        const defaultLucide = {
+            olt: 'network',
+            odc: 'box',
+            oit: 'git-branch',
+            odp: 'share-2',
+            nas: 'server'
+        };
+        return defaultLucide[type] || 'map-pin';
+    }
 
     let setLocationState = {
         active: false,
@@ -843,6 +869,10 @@
             const popup = e.popup;
             const container = popup.getElement();
             if (container) {
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+
                 // 1. Sparkline chart for client
                 const canvas = container.querySelector('canvas[id^="clientTrendChart_"]');
                 if (canvas) {
@@ -906,6 +936,13 @@
             oltStatsInterval = null;
             clearInterval(snmpOltStatsInterval);
             snmpOltStatsInterval = null;
+        });
+
+        map.on('zoomend', function() {
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+        clientsClusterGroup.on('animationend', function() {
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         });
 
 
@@ -1004,12 +1041,13 @@
                 setLocationState.tempMarker.setLatLng([lat, lng]);
             } else {
                 const tempIcon = L.divIcon({
-                    html: '<i class="fas fa-map-marker-alt text-amber-500 text-4xl animate-bounce"></i>',
+                    html: '<div class="text-amber-500 flex items-center justify-center animate-bounce"><i data-lucide="map-pin" class="w-8 h-8"></i></div>',
                     className: 'temp-marker-icon',
-                    iconSize: [24, 36],
-                    iconAnchor: [12, 36]
+                    iconSize: [32, 36],
+                    iconAnchor: [16, 36]
                 });
                 setLocationState.tempMarker = L.marker([lat, lng], { icon: tempIcon, draggable: true }).addTo(map);
+                setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 10);
                 bindTempMarkerEvents();
             }
             
@@ -1047,12 +1085,13 @@
                     setLocationState.tempMarker.setLatLng([lat, lng]);
                 } else {
                     const tempIcon = L.divIcon({
-                        html: '<i class="fas fa-map-marker-alt text-amber-500 text-4xl animate-bounce"></i>',
+                        html: '<div class="text-amber-500 flex items-center justify-center animate-bounce"><i data-lucide="map-pin" class="w-8 h-8"></i></div>',
                         className: 'temp-marker-icon',
-                        iconSize: [24, 36],
-                        iconAnchor: [12, 36]
+                        iconSize: [32, 36],
+                        iconAnchor: [16, 36]
                     });
                     setLocationState.tempMarker = L.marker([lat, lng], { icon: tempIcon, draggable: true }).addTo(map);
+                    setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 10);
                     bindTempMarkerEvents();
                 }
                 
@@ -1105,7 +1144,7 @@
     // Load map devices, routers and infrastructure data
     async function loadMapData() {
         const refreshIcon = document.getElementById('refreshMapIcon');
-        if (refreshIcon) refreshIcon.classList.add('fa-spin');
+        if (refreshIcon) refreshIcon.classList.add('animate-spin');
         
         try {
             // Load routers and client devices
@@ -1150,13 +1189,16 @@
                 renderInfrastructure();
                 renderCables(); // Call renderCables here so mapData.clients is already populated
                 renderSidebarList();
+                setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 50);
             } else {
                 showNotification('Gagal mengambil data peta atau infrastruktur', 'error');
             }
         } catch (e) {
             console.error('Error loading map data:', e);
         } finally {
-            if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+            if (refreshIcon) {
+                refreshIcon.classList.remove('animate-spin');
+            }
             setTimeout(() => { map.invalidateSize(); }, 150);
         }
     }
@@ -1174,7 +1216,7 @@
                     className: 'infra-labeled-marker',
                     html: `
                         <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg border-2 border-white shadow-blue-500/20 hover:scale-110 transition-transform">
-                            <i class="fas fa-server text-xs"></i>
+                            <i data-lucide="server" class="w-4 h-4"></i>
                         </div>
                         <div class="marker-label">${nas.shortname}</div>
                     `,
@@ -1186,7 +1228,7 @@
                     <div class="p-3 w-64 text-slate-200">
                         <div class="flex items-center gap-2 mb-2">
                             <div class="w-7 h-7 rounded-lg bg-blue-500 text-white flex items-center justify-center">
-                                <i class="fas fa-server text-xs"></i>
+                                <i data-lucide="server" class="w-3.5 h-3.5"></i>
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-white leading-none">${nas.shortname}</p>
@@ -1200,18 +1242,19 @@
                         </div>
                         <!-- TAMBAHAN: Real-time stats NAS dari RADIUS -->
                         <div id="nasRealtimeStats_${nas.nasname}" class="mt-2 text-[10px]">
-                           <div class="text-slate-500 italic text-center py-1">
-                               <i class="fas fa-spinner animate-spin mr-1"></i>Mengambil statistik NAS...
+                           <div class="text-slate-500 italic text-center py-1 flex items-center justify-center gap-1">
+                               <div class="w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin mr-1.5 inline-block"></div>
+                               <span>Mengambil statistik NAS...</span>
                            </div>
                         </div>
                         <div class="grid grid-cols-2 gap-1.5 mt-3">
                             <button onclick="startSetLocation(null, '${nas.nasname}', 'NAS: ${nas.shortname}')"
-                                    class="bg-blue-600 hover:bg-blue-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all cursor-pointer">
-                                <i class="fas fa-map-marker-alt mr-1"></i>Pindahkan
+                                    class="bg-blue-600 hover:bg-blue-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center">
+                                <i data-lucide="map-pin" class="w-3 h-3 mr-1 inline-block"></i>Pindahkan
                             </button>
                             <button onclick="deleteCoordinates(null, '${nas.nasname}')"
-                                    class="bg-slate-800 hover:bg-red-950 text-slate-400 hover:text-red-400 border border-slate-700 text-[9px] py-1.5 rounded-lg font-bold transition-all cursor-pointer">
-                                <i class="fas fa-trash-alt mr-1"></i>Hapus Lokasi
+                                    class="bg-slate-800 hover:bg-red-950 text-slate-400 hover:text-red-400 border border-slate-700 text-[9px] py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center">
+                                <i data-lucide="trash-2" class="w-3 h-3 mr-1 inline-block"></i>Hapus Lokasi
                             </button>
                         </div>
                     </div>
@@ -1273,7 +1316,7 @@
                         <div class="house-label">${client.username}</div>
                         <div class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-md text-white transition-all duration-200 hover:scale-115"
                              style="background: linear-gradient(135deg, ${houseColor} 0%, ${houseStroke} 100%); filter: ${houseGlow}; ${pulseCss}">
-                            <i class="fas fa-home text-[11px]"></i>
+                            <i data-lucide="home" class="w-3.5 h-3.5"></i>
                             <!-- Online status indicator dot -->
                             <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white shadow-sm" style="background-color: ${signalDotColor}"></span>
                         </div>
@@ -1291,12 +1334,12 @@
 
             const clientCable = mapData.cables ? mapData.cables.find(c => c.customer_username === client.username) : null;
             const cableBtnHtml = clientCable ? `
-                <button onclick="deleteCable(${clientCable.id})" class="w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-red-500/30 cursor-pointer">
-                    <i class="fas fa-unlink mr-1"></i>Putus Kabel dari ODP
+                <button onclick="deleteCable(${clientCable.id})" class="w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-red-500/30 cursor-pointer flex items-center justify-center">
+                    <i data-lucide="unlink" class="w-3 h-3 mr-1 inline-block"></i>Putus Kabel dari ODP
                 </button>
             ` : `
-                <button onclick="openCableModal('${client.username}')" class="w-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-emerald-500/30 cursor-pointer">
-                    <i class="fas fa-plug mr-1"></i>Tarik Kabel dari ODP
+                <button onclick="openCableModal('${client.username}')" class="w-full bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-emerald-500/30 cursor-pointer flex items-center justify-center">
+                    <i data-lucide="plug" class="w-3 h-3 mr-1 inline-block"></i>Tarik Kabel dari ODP
                 </button>
             `;
 
@@ -1318,7 +1361,7 @@
                         <div class="flex justify-between"><span class="text-slate-400">Optical RX Power:</span><span class="font-bold ${rxColorClass}">${client.rx_power} dBm</span></div>
                         ${client.proactive_alert ? `
                         <div class="p-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[8px] text-amber-400 flex items-start gap-1">
-                            <i class="fas fa-exclamation-triangle mt-0.5 animate-pulse text-amber-500"></i>
+                            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 mt-0.5 animate-pulse text-amber-500 shrink-0 inline-block"></i>
                             <div>
                                 <span class="font-bold">EWS Degradasi:</span> Sinyal drop <span class="font-bold">-${client.degradation_val} dB</span> dalam 7 hari. Pengecekan proaktif disarankan.
                             </div>
@@ -1338,23 +1381,23 @@
                     
                     <div class="space-y-1.5 mt-3">
                         <button onclick="traceClientPath('${client.username}')"
-                                class="w-full bg-indigo-500/20 hover:bg-indigo-500 text-indigo-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-indigo-500/30 cursor-pointer">
-                            <i class="fas fa-route mr-1"></i>Trace Rute Kabel (OLT &rarr; Rumah)
+                                class="w-full bg-indigo-500/20 hover:bg-indigo-500 text-indigo-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-indigo-500/30 cursor-pointer flex items-center justify-center">
+                            <i data-lucide="git-branch" class="w-3 h-3 mr-1 inline-block"></i>Trace Rute Kabel (OLT &rarr; Rumah)
                         </button>
                         <div class="grid grid-cols-2 gap-1.5">
                             <button onclick="startSetLocation('${client.username}', null, 'Client: ${client.username}')"
-                                    class="bg-slate-750 hover:bg-slate-700 text-slate-200 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-600 cursor-pointer">
-                                <i class="fas fa-map-marker-alt mr-1"></i>Pindahkan
+                                    class="bg-slate-750 hover:bg-slate-700 text-slate-200 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-600 cursor-pointer flex items-center justify-center">
+                                <i data-lucide="map-pin" class="w-3 h-3 mr-1 inline-block"></i>Pindahkan
                             </button>
                             <button onclick="rebootOnt('${client.username}')"
-                                    class="bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all shadow-md cursor-pointer">
-                                <i class="fas fa-sync-alt mr-1"></i>Reboot ONT
+                                    class="bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all shadow-md cursor-pointer flex items-center justify-center">
+                                <i data-lucide="rotate-cw" class="w-3 h-3 mr-1 inline-block"></i>Reboot ONT
                             </button>
                         </div>
                         ${cableBtnHtml}
                         <button onclick="deleteCustomerCoordinates('${client.username}')"
-                                class="w-full bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-700 cursor-pointer">
-                            <i class="fas fa-trash-alt mr-1"></i>Hapus Lokasi dari Peta
+                                class="w-full bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-700 cursor-pointer flex items-center justify-center">
+                            <i data-lucide="trash-2" class="w-3 h-3 mr-1 inline-block"></i>Hapus Lokasi dari Peta
                         </button>
                     </div>
                 </div>
@@ -1407,11 +1450,11 @@
         coverageLayer.clearLayers();
         mapData.infra.forEach(device => {
             const defaultIcons = {
-                olt: 'fa-network-wired',
-                odc: 'fa-box',
-                oit: 'fa-code-branch',
-                odp: 'fa-sitemap',
-                nas: 'fa-server'
+                olt: 'network',
+                odc: 'box',
+                oit: 'git-branch',
+                odp: 'share-2',
+                nas: 'server'
             };
             const typesMeta = {
                 olt: { label: 'OLT Pusat', colorClass: 'infra-olt' },
@@ -1422,7 +1465,7 @@
             };
 
             const meta = typesMeta[device.type] || typesMeta['odp'];
-            const iconClass = device.icon || defaultIcons[device.type] || 'fa-map-pin';
+            const iconName = getLucideIconName(device.icon, device.type);
 
             // Outage Cluster Detection for ODP
             let isOutageSuspected = false;
@@ -1475,7 +1518,7 @@
                 className: 'infra-labeled-marker',
                 html: `
                     <div class="relative w-9 h-9 rounded-2xl ${OdpColorClass} text-white flex items-center justify-center shadow-lg border-2 border-white hover:scale-110 transition-transform">
-                        <i class="fas ${iconClass} text-xs"></i>
+                        <i data-lucide="${iconName}" class="w-4 h-4"></i>
                         ${alertPulseHtml}
                     </div>
                     <div class="marker-label">${device.name}</div>
@@ -1522,7 +1565,7 @@
                                 detailsHtml += `
                                     <div id="oltRealtimeStats_${device.id}" data-device-name="${device.name}" data-device-ip="${ip}" class="mt-2.5 pt-2 border-t border-slate-700/50 text-[10px]">
                                         <div class="text-slate-500 italic flex items-center gap-1.5">
-                                            <i class="fas fa-spinner animate-spin text-sky-400"></i> Menghubungkan ke OLT Tenda...
+                                            <div class="w-3.5 h-3.5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div> Menghubungkan ke OLT Tenda...
                                         </div>
                                     </div>
                                 `;
@@ -1530,7 +1573,7 @@
                                 detailsHtml += `
                                     <div id="snmpOltStats_${device.id}" data-device-name="${device.name}" data-device-ip="${ip}" class="mt-2.5 pt-2 border-t border-slate-700/50 text-[10px]">
                                         <div class="text-slate-500 italic flex items-center gap-1.5">
-                                            <i class="fas fa-spinner animate-spin text-blue-400"></i> Menghubungkan ke OLT HSGQ via SNMP...
+                                            <div class="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div> Menghubungkan ke OLT HSGQ via SNMP...
                                         </div>
                                     </div>
                                 `;
@@ -1662,8 +1705,8 @@
                             ${isUsed
                                 ? `<div class="flex items-center gap-1">
                                      <span class="text-[9px] text-emerald-400 font-semibold truncate max-w-[80px]">${cable.customer_username}</span>
-                                     <button onclick="deleteCable(${cable.id})" class="p-0.5 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded text-[8px] font-bold transition-all border border-red-500/30 cursor-pointer" title="Putus kabel">
-                                         <i class="fas fa-unlink"></i>
+                                     <button onclick="deleteCable(${cable.id})" class="p-0.5 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded text-[8px] font-bold transition-all border border-red-500/30 cursor-pointer flex items-center justify-center" title="Putus kabel">
+                                         <i data-lucide="unlink" class="w-2.5 h-2.5"></i>
                                      </button>
                                    </div>`
                                 : portLabel
@@ -1695,8 +1738,8 @@
                                 ${odcConns.map(c => `
                                     <div class="flex items-center justify-between">
                                         <span class="text-[9px] text-white truncate max-w-[130px]">${c.src_name} ↔ ${c.dst_name}</span>
-                                        <button onclick="deleteInfraConnection(${c.id})" class="p-0.5 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded text-[8px] font-bold transition-all border border-red-500/30 cursor-pointer" title="Putus kabel">
-                                            <i class="fas fa-unlink"></i>
+                                        <button onclick="deleteInfraConnection(${c.id})" class="p-0.5 bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded text-[8px] font-bold transition-all border border-red-500/30 cursor-pointer flex items-center justify-center" title="Putus kabel">
+                                            <i data-lucide="unlink" class="w-2.5 h-2.5"></i>
                                         </button>
                                     </div>
                                 `).join('')}
@@ -1709,9 +1752,9 @@
             let alertMsgHtml = '';
             if (isOutageSuspected) {
                 alertMsgHtml = `
-                    <div class="bg-red-500/15 border border-red-500/30 rounded-xl p-2.5 mb-2.5 text-red-400 text-[10px] font-bold">
-                        <i class="fas fa-exclamation-triangle mr-1 animate-bounce"></i>
-                        ALARM: Indikasi Kabel Putus! Semua (${offlineCount}/${totalConnected}) pelanggan offline.
+                    <div class="bg-red-500/15 border border-red-500/30 rounded-xl p-2.5 mb-2.5 text-red-400 text-[10px] font-bold flex items-center gap-1">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 mr-1 inline-block animate-bounce text-red-400 shrink-0"></i>
+                        <span>ALARM: Indikasi Kabel Putus! Semua (${offlineCount}/${totalConnected}) pelanggan offline.</span>
                     </div>
                 `;
             }
@@ -1721,7 +1764,7 @@
                     <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-700/50">
                         <div class="flex items-center gap-2">
                             <div class="w-7 h-7 rounded-lg ${OdpColorClass} text-white flex items-center justify-center shadow-md">
-                                <i class="fas ${iconClass} text-xs"></i>
+                                <i data-lucide="${iconName}" class="w-3.5 h-3.5"></i>
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-white leading-none">${device.name}</p>
@@ -1754,17 +1797,17 @@
                     <div class="space-y-1.5">
                         <div class="grid grid-cols-2 gap-1.5">
                             <button onclick="openInfraCableModal(${device.id})"
-                                    class="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all shadow-md cursor-pointer">
-                                <i class="fas fa-plug mr-1"></i>Tarik Kabel
+                                    class="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] py-1.5 rounded-lg font-bold transition-all shadow-md cursor-pointer flex items-center justify-center">
+                                <i data-lucide="plug" class="w-3 h-3 mr-1 inline-block"></i>Tarik Kabel
                             </button>
                             <button onclick="openEditInfraModal(${device.id})"
-                                    class="bg-slate-750 hover:bg-slate-700 text-slate-200 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-600 cursor-pointer">
-                                <i class="fas fa-edit mr-1"></i>Edit Detail
+                                    class="bg-slate-750 hover:bg-slate-700 text-slate-200 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-600 cursor-pointer flex items-center justify-center">
+                                <i data-lucide="edit" class="w-3 h-3 mr-1 inline-block"></i>Edit Detail
                             </button>
                         </div>
                         <button onclick="deleteInfrastructure(${device.id}, '${device.name}')"
-                                class="w-full bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-700 cursor-pointer">
-                            <i class="fas fa-trash-alt mr-1"></i>Hapus Alat
+                                class="w-full bg-slate-800 hover:bg-red-950 hover:text-red-400 text-slate-400 text-[9px] py-1.5 rounded-lg font-bold transition-all border border-slate-700 cursor-pointer flex items-center justify-center">
+                            <i data-lucide="trash-2" class="w-3 h-3 mr-1 inline-block"></i>Hapus Alat
                         </button>
                     </div>
                 </div>
@@ -1870,7 +1913,7 @@
             cableLine.bindPopup(`
                 <div class="p-3 w-56 text-slate-200">
                     <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700/50">
-                        <i class="fas fa-ethernet ${iconColorClass} text-sm"></i>
+                        <i data-lucide="network" class="${iconColorClass} w-4 h-4 inline-block"></i>
                         <span class="text-xs font-bold text-white">Koneksi Kabel Fiber</span>
                     </div>
                     <div class="text-[10px] space-y-1.5">
@@ -1892,8 +1935,8 @@
                         </div>
                     </div>
                     <button onclick="deleteCable(${cable.id})" 
-                            class="mt-3 w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-red-500/30 cursor-pointer">
-                        <i class="fas fa-unlink mr-1"></i>Putus Koneksi
+                            class="mt-3 w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-red-500/30 cursor-pointer flex items-center justify-center">
+                        <i data-lucide="unlink" class="w-3 h-3 mr-1 inline-block"></i>Putus Koneksi
                     </button>
                 </div>
             `);
@@ -1950,7 +1993,7 @@
                     <div class="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl flex items-center justify-between hover:border-indigo-400/50 transition-all mb-2">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 mb-1">
-                                <i class="fas fa-server text-indigo-500 text-[10px]"></i>
+                                <i data-lucide="server" class="text-indigo-500 w-3 h-3 inline-block"></i>
                                 <p class="text-xs font-bold text-slate-850 dark:text-slate-200 truncate max-w-[120px]">${n.shortname}</p>
                             </div>
                             <span class="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-600 text-[8px] font-extrabold rounded-md uppercase">NAS Belum Terpetakan</span>
@@ -1958,7 +2001,7 @@
                         <button onclick="startSetLocation(null, '${n.nasname}', 'NAS: ${n.shortname}')"
                                 title="Set Lokasi di Peta"
                                 class="ml-2 px-2 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-600 hover:text-white rounded-lg text-[9px] font-bold transition-all flex items-center gap-1 border border-indigo-500/20 cursor-pointer flex-shrink-0">
-                            <i class="fas fa-map-marker-alt"></i> Set Lokasi
+                            <i data-lucide="map-pin" class="w-3 h-3 inline-block"></i> Set Lokasi
                         </button>
                     </div>
                 `).join('');
@@ -1968,10 +2011,11 @@
         if (displayed.length === 0 && htmlOut === '') {
             listDiv.innerHTML = `
                 <div class="text-center py-10 text-slate-400 dark:text-slate-550 text-xs">
-                    <i class="fas fa-search text-2xl mb-2 text-slate-400 opacity-60"></i>
+                    <i data-lucide="search" class="w-6 h-6 mx-auto mb-2 text-slate-400 opacity-60"></i>
                     <p class="font-bold">Tidak ada data ditemukan</p>
                 </div>
             `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
             return;
         }
 
@@ -1997,7 +2041,7 @@
                         <button onclick="startSetLocation('${c.username}', null, '${c.username}')"
                                 title="Set Lokasi di Peta"
                                 class="ml-2 px-2 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-600 hover:text-white rounded-lg text-[9px] font-bold transition-all flex items-center gap-1 border border-amber-500/20 cursor-pointer flex-shrink-0">
-                            <i class="fas fa-map-marker-alt"></i> Set Lokasi
+                            <i data-lucide="map-pin" class="w-3 h-3 inline-block"></i> Set Lokasi
                         </button>
                     </div>
                 `;
@@ -2014,18 +2058,18 @@
                         <div class="flex gap-1">
                             <button onclick="flyToClient('${c.username}')"
                                     title="Tampilkan di Peta"
-                                    class="p-1.5 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-blue-500/10">
-                                <i class="fas fa-crosshairs"></i>
+                                    class="p-1.5 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-blue-500/10 flex items-center justify-center">
+                                <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
                             </button>
                             <button onclick="startSetLocation('${c.username}', null, '${c.username}')"
                                     title="Pindahkan Lokasi"
-                                    class="p-1.5 bg-slate-100 hover:bg-slate-700 text-slate-500 hover:text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-slate-200 dark:border-slate-700">
-                                <i class="fas fa-map-marker-alt"></i>
+                                    class="p-1.5 bg-slate-100 hover:bg-slate-700 text-slate-500 hover:text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                                <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
                             </button>
                             <button onclick="deleteCustomerCoordinates('${c.username}')"
                                     title="Hapus Lokasi dari Peta"
-                                    class="p-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-red-500/10">
-                                <i class="fas fa-trash-alt"></i>
+                                    class="p-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-red-500/10 flex items-center justify-center">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                             </button>
                         </div>
                     </div>
@@ -2042,6 +2086,7 @@
         }
 
         listDiv.innerHTML = htmlOut;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // Zoom and pan to a client marker on map
@@ -2248,7 +2293,7 @@
                 line.bindPopup(`
                     <div class="p-3 w-56 text-slate-200">
                         <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-700/50">
-                            <i class="fas fa-network-wired text-cyan-400 text-sm"></i>
+                            <i data-lucide="network" class="text-cyan-400 w-4 h-4 inline-block"></i>
                             <span class="text-xs font-bold text-white">Koneksi Infrastruktur</span>
                         </div>
                         <div class="text-[10px] space-y-1.5">
@@ -2256,8 +2301,8 @@
                             <div class="flex justify-between"><span class="text-slate-400">Dari:</span><span class="font-bold text-white">${conn.src_name} (${conn.src_type.toUpperCase()})</span></div>
                             <div class="flex justify-between"><span class="text-slate-400">Ke:</span><span class="font-bold text-white">${conn.dst_name} (${conn.dst_type.toUpperCase()})</span></div>
                         </div>
-                        <button onclick="deleteInfraConnection(${conn.id})" class="mt-3 w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-red-500/30 cursor-pointer">
-                            <i class="fas fa-unlink mr-1"></i>Putus Koneksi
+                        <button onclick="deleteInfraConnection(${conn.id})" class="mt-3 w-full bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white text-[9px] py-1.5 rounded-lg font-bold transition-all border border-red-500/30 cursor-pointer flex items-center justify-center">
+                            <i data-lucide="unlink" class="w-3 h-3 mr-1 inline-block"></i>Putus Koneksi
                         </button>
                     </div>
                 `);
@@ -2328,12 +2373,13 @@
         map.flyTo(initialLatLng, 17);
         
         const tempIcon = L.divIcon({
-            html: '<i class="fas fa-map-marker-alt text-amber-500 text-4xl animate-bounce"></i>',
+            html: '<div class="text-amber-500 flex items-center justify-center animate-bounce"><i data-lucide="map-pin" class="w-8 h-8"></i></div>',
             className: 'temp-marker-icon',
-            iconSize: [24, 36],
-            iconAnchor: [12, 36]
+            iconSize: [32, 36],
+            iconAnchor: [16, 36]
         });
         setLocationState.tempMarker = L.marker(initialLatLng, { icon: tempIcon, draggable: true }).addTo(map);
+        setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 10);
         bindTempMarkerEvents();
         
         document.getElementById('manualCoordsInput').value = `${startLat.toFixed(6)}, ${startLng.toFixed(6)}`;
@@ -2368,7 +2414,7 @@
         document.getElementById('infraDetailsInput').value = '';
         document.getElementById('infraCoordsInput').value = '';
         document.getElementById('infraTypeInput').value = 'olt';
-        document.getElementById('infraIconInput').value = 'fa-network-wired';
+        document.getElementById('infraIconInput').value = 'network';
         document.getElementById('infraCoordDisplay').textContent = 'Klik di peta atau paste koordinat untuk menempatkan PIN';
 
         // Initialize professional fields
@@ -2385,7 +2431,7 @@
         const tempIcon = L.divIcon({
             html: `
                 <div class="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg border-2 border-white animate-bounce">
-                    <i class="fas fa-plus text-xs"></i>
+                    <i data-lucide="plus" class="w-4 h-4"></i>
                 </div>
             `,
             className: 'temp-infra-icon-wrapper',
@@ -2394,6 +2440,7 @@
         });
 
         addInfraState.tempMarker = L.marker(center, { icon: tempIcon, draggable: true }).addTo(map);
+        setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 10);
         bindInfraTempMarkerEvents();
         updateInfraCoordDisplay(center.lat, center.lng);
 
@@ -2508,7 +2555,7 @@
                 <!-- Info Banner OIT -->
                 <div class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3 mb-2">
                     <div class="flex items-start gap-2">
-                        <i class="fas fa-info-circle text-amber-500 mt-0.5"></i>
+                        <i data-lucide="info" class="w-4 h-4 text-amber-500 mt-0.5 shrink-0"></i>
                         <div class="text-[10px] text-amber-800 dark:text-amber-400">
                             <strong>OIT (Optical Inline Tap)</strong> untuk sistem estafet splitter bertingkat.
                             <br>Output Tap → ke ODP/ODC | Output Pass → lanjut ke OIT berikutnya
@@ -2518,7 +2565,7 @@
                 <div>
                     <label class="flex items-center gap-1 text-[9px] font-extrabold text-slate-400 uppercase mb-1">
                         🔌 Sumber Feeder Upstream <span class="text-red-500">*</span>
-                        <i class="fas fa-question-circle text-slate-400 text-[9px] cursor-help" title="Pilih OLT atau OIT sebelumnya sebagai sumber sinyal"></i>
+                        <i data-lucide="help-circle" class="w-3 h-3 text-slate-400 cursor-help inline-block" title="Pilih OLT atau OIT sebelumnya sebagai sumber sinyal"></i>
                     </label>
                     <select id="oitFeederSource" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
                         <option value="">-- Pilih OLT/OIT Upstream --</option>
@@ -2528,7 +2575,7 @@
                 <div>
                     <label class="flex items-center gap-1 text-[9px] font-extrabold text-slate-400 uppercase mb-1">
                         Pjg Kabel & Redaman Input
-                        <i class="fas fa-question-circle text-slate-400 text-[9px] cursor-help" title="Contoh: 500m | +5.2 dBm (dari upstream)"></i>
+                        <i data-lucide="help-circle" class="w-3 h-3 text-slate-400 cursor-help inline-block" title="Contoh: 500m | +5.2 dBm (dari upstream)"></i>
                     </label>
                     <div class="flex gap-2">
                         <input type="number" id="oitCableIn" placeholder="Meter" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
@@ -2538,7 +2585,7 @@
                 <div>
                     <label class="flex items-center gap-1 text-[9px] font-extrabold text-slate-400 uppercase mb-1">
                         Rasio Tap Splitter <span class="text-red-500">*</span> & Merk
-                        <i class="fas fa-question-circle text-slate-400 text-[9px] cursor-help" title="Contoh: 30:70 (30% ke ODP, 70% lanjut)"></i>
+                        <i data-lucide="help-circle" class="w-3 h-3 text-slate-400 cursor-help inline-block" title="Contoh: 30:70 (30% ke ODP, 70% lanjut)"></i>
                     </label>
                     <div class="flex gap-2">
                         <select id="oitTapRatio" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
@@ -2555,7 +2602,7 @@
                 <div>
                     <label class="flex items-center gap-1 text-[9px] font-extrabold text-slate-400 uppercase mb-1">
                         Redaman Output (dBm)
-                        <i class="fas fa-question-circle text-slate-400 text-[9px] cursor-help" title="Tap: +3.5 (ke ODP) | Pass: +7.0 (lanjut)"></i>
+                        <i data-lucide="help-circle" class="w-3 h-3 text-slate-400 cursor-help inline-block" title="Tap: +3.5 (ke ODP) | Pass: +7.0 (lanjut)"></i>
                     </label>
                     <div class="flex gap-2">
                         <input type="text" id="oitAttenTap" placeholder="Tap +3.5" class="w-1/2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
@@ -2565,7 +2612,7 @@
                 <div class="col-span-1 sm:col-span-2 border-t border-slate-100 dark:border-slate-700/60 pt-2 mt-1">
                     <label class="flex items-center gap-1 text-[9px] font-extrabold text-emerald-400 uppercase mb-1">
                         📍 Port TAP → Ke ODP/ODC (30% Output)
-                        <i class="fas fa-question-circle text-slate-400 text-[9px] cursor-help" title="Koneksi dari port Tap ke ODP terdekat"></i>
+                        <i data-lucide="help-circle" class="w-3 h-3 text-slate-400 cursor-help inline-block" title="Koneksi dari port Tap ke ODP terdekat"></i>
                     </label>
                     <div class="flex gap-2">
                         <select id="oitConnectedOdp" class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
@@ -2584,7 +2631,7 @@
                 <div class="col-span-1 sm:col-span-2 border-t border-slate-100 dark:border-slate-700/60 pt-2 mt-1">
                     <label class="flex items-center gap-1 text-[9px] font-extrabold text-blue-400 uppercase mb-1">
                         🔀 Port PASS → Ke OIT Berikutnya (70% Output)
-                        <i class="fas fa-question-circle text-slate-400 text-[9px] cursor-help" title="Koneksi lanjutan ke OIT berikutnya dalam sistem estafet"></i>
+                        <i data-lucide="help-circle" class="w-3 h-3 text-slate-400 cursor-help inline-block" title="Koneksi lanjutan ke OIT berikutnya dalam sistem estafet"></i>
                     </label>
                     <div class="flex gap-2 items-center">
                         <select id="oitNextOit" class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-semibold text-slate-800 dark:text-white focus:outline-none">
@@ -2688,6 +2735,7 @@
         }
 
         container.innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         // Auto-render ODP port names list if odp form was just rendered
         if (type === 'odp') {
             renderOdpPortList();
@@ -2698,11 +2746,11 @@
         const type = document.getElementById('infraTypeInput').value;
         const iconInput = document.getElementById('infraIconInput');
         
-        if (type === 'olt') iconInput.value = 'fa-network-wired';
-        else if (type === 'odc') iconInput.value = 'fa-box';
-        else if (type === 'oit') iconInput.value = 'fa-code-branch';
-        else if (type === 'odp') iconInput.value = 'fa-sitemap';
-        else if (type === 'nas') iconInput.value = 'fa-server';
+        if (type === 'olt') iconInput.value = 'network';
+        else if (type === 'odc') iconInput.value = 'box';
+        else if (type === 'oit') iconInput.value = 'git-branch';
+        else if (type === 'odp') iconInput.value = 'share-2';
+        else if (type === 'nas') iconInput.value = 'server';
         
         updateInfraTempIcon();
         renderAddInfraFormFields(type);
@@ -2715,16 +2763,14 @@
         let iconClass = document.getElementById('infraIconInput').value;
 
         const defaultIcons = {
-            olt: 'fa-network-wired',
-            odc: 'fa-box',
-            oit: 'fa-code-branch',
-            odp: 'fa-sitemap',
-            nas: 'fa-server'
+            olt: 'network',
+            odc: 'box',
+            oit: 'git-branch',
+            odp: 'share-2',
+            nas: 'server'
         };
 
-        if (!iconClass) {
-            iconClass = defaultIcons[type] || 'fa-map-pin';
-        }
+        const lucideName = getLucideIconName(iconClass, type);
 
         const typesMeta = {
             olt: { colorClass: 'infra-olt' },
@@ -2739,7 +2785,7 @@
         const previewIcon = L.divIcon({
             html: `
                 <div class="w-9 h-9 rounded-2xl ${meta.colorClass} text-white flex items-center justify-center shadow-lg border-2 border-white animate-bounce">
-                    <i class="fas ${iconClass} text-xs"></i>
+                    <i data-lucide="${lucideName}" class="w-4 h-4"></i>
                 </div>
             `,
             className: 'temp-infra-icon-wrapper',
@@ -2748,6 +2794,7 @@
         });
 
         addInfraState.tempMarker.setIcon(previewIcon);
+        setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 10);
     }
 
     function bindInfraTempMarkerEvents() {
@@ -2878,7 +2925,7 @@
         // Loading animation
         Swal.fire({
             title: 'Menyimpan...',
-            html: '<div class="flex items-center justify-center gap-2 text-sm"><i class="fas fa-spinner fa-spin text-indigo-500"></i> <span>Memproses data infrastruktur</span></div>',
+            html: '<div class="flex items-center justify-center gap-2 text-sm"><div class="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div> <span>Memproses data infrastruktur</span></div>',
             allowOutsideClick: false,
             showConfirmButton: false,
             background: '#1e293b',
@@ -3401,7 +3448,7 @@
 
             Swal.fire({
                 title: 'Menyimpan perubahan...',
-                html: '<div class="flex items-center justify-center gap-2 text-sm"><i class="fas fa-spinner fa-spin text-indigo-500"></i> <span>Memperbarui data</span></div>',
+                html: '<div class="flex items-center justify-center gap-2 text-sm"><div class="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div> <span>Memperbarui data</span></div>',
                 allowOutsideClick: false,
                 showConfirmButton: false,
                 background: '#1e293b',
@@ -3492,12 +3539,13 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                 setLocationState.tempMarker.setLatLng(e.latlng);
             } else {
                 const tempIcon = L.divIcon({
-                    html: '<i class="fas fa-map-marker-alt text-amber-500 text-4xl animate-bounce"></i>',
+                    html: '<div class="text-amber-500 flex items-center justify-center animate-bounce"><i data-lucide="map-pin" class="w-8 h-8"></i></div>',
                     className: 'temp-marker-icon',
-                    iconSize: [24, 36],
-                    iconAnchor: [12, 36]
+                    iconSize: [32, 36],
+                    iconAnchor: [16, 36]
                 });
                 setLocationState.tempMarker = L.marker(e.latlng, { icon: tempIcon, draggable: true }).addTo(map);
+                setTimeout(() => { if (typeof lucide !== 'undefined') lucide.createIcons(); }, 10);
                 bindTempMarkerEvents();
             }
 
@@ -4545,11 +4593,12 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                 const ifaceEl = element.querySelector(`#nas_iface_${safeIp}`);
                 if (ifaceEl) {
                     ifaceEl.innerHTML = `
-                        <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[8px]">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                            Gagal koneksi API Mikrotik: ${data.error || 'Connection Timeout'}
+                        <div class="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-[8px] flex items-center">
+                            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 mr-1 inline-block"></i>
+                            <span>Gagal koneksi API Mikrotik: ${data.error || 'Connection Timeout'}</span>
                         </div>
                     `;
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
                 }
             } else {
                 const ifaceEl = element.querySelector(`#nas_iface_${safeIp}`);
@@ -4580,10 +4629,11 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
             if (!res.success || !res.data || res.data.length === 0) {
                 container.innerHTML = `
                     <div class="text-rose-400 font-bold flex items-center gap-1">
-                        <i class="fas fa-exclamation-triangle"></i> Gagal memuat data OLT Tenda.
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline-block"></i> Gagal memuat data OLT Tenda.
                     </div>
                     <div class="text-[9px] text-slate-500">Pastikan integrasi Tenda OLT aktif.</div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
@@ -4599,20 +4649,22 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
             if (!oltData) {
                 container.innerHTML = `
                     <div class="text-amber-400 font-bold flex items-center gap-1">
-                        <i class="fas fa-exclamation-circle"></i> OLT belum terintegrasi
+                        <i data-lucide="alert-circle" class="w-3.5 h-3.5 inline-block"></i> OLT belum terintegrasi
                     </div>
                     <div class="text-[9px] text-slate-400 mt-1">IP OLT di peta (${cleanIp}) atau Nama (${deviceName}) tidak cocok dengan data di menu Integrasi.</div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
             if (oltData.error) {
                 container.innerHTML = `
                     <div class="text-rose-400 font-bold flex items-center gap-1">
-                        <i class="fas fa-exclamation-triangle"></i> Error OLT:
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline-block"></i> Error OLT:
                     </div>
                     <div class="text-[9px] text-rose-300 font-mono mt-1">${oltData.error}</div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
@@ -4634,15 +4686,15 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                         opticalHtml = `
                             <div class="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[8px] pt-1 border-t border-slate-800/40 text-slate-400 mt-1">
                                 <div><span class="text-slate-500">SFP SN:</span> <span class="font-mono text-slate-300 font-semibold">${sfpSn}</span></div>
-                                <div><span class="text-slate-500">TX Power:</span> <span class="font-mono text-amber-400 font-bold"><i class="fas fa-signal mr-0.5"></i>${sfpTx}</span></div>
+                                <div><span class="text-slate-500">TX Power:</span> <span class="font-mono text-amber-400 font-bold flex items-center gap-0.5"><i data-lucide="activity" class="w-2.5 h-2.5 inline-block"></i>${sfpTx}</span></div>
                                 <div><span class="text-slate-500">SFP Temp:</span> <span class="font-mono text-slate-300">${sfpTemp}</span></div>
                                 <div><span class="text-slate-500">SFP Volt:</span> <span class="font-mono text-slate-300">${sfpVolt}</span></div>
                             </div>
                         `;
                     } else {
                         opticalHtml = `
-                            <div class="text-[8px] pt-1 border-t border-slate-800/40 text-slate-500 mt-1">
-                                <i class="fas fa-info-circle mr-0.5"></i> SFP tidak terdeteksi
+                            <div class="text-[8px] pt-1 border-t border-slate-800/40 text-slate-500 mt-1 flex items-center gap-0.5">
+                                <i data-lucide="info" class="w-2.5 h-2.5 inline-block"></i> <span>SFP tidak terdeteksi</span>
                             </div>
                         `;
                     }
@@ -4650,17 +4702,17 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                     portsHtml += `
                         <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-2 space-y-1">
                             <div class="flex justify-between items-center">
-                                <span class="font-bold text-sky-400 text-[10px]"><i class="fas fa-ethernet mr-1 text-[8px]"></i>${port.name}</span>
+                                <span class="font-bold text-sky-400 text-[10px] flex items-center"><i data-lucide="network" class="w-2.5 h-2.5 mr-1 inline-block"></i>${port.name}</span>
                                 <span class="text-[9px] text-slate-350 font-bold">${online} / ${total} ONT Online</span>
                             </div>
                             <div class="grid grid-cols-2 gap-1 text-[9px] pt-0.5 border-t border-slate-800/80">
                                 <div>
                                     <span class="text-slate-500">Up:</span>
-                                    <span class="text-emerald-400 font-mono font-bold"><i class="fas fa-arrow-up mr-0.5 text-[7px]"></i>${upSpeed} Mb</span>
+                                    <span class="text-emerald-400 font-mono font-bold inline-flex items-center"><i data-lucide="arrow-up" class="w-2.5 h-2.5 mr-0.5 inline-block"></i>${upSpeed} Mb</span>
                                 </div>
                                 <div>
                                     <span class="text-slate-500">Down:</span>
-                                    <span class="text-sky-400 font-mono font-bold"><i class="fas fa-arrow-down mr-0.5 text-[7px]"></i>${downSpeed} Mb</span>
+                                    <span class="text-sky-400 font-mono font-bold inline-flex items-center"><i data-lucide="arrow-down" class="w-2.5 h-2.5 mr-0.5 inline-block"></i>${downSpeed} Mb</span>
                                 </div>
                             </div>
                             ${opticalHtml}
@@ -4674,11 +4726,11 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                     <div class="grid grid-cols-2 gap-1.5 text-[9px] bg-slate-900/40 p-2 rounded-xl border border-slate-800/60">
                         <div class="flex flex-col">
                             <span class="text-slate-500">Uptime OLT:</span>
-                            <span class="text-white font-bold"><i class="far fa-clock mr-0.5 text-slate-400"></i>${oltData.uptime_days || 0} Hari</span>
+                            <span class="text-white font-bold flex items-center"><i data-lucide="clock" class="w-3 h-3 mr-1 text-slate-400 inline-block"></i>${oltData.uptime_days || 0} Hari</span>
                         </div>
                         <div class="flex flex-col">
                             <span class="text-slate-500">Suhu / Temp:</span>
-                            <span class="text-amber-400 font-bold"><i class="fas fa-thermometer-half mr-0.5"></i>${oltData.temperature}°C</span>
+                            <span class="text-amber-400 font-bold flex items-center"><i data-lucide="thermometer" class="w-3 h-3 mr-1 inline-block"></i>${oltData.temperature}°C</span>
                         </div>
                     </div>
                     <div class="space-y-1.5">
@@ -4687,12 +4739,14 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                     </div>
                 </div>
             `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         } catch (err) {
             container.innerHTML = `
                 <div class="text-rose-400 font-bold flex items-center gap-1">
-                    <i class="fas fa-exclamation-triangle"></i> Gagal menghubungi server.
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline-block"></i> Gagal menghubungi server.
                 </div>
             `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 
@@ -4703,10 +4757,11 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
             if (!res.success || !res.data || res.data.length === 0) {
                 container.innerHTML = `
                     <div class="text-rose-400 font-bold flex items-center gap-1">
-                        <i class="fas fa-exclamation-triangle"></i> Gagal memuat data OLT HSGQ.
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline-block"></i> Gagal memuat data OLT HSGQ.
                     </div>
                     <div class="text-[9px] text-slate-500">Pastikan integrasi SNMP aktif.</div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
@@ -4721,20 +4776,22 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
             if (!oltData) {
                 container.innerHTML = `
                     <div class="text-amber-400 font-bold flex items-center gap-1">
-                        <i class="fas fa-exclamation-circle"></i> OLT belum terintegrasi
+                        <i data-lucide="alert-circle" class="w-3.5 h-3.5 inline-block"></i> OLT belum terintegrasi
                     </div>
                     <div class="text-[9px] text-slate-400 mt-1">IP OLT di peta (${cleanIp}) tidak cocok dengan data di menu Integrasi.</div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
             if (oltData.error) {
                 container.innerHTML = `
                     <div class="text-rose-400 font-bold flex items-center gap-1">
-                        <i class="fas fa-exclamation-triangle"></i> Error SNMP:
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline-block"></i> Error SNMP:
                     </div>
                     <div class="text-[9px] text-rose-300 font-mono mt-1">${oltData.error}</div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
@@ -4752,8 +4809,8 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                     portsHtml += `
                         <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-2 space-y-1.5">
                             <div class="flex justify-between items-center">
-                                <span class="font-bold text-sky-400 text-[10px]"><i class="fas fa-ethernet mr-1 text-[8px]"></i>${port.name}</span>
-                                <span class="text-[9px] font-bold ${portUpColor}"><i class="fas fa-circle text-[6px] mr-0.5"></i>${portUpText}</span>
+                                <span class="font-bold text-sky-400 text-[10px] flex items-center"><i data-lucide="network" class="w-2.5 h-2.5 mr-1 inline-block"></i>${port.name}</span>
+                                <span class="text-[9px] font-bold ${portUpColor} flex items-center"><i data-lucide="circle" class="w-2 h-2 mr-1 inline-block fill-current"></i>${portUpText}</span>
                             </div>
                             <div class="grid grid-cols-3 gap-1 text-[8px]">
                                 <div class="text-center bg-slate-800/60 rounded-lg p-1">
@@ -4785,21 +4842,21 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
             container.innerHTML = `
                 <div class="space-y-2">
                     <div class="flex items-center gap-1 mb-1">
-                        <i class="fas fa-signal text-blue-400 text-[8px]"></i>
+                        <i data-lucide="activity" class="text-blue-400 w-2.5 h-2.5 inline-block"></i>
                         <span class="text-[8px] font-bold text-blue-400 uppercase tracking-wider">SNMP Live — ${oltData.model || 'HSGQ OLT'}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-1.5 text-[9px] bg-slate-900/40 p-2 rounded-xl border border-slate-800/60">
                         <div class="flex flex-col">
                             <span class="text-slate-500">Uptime:</span>
-                            <span class="text-white font-bold"><i class="far fa-clock mr-0.5 text-slate-400"></i>${oltData.uptime_days || 0} Hari</span>
+                            <span class="text-white font-bold flex items-center"><i data-lucide="clock" class="w-3 h-3 mr-1 text-slate-400 inline-block"></i>${oltData.uptime_days || 0} Hari</span>
                         </div>
                         <div class="flex flex-col">
                             <span class="text-slate-500">Suhu:</span>
-                            <span class="${tempColor} font-bold"><i class="fas fa-thermometer-half mr-0.5"></i>${tempVal !== 'N/A' ? tempVal + '°C' : 'N/A'}</span>
+                            <span class="${tempColor} font-bold flex items-center"><i data-lucide="thermometer" class="w-3 h-3 mr-1 inline-block"></i>${tempVal !== 'N/A' ? tempVal + '°C' : 'N/A'}</span>
                         </div>
                         <div class="flex flex-col">
                             <span class="text-slate-500">Memory:</span>
-                            <span class="${memColor} font-bold"><i class="fas fa-memory mr-0.5"></i>${memPct}%</span>
+                            <span class="${memColor} font-bold flex items-center"><i data-lucide="cpu" class="w-3 h-3 mr-1 inline-block"></i>${memPct}%</span>
                         </div>
                         <div class="flex flex-col">
                             <span class="text-slate-500">Firmware:</span>
@@ -4812,12 +4869,14 @@ Pelanggan akan kembali ke daftar Belum Terpetakan.`)) return;
                     </div>
                 </div>
             `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         } catch (err) {
             container.innerHTML = `
                 <div class="text-rose-400 font-bold flex items-center gap-1">
-                    <i class="fas fa-exclamation-triangle"></i> Gagal menghubungi server SNMP.
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline-block"></i> Gagal menghubungi server SNMP.
                 </div>
             `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 
