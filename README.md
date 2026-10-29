@@ -250,65 +250,23 @@ Sistem akan otomatis menentukan jenis kabel:
 
 ## ⚙️ Integrasi MikroTik IPoE (MAC Authentication)
 
-Untuk client IPoE (DHCP MAC Authentication), agar nama client di **Simple Queue** RouterOS bisa disesuaikan secara manual (kustom), modul FreeRADIUS dikonfigurasi untuk **tidak** mengirimkan attribute limitasi kecepatan `Mikrotik-Rate-Limit` secara langsung. 
+Untuk client IPoE (DHCP MAC Authentication), rate limit dan queue **tidak dibatasi secara dinamis oleh RADIUS/Dashboard**. FreeRADIUS dikonfigurasi untuk **tidak mengirimkan** attribute `Mikrotik-Rate-Limit`.
 
-Sebagai gantinya, MikroTik RouterOS mengambil data limitasi (`rate_limit`) dan nama pelanggan (`name`) melalui API endpoint `/api/ipoe/get-name/<MAC>` dan memproses konversinya ke **Static Simple Queue** secara dinamis saat client mendapatkan lease DHCP.
+Dengan konfigurasi ini:
+1. **Tidak ada dynamic queue (flag D)** yang dikirim oleh RADIUS.
+2. Anda memiliki **kebebasan penuh** mengatur Simple Queue, Queue Tree, Parent Queue, PCQ, burst, maupun priority secara **manual dan fleksibel langsung di MikroTik (Winbox > Queues)**.
+3. Antrean manual yang Anda buat di MikroTik tidak akan tertimpa atau terhapus oleh sistem RADIUS.
 
-### 1. Pengaturan di MikroTik (WinBox)
+### Pengaturan di MikroTik (WinBox)
 1. Masuk ke **IP > DHCP Server**.
-2. Klik dua kali pada server DHCP yang ingin digunakan untuk IPoE (contoh: `dhcp2`).
-3. Pada tab **DHCP**, centang opsi **Use Radius** menjadi aktif (`yes`).
-4. Klik kolom **Lease Script** di bagian paling bawah tab DHCP.
-5. Tempelkan script di bawah ini ke dalam kolom **Lease Script**:
-
-### 📋 DHCP Lease Script (RouterOS v7 - WireGuard IP Direct Edition)
-```routeros
-:if ($leaseBound = 1) do={
-    :delay 2s; # Tunggu lease stabil
-    
-    :local success false
-    :local attempts 3
-    :local delayTime 3s
-    :local res
-    :local data ""
-    
-    :for i from=1 to=$attempts do={
-        :if (!$success) do={
-            :do {
-                # Mengambil data langsung via IP WireGuard VPS (10.100.0.1) untuk menghindari resolving error
-                :set res [/tool fetch url="https://10.100.0.1/api/ipoe/get-name/$leaseActMAC" http-header-field="Host: radius.access.daragroup.cloud" check-certificate=no as-value output=user]
-                :set data ($res->"data")
-                :set success true
-            } on-error={
-                :log warn "IPoE: Percobaan ke-$i gagal menghubungi IP WireGuard (10.100.0.1) untuk MAC $leaseActMAC. Mencoba lagi dalam $delayTime..."
-                :delay $delayTime
-            }
-        }
-    }
-    
-    :if ($success) do={
-        # Cari posisi titik koma (;) untuk memisah data
-        :local pos [:find $data ";"]
-        :if ($pos > 0) do={
-            :local name [:pick $data 0 $pos]
-            :local rate [:pick $data ($pos+1) [:len $data]]
-            
-            # Hapus queue bawaan (jika ada) agar tidak bentrok
-            /queue simple remove [find target="$leaseActIP/32"]
-            
-            # Jika user memiliki rate limit di dashboard, buat static queue kustom
-            :if ([:len $rate] > 0) do={
-                /queue simple add name="IPoE-$name" target="$leaseActIP/32" max-limit=$rate parent=GLOBAL
-            }
-        }
-    } else={
-        :log error "Gagal memproses limitasi IPoE dari RADIUS Dashboard untuk MAC: $leaseActMAC (Koneksi ke IP WireGuard gagal setelah $attempts percobaan)"
-    }
-} else={
-    # Saat client terputus (leaseBound = 0), hapus static queue secara otomatis
-    /queue simple remove [find target="$leaseActIP/32"]
-}
-```
+2. Klik dua kali pada DHCP Server untuk IPoE (contoh: `dhcp1`).
+3. Pada tab **DHCP**, centang opsi **Use Radius** (`yes`).
+4. Pada menu **Queues > Simple Queues** di Winbox:
+   - Tambahkan Simple Queue baru secara manual.
+   - **Name**: Nama pelanggan / deskripsi sesuai keinginan Anda.
+   - **Target**: IP Address pelanggan (contoh: `172.16.200.13/32`) atau subnet/interface.
+   - **Max Limit**: Upload dan Download sesuai paket yang Anda tentukan secara fleksibel.
+   - Anda bebas menentukan **Parent Queue**, **Queue Type**, **Priority**, maupun **Burst**.
 
 ---
 

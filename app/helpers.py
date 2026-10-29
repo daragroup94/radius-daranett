@@ -12,7 +12,8 @@ from flask import request
 # ---------------------------------------------------------------------------
 _mk_lock = threading.Lock()
 _mk_cache: dict = {}   # key=(host,port,username) → {api, born, last_used}
-_MK_MAX_AGE = 300      # detik — koneksi dipakai ulang max 5 menit
+_MK_IDLE_TIMEOUT = 900 # detik — koneksi dipakai terus selama aktif, hanya tutup jika idle > 15 menit
+
 
 def get_request_data():
     try:
@@ -161,14 +162,10 @@ def connect_mikrotik(host, username, password, port, timeout=3.0):
 def get_cached_mikrotik(host, username, password, port, timeout=5.0):
     """
     Kembalikan koneksi MikroTik yang di-cache (persistent).
-    Koneksi dibuat saat pertama kali dan dipakai ulang selama masih
-    valid (max _MK_MAX_AGE detik). Jika koneksi drop/error akan
-    otomatis reconnect — menghasilkan tepat 1 login di log MikroTik
-    per sesi, bukan 1 login per polling.
-
-    PENTING: Lock hanya dipakai untuk baca/tulis dict cache (sub-milidetik).
-    Network I/O (health-check + reconnect) dilakukan di LUAR lock agar
-    tidak memblokir thread lain saat jaringan lambat.
+    Koneksi dibuat saat pertama kali dan dipakai ulang terus menerus
+    selama koneksi masih hidup. Jika koneksi drop/error akan otomatis
+    reconnect — menghasilkan tepat 1 login saat startup dan TIDAK banjir
+    log login/logout berulang di MikroTik.
     """
     try:
         port_num = int(port)
@@ -184,31 +181,36 @@ def get_cached_mikrotik(host, username, password, port, timeout=5.0):
     with _mk_lock:
         entry = _mk_cache.get(cache_key)
         if entry:
-            age = now - entry['born']
-            if age >= _MK_MAX_AGE:
-                # TTL habis — keluarkan dari cache, close di luar lock
+            idle = now - entry.get('last_used', now)
+            if idle >= _MK_IDLE_TIMEOUT:
+                # Idle terlalu lama — keluarkan dari cache, close di luar lock
                 old_api = _mk_cache.pop(cache_key)['api']
             else:
                 cached_api = entry['api']
 
-    # Close koneksi expired di luar lock
+    # Close koneksi idle di luar lock
     if old_api is not None:
         try:
             old_api.close()
         except Exception:
             pass
 
-    # --- Fase 2: Validasi koneksi yang ada (di luar lock, bisa blocking) ---
+    # --- Fase 2: Validasi koneksi yang ada (di luar lock) ---
     if cached_api is not None:
         try:
-            list(cached_api('/system/identity/print'))
-            # Koneksi masih hidup — update last_used
+            # Hanya jalankan health check jika sudah lebih dari 20 detik sejak pemakaian terakhir
+            with _mk_lock:
+                entry = _mk_cache.get(cache_key)
+                since_last = now - entry.get('last_used', 0) if entry else 999
+            if since_last > 20:
+                list(cached_api('/system/identity/print'))
+            # Update last_used
             with _mk_lock:
                 if cache_key in _mk_cache:
                     _mk_cache[cache_key]['last_used'] = time.monotonic()
             return cached_api
         except Exception:
-            # Koneksi mati — tutup dan hapus dari cache
+            # Koneksi mati/drop — tutup dan hapus dari cache
             try:
                 cached_api.close()
             except Exception:

@@ -6,10 +6,9 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, current_app
 from decorators import login_required
 from database import execute_query
-from helpers import get_request_data, convert_data_limit_to_bytes, connect_mikrotik
+from helpers import get_request_data, convert_data_limit_to_bytes, connect_mikrotik, get_cached_mikrotik
 from services.telegram import send_telegram_notification
 from services.mikrotik_coa import send_coa_update, send_coa_update_async
-from services.mikrotik_queue import sync_user_queue, remove_user_queue, get_queue_parents, get_user_queue_status
 from extensions import limiter
 from services.genieacs import get_genieacs_device_info
 
@@ -37,6 +36,31 @@ def _sync_ikev2_pool(username, ip_address):
             )
         else:
             _sqlite(f"DELETE FROM addresses WHERE identity=(SELECT id FROM identities WHERE data='{u}' LIMIT 1);")
+    except Exception:
+        pass  # Non-critical
+
+def _sync_openvpn_ccd(username, ip_address):
+    """Sync static IP ke file CCD OpenVPN di /etc/openvpn/ccd/<username>.
+    Jika ip_address diisi, buat/update file CCD dengan ifconfig-push.
+    Jika ip_address kosong/None, hapus file CCD agar user dapat IP dari pool.
+    """
+    ccd_dir = '/etc/openvpn/ccd'
+    if not os.path.isdir(ccd_dir):
+        return  # OpenVPN CCD dir tidak ada, skip
+    ccd_path = os.path.join(ccd_dir, username)
+    try:
+        if ip_address:
+            content = (
+                f'ifconfig-push {ip_address} 255.255.255.0\n'
+                f'push "route 10.177.177.0 255.255.255.0"\n'
+                f'push "route 10.203.66.0 255.255.255.0"\n'
+            )
+            with open(ccd_path, 'w') as f:
+                f.write(content)
+            os.chmod(ccd_path, 0o644)
+        else:
+            if os.path.isfile(ccd_path):
+                os.remove(ccd_path)
     except Exception:
         pass  # Non-critical
 
@@ -443,7 +467,6 @@ def api_ipoe_users():
         data_query = f"""
             SELECT c.id, c.username, c.username as mac_address, c.value as password,
                    (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
-                   (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
                    (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-Pool' LIMIT 1) as framed_pool,
                    (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Description' LIMIT 1) as name,
                    (SELECT COUNT(*) FROM radacct a WHERE (LOWER(a.username) = LOWER(c.username) OR REGEXP_REPLACE(LOWER(a.username), '[^a-z0-9]', '', 'g') = REGEXP_REPLACE(LOWER(c.username), '[^a-z0-9]', '', 'g')) AND a.acctstoptime IS NULL) as active_sessions,
@@ -478,16 +501,8 @@ def api_ipoe_add_user():
             password = mac # Default password to MAC address
             
         ip_address = data.get('ip_address', '').strip()
-        rate_limit = data.get('rate_limit', '').strip()
         framed_pool = (data.get('framed_pool') or data.get('ip_pool') or '').strip()
         name = data.get('name', '').strip()
-
-        # Parameter Queue Tree (opsional)
-        parent_dl      = data.get('parent_dl', '').strip()
-        parent_ul      = data.get('parent_ul', '').strip()
-        limit_at       = data.get('limit_at', '0').strip() or '0'
-        priority       = int(data.get('priority', 8) or 8)
-        integration_id = data.get('integration_id')
 
         # Cek duplikat
         existing = execute_query("SELECT id FROM radcheck WHERE username = %s AND attribute = 'Cleartext-Password'", (mac,))
@@ -498,57 +513,18 @@ def api_ipoe_add_user():
         execute_query("INSERT INTO radcheck (username, attribute, op, value) VALUES (%s, 'Cleartext-Password', ':=', %s)", (mac, password), fetch=False)
         execute_query("INSERT INTO radusergroup (username, groupname, priority) VALUES (%s, 'ipoe', 1) ON CONFLICT DO NOTHING", (mac,), fetch=False)
         
-        # Insert replies
+        # Hapus sisa attribute Mikrotik-Rate-Limit jika ada agar tidak membuat queue dynamic di MikroTik
+        execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Mikrotik-Rate-Limit'", (mac,), fetch=False)
+
+        # Insert replies (hanya IP, Pool, dan Description)
         if ip_address:
             execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)", (mac, ip_address), fetch=False)
-        if rate_limit:
-            execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Mikrotik-Rate-Limit', ':=', %s)", (mac, rate_limit), fetch=False)
         if framed_pool:
             execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-Pool', ':=', %s)", (mac, framed_pool), fetch=False)
         if name:
             execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Description', ':=', %s)", (mac, name), fetch=False)
 
-        queue_msg = ''
-        # ── Sync Queue Tree ke MikroTik (hanya jika parent_dl & parent_ul diisi) ──
-        if parent_dl and parent_ul and ip_address:
-            try:
-                # Simpan konfigurasi queue ke DB
-                execute_query("""
-                    INSERT INTO ipoe_queue_config (username, parent_dl, parent_ul, limit_at, priority, integration_id)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (username) DO UPDATE
-                    SET parent_dl=%s, parent_ul=%s, limit_at=%s, priority=%s,
-                        integration_id=%s, updated_at=NOW()
-                """, (mac, parent_dl, parent_ul, limit_at, priority, integration_id or None,
-                       parent_dl, parent_ul, limit_at, priority, integration_id or None), fetch=False)
-
-                # Ambil integrasi MikroTik
-                if integration_id:
-                    integ = execute_query("SELECT * FROM integrations WHERE id=%s AND is_active=true", (integration_id,))
-                else:
-                    integ = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true LIMIT 1")
-
-                if integ:
-                    i = integ[0]
-                    api = connect_mikrotik(i['host'], i['username'], i['password'], i.get('port', 8728))
-                    result = sync_user_queue(
-                        api, mac, ip_address, rate_limit,
-                        parent_dl, parent_ul, limit_at, priority,
-                        display_name=name or mac
-                    )
-                    api.close()
-                    execute_query("UPDATE ipoe_queue_config SET synced_at=NOW() WHERE username=%s", (mac,), fetch=False)
-                    if result['success']:
-                        queue_msg = ' | Queue Tree & Mangle berhasil dibuat di MikroTik'
-                    else:
-                        errs = result['mangle']['errors'] + result['queue']['errors']
-                        queue_msg = f' | Queue sync parsial: {"; ".join(errs[:2])}'
-                else:
-                    queue_msg = ' | Queue config tersimpan (tidak ada integrasi MikroTik aktif)'
-            except Exception as qe:
-                queue_msg = f' | Queue sync gagal: {str(qe)}'
-
-        return jsonify({'success': True, 'message': f'User IPoE berhasil ditambahkan{queue_msg}'})
+        return jsonify({'success': True, 'message': 'User IPoE berhasil ditambahkan'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -565,79 +541,16 @@ def api_ipoe_update_user(username):
         if 'ip_pool' in data and 'framed_pool' not in data:
             data['framed_pool'] = data['ip_pool']
 
-        for attr, key in [('Framed-IP-Address', 'ip_address'), ('Mikrotik-Rate-Limit', 'rate_limit'), ('Framed-Pool', 'framed_pool'), ('Description', 'name')]:
+        # Pastikan Mikrotik-Rate-Limit selalu dihapus untuk IPoE agar tidak ada antrean dinamis
+        execute_query("DELETE FROM radreply WHERE username = %s AND attribute = 'Mikrotik-Rate-Limit'", (username,), fetch=False)
+
+        for attr, key in [('Framed-IP-Address', 'ip_address'), ('Framed-Pool', 'framed_pool'), ('Description', 'name')]:
             if key in data:
                 execute_query("DELETE FROM radreply WHERE username = %s AND attribute = %s", (username, attr), fetch=False)
                 if data[key]:
                     execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, %s, ':=', %s)", (username, attr, data[key]), fetch=False)
 
-        queue_msg = ''
-        # ── Update Queue Tree di MikroTik jika ada perubahan queue config ──
-        has_queue_update = any(k in data for k in ['parent_dl', 'parent_ul', 'limit_at', 'priority', 'integration_id'])
-        has_ip_or_rate   = any(k in data for k in ['ip_address', 'rate_limit'])
-
-        if has_queue_update or has_ip_or_rate:
-            try:
-                # Ambil config lama dari DB
-                old_cfg = execute_query("SELECT * FROM ipoe_queue_config WHERE username=%s", (username,))
-
-                parent_dl      = data.get('parent_dl') or (old_cfg[0]['parent_dl'] if old_cfg else '')
-                parent_ul      = data.get('parent_ul') or (old_cfg[0]['parent_ul'] if old_cfg else '')
-                limit_at       = data.get('limit_at',  old_cfg[0]['limit_at']  if old_cfg else '0') or '0'
-                priority       = int(data.get('priority', old_cfg[0]['priority'] if old_cfg else 8) or 8)
-                integration_id = data.get('integration_id') or (old_cfg[0]['integration_id'] if old_cfg else None)
-
-                # Ambil ip dan rate terbaru dari DB (sudah diupdate di atas)
-                current = execute_query("""
-                    SELECT
-                        (SELECT value FROM radreply WHERE username=%s AND attribute='Framed-IP-Address' LIMIT 1) as ip,
-                        (SELECT value FROM radreply WHERE username=%s AND attribute='Mikrotik-Rate-Limit' LIMIT 1) as rate
-                """, (username, username))
-                ip_address = current[0]['ip'] if current else ''
-                rate_limit = current[0]['rate'] if current else ''
-
-                if parent_dl and parent_ul and ip_address:
-                    # Update config di DB
-                    execute_query("""
-                        INSERT INTO ipoe_queue_config (username, parent_dl, parent_ul, limit_at, priority, integration_id)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (username) DO UPDATE
-                        SET parent_dl=%s, parent_ul=%s, limit_at=%s, priority=%s,
-                            integration_id=%s, updated_at=NOW()
-                    """, (username, parent_dl, parent_ul, limit_at, priority, integration_id,
-                           parent_dl, parent_ul, limit_at, priority, integration_id), fetch=False)
-
-                    # Ambil integrasi MikroTik
-                    if integration_id:
-                        integ = execute_query("SELECT * FROM integrations WHERE id=%s AND is_active=true", (integration_id,))
-                    else:
-                        integ = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true LIMIT 1")
-
-                    if integ:
-                        # Ambil nama display
-                        name_row = execute_query("SELECT value FROM radreply WHERE username=%s AND attribute='Description' LIMIT 1", (username,))
-                        display_name = name_row[0]['value'] if name_row else username
-
-                        i = integ[0]
-                        api = connect_mikrotik(i['host'], i['username'], i['password'], i.get('port', 8728))
-                        result = sync_user_queue(
-                            api, username, ip_address, rate_limit,
-                            parent_dl, parent_ul, limit_at, priority,
-                            display_name=display_name
-                        )
-                        api.close()
-                        execute_query("UPDATE ipoe_queue_config SET synced_at=NOW() WHERE username=%s", (username,), fetch=False)
-                        if result['success']:
-                            queue_msg = ' | Queue Tree & Mangle diperbarui di MikroTik'
-                        else:
-                            errs = result['mangle']['errors'] + result['queue']['errors']
-                            queue_msg = f' | Queue sync parsial: {"; ".join(errs[:2])}'
-                    else:
-                        queue_msg = ' | Queue config tersimpan (tidak ada integrasi MikroTik aktif)'
-            except Exception as qe:
-                queue_msg = f' | Queue sync gagal: {str(qe)}'
-
-        return jsonify({'success': True, 'message': f'User IPoE berhasil diperbarui{queue_msg}'})
+        return jsonify({'success': True, 'message': 'User IPoE berhasil diperbarui'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -645,28 +558,6 @@ def api_ipoe_update_user(username):
 @login_required
 def api_ipoe_delete_user(username):
     try:
-        queue_msg = ''
-        # ── Hapus Queue Tree & Mangle dari MikroTik sebelum hapus dari DB ──
-        try:
-            cfg = execute_query("SELECT * FROM ipoe_queue_config WHERE username=%s", (username,))
-            if cfg:
-                integration_id = cfg[0].get('integration_id')
-                if integration_id:
-                    integ = execute_query("SELECT * FROM integrations WHERE id=%s AND is_active=true", (integration_id,))
-                else:
-                    integ = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true LIMIT 1")
-
-                if integ:
-                    i = integ[0]
-                    api = connect_mikrotik(i['host'], i['username'], i['password'], i.get('port', 8728))
-                    result = remove_user_queue(api, username)
-                    api.close()
-                    queue_msg = f' | Dihapus dari MikroTik: {result["mangle_removed"]} mangle, {result["queue_removed"]} queue'
-                # Hapus config dari DB
-                execute_query("DELETE FROM ipoe_queue_config WHERE username=%s", (username,), fetch=False)
-        except Exception as qe:
-            queue_msg = f' | Queue remove gagal: {str(qe)}'
-
         execute_query("DELETE FROM radusergroup WHERE username = %s AND groupname = 'ipoe'", (username,), fetch=False)
         # Hapus radcheck/radreply hanya jika user tidak terdaftar di group lain
         other_groups = execute_query(
@@ -675,72 +566,15 @@ def api_ipoe_delete_user(username):
         if not other_groups:
             execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
             execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
-        return jsonify({'success': True, 'message': f'User IPoE {username} berhasil dihapus{queue_msg}'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@users_bp.route('/api/ipoe/queue-parents')
-@login_required
-def api_ipoe_queue_parents():
-    """Ambil daftar parent queue dari MikroTik untuk dropdown UI."""
-    try:
-        integration_id = request.args.get('integration_id')
-        if integration_id:
-            integ = execute_query("SELECT * FROM integrations WHERE id=%s AND is_active=true", (integration_id,))
-        else:
-            integ = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true LIMIT 1")
-
-        if not integ:
-            return jsonify({'success': False, 'error': 'Tidak ada integrasi MikroTik aktif'}), 404
-
-        i = integ[0]
-        api = connect_mikrotik(i['host'], i['username'], i['password'], i.get('port', 8728))
-        parents = get_queue_parents(api)
-        api.close()
-        return jsonify({'success': True, 'parents': parents})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@users_bp.route('/api/ipoe/queue-status/<username>')
-@login_required
-def api_ipoe_queue_status(username):
-    """Cek status queue tree user di MikroTik."""
-    try:
-        cfg = execute_query("SELECT * FROM ipoe_queue_config WHERE username=%s", (username,))
-        db_config = cfg[0] if cfg else None
-
-        integration_id = db_config.get('integration_id') if db_config else None
-        if integration_id:
-            integ = execute_query("SELECT * FROM integrations WHERE id=%s AND is_active=true", (integration_id,))
-        else:
-            integ = execute_query("SELECT * FROM integrations WHERE type='mikrotik' AND is_active=true LIMIT 1")
-
-        mikrotik_status = None
-        if integ:
-            try:
-                i = integ[0]
-                api = connect_mikrotik(i['host'], i['username'], i['password'], i.get('port', 8728))
-                mikrotik_status = get_user_queue_status(api, username)
-                api.close()
-            except Exception as me:
-                mikrotik_status = {'found': False, 'error': str(me)}
-
-        return jsonify({
-            'success': True,
-            'username': username,
-            'db_config': db_config,
-            'mikrotik': mikrotik_status,
-        })
+        return jsonify({'success': True, 'message': f'User IPoE {username} berhasil dihapus'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @users_bp.route('/api/ipoe/get-name')
 @users_bp.route('/api/ipoe/get-name/<mac>')
-@limiter.limit("60 per minute")
+@limiter.limit("300 per minute")
 def api_ipoe_get_name(mac=None):
-    """API endpoint public for MikroTik Lease Script."""
+    """API endpoint public for MikroTik Lease Script (hanya mengembalikan nama client, tanpa rate limit)."""
     try:
         if mac is None:
             mac = request.args.get('mac', '').strip().lower()
@@ -752,26 +586,24 @@ def api_ipoe_get_name(mac=None):
         
         clean_mac = "".join(c for c in mac if c.isalnum())
         rows = execute_query("""
-            SELECT attribute, value FROM radreply 
+            SELECT value FROM radreply 
             WHERE regexp_replace(LOWER(username), '[^a-z0-9]', '', 'g') = %s 
-            AND attribute IN ('Description', 'Mikrotik-Rate-Limit')
+            AND attribute = 'Description'
+            LIMIT 1
         """, (clean_mac,))
         
         name = ""
-        rate_limit = ""
-        for r in rows:
-            if r['attribute'] == 'Description':
-                name = r['value'].strip()
-            elif r['attribute'] == 'Mikrotik-Rate-Limit':
-                rate_limit = r['value'].strip()
+        if rows and rows[0].get('value'):
+            name = rows[0]['value'].strip()
                 
         if name:
             name = name.replace(" ", "-")
-            safe_name = "".join(c for c in name if c.isalnum() or c == '-')
+            safe_name = "".join(c for c in name if c.isalnum() or c in ('-', '_'))
         else:
             safe_name = f"IPoE-{clean_mac}"
             
-        return f"{safe_name};{rate_limit}"
+        # Tanpa rate limit agar MikroTik tidak membuat queue otomatis
+        return f"{safe_name};"
     except Exception as e:
         return f"Error-{str(e)}; ", 500
 
@@ -787,7 +619,6 @@ def api_ipoe_sync_static():
             SELECT 
                 c.username,
                 (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Framed-IP-Address' LIMIT 1) as ip_address,
-                (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Mikrotik-Rate-Limit' LIMIT 1) as rate_limit,
                 (SELECT value FROM radreply r WHERE r.username = c.username AND r.attribute = 'Description' LIMIT 1) as name
             FROM radcheck c
             WHERE c.attribute = 'Cleartext-Password'
@@ -801,12 +632,12 @@ def api_ipoe_sync_static():
                 continue
             
             mac = r['username'] or ""
-            rate = r['rate_limit'] or ""
             name = r['name'] or f"Static-{mac}"
             name = name.replace(" ", "-")
             safe_name = "".join(c for c in name if c.isalnum() or c in ('-', '_'))
             
-            lines.append(f"{ip.strip()};{mac.strip()};{rate.strip()};{safe_name}")
+            # Tanpa rate limit
+            lines.append(f"{ip.strip()};{mac.strip()};;{safe_name}")
             
         return "\n".join(lines), 200, {'Content-Type': 'text/plain'}
     except Exception as e:
@@ -820,9 +651,8 @@ def api_ipoe_dhcp_leases():
     errors = []
     for ig in integrations:
         try:
-            api = connect_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
+            api = get_cached_mikrotik(ig['host'], username=ig['username'], password=ig['password'], port=ig['port'], timeout=3)
             raw = list(api('/ip/dhcp-server/lease/print'))
-            api.close()
             
             for l in raw:
                 mac = l.get('mac-address', '').lower()
@@ -857,7 +687,7 @@ def api_ipoe_dhcp_leases():
             SELECT username, attribute, value, REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g') as clean_username 
             FROM radreply 
             WHERE REGEXP_REPLACE(LOWER(username), '[^a-z0-9]', '', 'g') IN ({placeholders}) 
-              AND attribute IN ('Framed-IP-Address','Mikrotik-Rate-Limit','Framed-Pool')
+              AND attribute IN ('Framed-IP-Address','Framed-Pool')
             """,
             tuple(clean_macs)
         ) or []
@@ -869,8 +699,6 @@ def api_ipoe_dhcp_leases():
             if orig_mac:
                 if row['attribute'] == 'Framed-IP-Address':
                     leases[orig_mac]['radius_ip'] = row['value']
-                elif row['attribute'] == 'Mikrotik-Rate-Limit':
-                    leases[orig_mac]['radius_rate'] = row['value']
                 elif row['attribute'] == 'Framed-Pool':
                     leases[orig_mac]['radius_pool'] = row['value']
 
@@ -1268,6 +1096,7 @@ def api_vpn_add_user():
             execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, 'Framed-IP-Address', ':=', %s)", (username, ip_address), fetch=False)
 
         _sync_ikev2_pool(username, ip_address)
+        _sync_openvpn_ccd(username, ip_address)
         return jsonify({'success': True, 'message': 'VPN user berhasil ditambahkan'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1285,9 +1114,10 @@ def api_vpn_update_user(username):
                 if data[key]:
                     execute_query("INSERT INTO radreply (username, attribute, op, value) VALUES (%s, %s, ':=', %s)", (username, attr, data[key]), fetch=False)
         
-        # Sync IP to ikev2 pool
+        # Sync IP to ikev2 pool and OpenVPN CCD
         ip_address = data.get('ip_address', '')
         _sync_ikev2_pool(username, ip_address)
+        _sync_openvpn_ccd(username, ip_address)
         return jsonify({'success': True, 'message': 'VPN user berhasil diupdate'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1305,7 +1135,8 @@ def api_vpn_delete_user(username):
             execute_query("DELETE FROM radcheck WHERE username = %s", (username,), fetch=False)
             execute_query("DELETE FROM radreply WHERE username = %s", (username,), fetch=False)
         
-        _sync_ikev2_pool(username, None)  # Remove from pool
+        _sync_ikev2_pool(username, None)  # Remove from ikev2 pool
+        _sync_openvpn_ccd(username, None)  # Remove CCD file
         return jsonify({'success': True, 'message': f'VPN user {username} berhasil dihapus'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

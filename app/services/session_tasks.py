@@ -86,7 +86,7 @@ def background_stale_sessions():
             """, fetch=False)
         except Exception as e:
             print(f"[stale-session-cleaner] Error: {e}")
-        socketio.sleep(30)
+        socketio.sleep(60)
 
 def background_expired_disconnect():
     """Setiap 60 detik: disconnect sesi aktif milik user yang Expiration-nya sudah lewat, lalu hapus akun."""
@@ -256,13 +256,14 @@ def sync_active_sessions_with_routers():
                 sessions_by_nas[nas_ip] = []
             sessions_by_nas[nas_ip].append(s)
             
-        from helpers import connect_mikrotik
+        from helpers import get_cached_mikrotik
         for r in routers:
             nas_ip = r['host']
             nas_sessions = sessions_by_nas.get(nas_ip, [])
             
             try:
-                api = connect_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=10)
+                # Gunakan get_cached_mikrotik agar koneksi di-reuse (persistent) dan tidak membanjiri log MikroTik
+                api = get_cached_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=5.0)
                 
                 # Fetch active PPP users and sessions
                 active_ppp_users = None
@@ -289,23 +290,32 @@ def sync_active_sessions_with_routers():
                     active_macs = {l.get('mac-address', '').lower().replace(':', '').replace('-', '').replace('_', '') for l in active_leases if l.get('status') == 'bound' and l.get('mac-address')}
                 except Exception as lease_err:
                     print(f"[session-sync] Error fetching Leases from {r['name']}: {lease_err}")
-                    
-                api.close()
 
-                # [EDIT 2] Fetch active Wireless clients dari registration table Mikrotik
+                # Fetch active Hotspot users
+                active_hotspot_users = set()
+                try:
+                    active_hs = list(api('/ip/hotspot/active/print'))
+                    for h in active_hs:
+                        hs_u = h.get('user', '').lower()
+                        if hs_u:
+                            active_hotspot_users.add(hs_u)
+                        hs_m = h.get('mac-address', '').lower().replace(':', '').replace('-', '').replace('_', '')
+                        if hs_m and active_macs is not None:
+                            active_macs.add(hs_m)
+                except Exception:
+                    pass
+
+                # Fetch active Wireless clients dari registration table Mikrotik (menggunakan koneksi persistent yang sama)
                 active_wireless_macs = None
                 try:
-                    api2 = connect_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=10)
                     wireless_macs = set()
-                    for endpoint in ['/interface/wireless/registration-table/print', '/interface/wifi/registration-table/print']:
-                        try:
-                            for w in api2(endpoint):
-                                mac = w.get('mac-address', '').lower().replace(':', '').replace('-', '').replace('_', '')
-                                if mac:
-                                    wireless_macs.add(mac)
-                        except Exception:
-                            pass
-                    api2.close()
+                    try:
+                        for w in api('/interface/wireless/registration-table/print'):
+                            mac = w.get('mac-address', '').lower().replace(':', '').replace('-', '').replace('_', '')
+                            if mac:
+                                wireless_macs.add(mac)
+                    except Exception:
+                        pass
                     active_wireless_macs = wireless_macs
                 except Exception as w_err:
                     print(f"[session-sync] Error fetching Wireless from {r['name']}: {w_err}")
@@ -377,7 +387,7 @@ def sync_active_sessions_with_routers():
                             mac = s.get('callingstationid') or ''
                             clean_mac = mac.replace(':', '').replace('-', '').replace('_', '').lower()
                             clean_uname = uname.replace(':', '').replace('-', '').replace('_', '').lower()
-                            is_online = (clean_uname in active_macs) or (clean_mac in active_macs)
+                            is_online = (clean_uname in active_macs) or (clean_mac in active_macs) or (uname in active_hotspot_users)
                         else:
                             is_online = True
                             

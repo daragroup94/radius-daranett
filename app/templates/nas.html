@@ -2,7 +2,7 @@
 
 {% block title %}NAS Devices - RADIUS Manager{% endblock %}
 {% block page_title %}NAS Devices{% endblock %}
-{% block page_subtitle %}Manage Network Access Servers{% endblock %}
+{% block page_subtitle %}Manage Network Access Servers & Router Gateways{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -18,7 +18,7 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        border-radius: 1rem !important; /* 16px */
+        border-radius: 1rem !important;
         flex-shrink: 0 !important;
     }
     .icon-noc {
@@ -28,17 +28,18 @@
 
     .icon-gradient-nas { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; }
     .icon-gradient-add { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; }
+    .icon-gradient-script { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important; }
     
     /* Stat Cards Hover & Shadows */
     .stat-card-glow {
         background: linear-gradient(to bottom, #ffffff, #fcfcfd);
         border: 1px solid #f1f5f9;
         box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.06);
-        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .stat-card-glow:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 20px 35px -5px rgba(148, 163, 184, 0.15);
+        transform: translateY(-4px);
+        box-shadow: 0 16px 30px -5px rgba(148, 163, 184, 0.12);
         border-color: #e2e8f0;
     }
     
@@ -49,37 +50,38 @@
         box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.25);
     }
     .dark .stat-card-glow:hover {
-        box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 16px 30px -5px rgba(0, 0, 0, 0.4);
         border-color: #475569;
     }
     
-    /* Dynamic status card border glows */
+    /* Rack Card styling */
     .nas-card-premium {
-        background: linear-gradient(to bottom, #ffffff, #fafbfb);
-        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         position: relative;
     }
     .nas-card-premium:hover {
-        transform: translateY(-6px);
+        transform: translateY(-4px);
     }
     
     .nas-card-online {
-        box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.04), 0 1px 3px rgba(0,0,0,0.01);
+        box-shadow: 0 8px 24px -6px rgba(16, 185, 129, 0.08);
+        border-color: rgba(16, 185, 129, 0.25);
     }
     .nas-card-online:hover {
-        box-shadow: 0 25px 40px -15px rgba(16, 185, 129, 0.12), 0 1px 5px rgba(16, 185, 129, 0.04);
-        border-color: rgba(16, 185, 129, 0.35);
+        box-shadow: 0 16px 32px -8px rgba(16, 185, 129, 0.16);
+        border-color: rgba(16, 185, 129, 0.45);
     }
 
     .nas-card-offline {
-        box-shadow: 0 10px 30px -10px rgba(239, 68, 68, 0.04), 0 1px 3px rgba(0,0,0,0.01);
+        box-shadow: 0 8px 24px -6px rgba(239, 68, 68, 0.08);
+        border-color: rgba(239, 68, 68, 0.25);
     }
     .nas-card-offline:hover {
-        box-shadow: 0 25px 40px -15px rgba(239, 68, 68, 0.12), 0 1px 5px rgba(239, 68, 68, 0.04);
-        border-color: rgba(239, 68, 68, 0.35);
+        box-shadow: 0 16px 32px -8px rgba(239, 68, 68, 0.16);
+        border-color: rgba(239, 68, 68, 0.45);
     }
 
-    /* Pulsing online/offline dot indicators */
+    /* Pulsing indicators */
     .pulse-dot-online {
         box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
         animation: pulse-online 2s infinite;
@@ -107,451 +109,662 @@
     }
     @keyframes float {
         0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-5px); }
+        50% { transform: translateY(-4px); }
     }
-    /* Tailwind Utilities */
-    .translate-x-full { transform: translateX(100%); }
-    .translate-x-0 { transform: translateX(0); }
-    .transition-transform { transition-property: transform; }
-    .duration-300 { transition-duration: 300ms; }
-    .ease-in-out { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+
+    /* Custom view tabs */
+    .view-btn.active {
+        background-color: #2563eb;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <!-- NAS PAGE HEADER -->
-    <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-white to-slate-50 dark:from-slate-950 dark:to-slate-900 border border-slate-150 dark:border-transparent p-6 rounded-3xl text-slate-800 dark:text-white shadow-xl relative overflow-hidden">
+<div class="fade-in space-y-6">
+
+    <!-- 1. NAS PAGE HEADER -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between bg-gradient-to-r from-white to-slate-50 dark:from-slate-950 dark:to-slate-900 border border-slate-150 dark:border-transparent p-6 rounded-3xl text-slate-800 dark:text-white shadow-xl relative overflow-hidden">
         <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <div class="absolute bottom-0 left-1/3 w-48 h-48 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none"></div>
         
-        <div class="z-10 mb-4 md:mb-0 flex items-center">
+        <div class="z-10 mb-4 lg:mb-0 flex items-center">
             <div class="icon-wrapper-noc bg-gradient-to-r from-blue-500 to-indigo-600 mr-4 shadow-lg shadow-blue-500/15 floating-icon">
                 <i data-lucide="server" class="lucide icon-noc text-white"></i>
             </div>
             <div>
-                <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-200 bg-clip-text text-transparent">Daftar NAS (MikroTik Router)</h2>
-                <p class="text-slate-500 dark:text-slate-300 text-xs md:text-sm mt-0.5">Kelola konfigurasi, radius secret, dan status integrasi perangkat NAS.</p>
+                <div class="flex items-center gap-2">
+                    <h2 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-200 bg-clip-text text-transparent">
+                        Daftar NAS (MikroTik Router & Gateway)
+                    </h2>
+                    <span class="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40">
+                        NOC Center
+                    </span>
+                </div>
+                <p class="text-slate-500 dark:text-slate-300 text-xs md:text-sm mt-0.5">
+                    Kelola konfigurasi, radius secret, status ping RTT, beban sesi, dan skrip RouterOS.
+                </p>
             </div>
         </div>
         
-        <div class="z-10 flex items-center gap-3">
-            <button id="btnAutoRefresh" onclick="toggleAutoRefreshButton()" class="bg-slate-900/5 dark:bg-white/10 hover:bg-slate-900/10 dark:hover:bg-white/20 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-900/10 dark:border-white/10 px-4 py-3 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 shadow-sm">
-                <i data-lucide="clock" id="iconAutoRefresh" class="lucide w-4 h-4"></i>
+        <div class="z-10 flex flex-wrap items-center gap-2.5">
+            <!-- Bulk Ping Test Button -->
+            <button id="btnBulkPing" onclick="triggerBulkPing()" 
+                    class="bg-slate-900/5 dark:bg-white/10 hover:bg-slate-900/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white border border-slate-900/10 dark:border-white/10 px-4 py-2.5 rounded-2xl flex items-center space-x-2 text-xs font-bold transition-all shadow-sm hover:scale-[1.02]">
+                <i data-lucide="zap" id="iconBulkPing" class="w-4 h-4 text-amber-500"></i>
+                <span>Uji Semua Ping</span>
+            </button>
+
+            <!-- Auto-refresh Toggle -->
+            <button id="btnAutoRefresh" onclick="toggleAutoRefreshButton()" 
+                    class="bg-slate-900/5 dark:bg-white/10 hover:bg-slate-900/10 dark:hover:bg-white/20 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-900/10 dark:border-white/10 px-4 py-2.5 rounded-2xl flex items-center space-x-2 text-xs font-bold transition-all shadow-sm">
+                <i data-lucide="clock" id="iconAutoRefresh" class="w-4 h-4"></i>
                 <span id="textAutoRefresh">Auto 10s: OFF</span>
             </button>
-            <button id="btnRefreshNoc" onclick="loadStatusBadges()" class="bg-slate-900/5 dark:bg-white/10 hover:bg-slate-900/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold transition-all duration-200 border border-slate-900/10 dark:border-white/10 hover:scale-[1.02] whitespace-nowrap">
+
+            <!-- Manual Status Check -->
+            <button id="btnRefreshNoc" onclick="loadStatusBadges()" 
+                    class="bg-slate-900/5 dark:bg-white/10 hover:bg-slate-900/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white px-4 py-2.5 rounded-2xl flex items-center space-x-2 text-xs font-bold transition-all border border-slate-900/10 dark:border-white/10 hover:scale-[1.02]">
                 <i id="iconRefreshNoc" data-lucide="refresh-cw" class="w-4 h-4"></i>
                 <span>Cek Status</span>
             </button>
-            <button onclick="openAddNasModal()" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-5 py-3 rounded-2xl flex items-center space-x-2 font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] whitespace-nowrap">
-                <i data-lucide="plus-circle" class="lucide w-5 h-5 text-white"></i>
+
+            <!-- Add NAS Button -->
+            <button onclick="openAddNasModal()" 
+                    class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-5 py-2.5 rounded-2xl flex items-center space-x-2 text-xs font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02]">
+                <i data-lucide="plus-circle" class="w-4 h-4 text-white"></i>
                 <span>Tambah NAS Baru</span>
             </button>
         </div>
     </div>
 
-    <!-- Stats Cards Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- 2. STATS CARDS GRID (4 Cards) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Total NAS -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 stat-card-glow group relative overflow-hidden transition-all duration-300">
-            <!-- Background Accent Glow -->
-            <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
-            
-            <div class="flex flex-col justify-between h-full relative z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-500/20 group-hover:scale-110 transition-all duration-300 floating-icon">
-                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="2" width="24" height="7" rx="2" fill="#378ADD"/><rect x="2" y="2" width="24" height="3" rx="2" fill="#0C447C" opacity=".35"/><circle cx="21.5" cy="5.5" r="1.4" fill="#E6F1FB"/><circle cx="18" cy="5.5" r="1.4" fill="#85B7EB"/><rect x="4" y="4.2" width="9" height="1.8" rx=".9" fill="#B5D4F4"/><rect x="2" y="11" width="24" height="7" rx="2" fill="#85B7EB"/><rect x="2" y="11" width="24" height="3" rx="2" fill="#378ADD" opacity=".4"/><circle cx="21.5" cy="14.5" r="1.4" fill="#E6F1FB"/><circle cx="18" cy="14.5" r="1.4" fill="#378ADD"/><rect x="4" y="13.2" width="9" height="1.8" rx=".9" fill="#B5D4F4"/><rect x="2" y="20" width="24" height="6" rx="2" fill="#B5D4F4"/><rect x="2" y="20" width="24" height="2.5" rx="2" fill="#378ADD" opacity=".25"/><circle cx="21.5" cy="23" r="1.4" fill="#378ADD"/><circle cx="18" cy="23" r="1.4" fill="#E6F1FB"/><rect x="4" y="22" width="9" height="1.8" rx=".9" fill="#85B7EB"/></svg>
-                    </div>
-                    <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40">INTEGRATED</span>
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-500/5 dark:bg-blue-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-2xl flex items-center justify-center bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-500/20 group-hover:scale-110 transition-all duration-300 floating-icon">
+                    <i data-lucide="server" class="w-5 h-5 text-blue-600 dark:text-blue-400"></i>
                 </div>
-                <div>
-                    <p class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total NAS</p>
-                    <div class="flex items-baseline mt-1">
-                        <span class="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight font-outfit" id="stat-total-nas">0</span>
-                        <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium ml-1">perangkat</span>
-                    </div>
+                <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/40">
+                    GATEWAYS
+                </span>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total NAS Terdaftar</p>
+                <div class="flex items-baseline mt-1">
+                    <span class="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight font-outfit" id="stat-total-nas">0</span>
+                    <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium ml-1.5">perangkat</span>
                 </div>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1" id="stat-vendor-breakdown">MikroTik & Gateway</p>
             </div>
         </div>
 
         <!-- Online NAS -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 stat-card-glow group relative overflow-hidden transition-all duration-300">
-            <!-- Background Accent Glow -->
-            <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
-            
-            <div class="flex flex-col justify-between h-full relative z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-500/20 group-hover:scale-110 transition-all duration-300 floating-icon" style="animation-delay: 0.5s">
-                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M2 10.5Q14 2 26 10.5" stroke="#C0DD97" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M5 15Q14 8 23 15" stroke="#97C459" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M8.5 19.5Q14 14.5 19.5 19.5" stroke="#639922" stroke-width="2.2" stroke-linecap="round" fill="none"/><circle cx="14" cy="24" r="3.8" fill="#3B6D11"/><path d="M11.8 24L13.3 25.6L16.8 22" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </div>
-                    <span class="flex items-center space-x-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-dot-online"></span>
-                        <span>RUNNING</span>
-                    </span>
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-2xl flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-500/20 group-hover:scale-110 transition-all duration-300 floating-icon" style="animation-delay: 0.5s">
+                    <i data-lucide="activity" class="w-5 h-5 text-emerald-600 dark:text-emerald-400"></i>
                 </div>
-                <div>
-                    <p class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Online NAS</p>
-                    <div class="flex items-baseline mt-1">
-                        <span class="text-3xl font-extrabold text-green-600 dark:text-green-400 tracking-tight font-outfit" id="stat-online-nas">0</span>
-                        <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium ml-1">aktif</span>
-                    </div>
+                <span class="flex items-center space-x-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/40">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-dot-online"></span>
+                    <span>ONLINE</span>
+                </span>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Online & Responding</p>
+                <div class="flex items-baseline mt-1">
+                    <span class="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight font-outfit" id="stat-online-nas">0</span>
+                    <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium ml-1.5" id="stat-online-percent">aktif</span>
                 </div>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1" id="stat-avg-latency">Avg ping: -- ms</p>
             </div>
         </div>
 
         <!-- Offline NAS -->
-        <div id="offline-card-wrapper" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 stat-card-glow group relative overflow-hidden transition-all duration-300">
-            <!-- Background Accent Glow -->
-            <div id="offline-glow" class="absolute -right-6 -bottom-6 w-28 h-28 bg-slate-500/5 dark:bg-slate-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
-            
-            <div class="flex flex-col justify-between h-full relative z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <div id="offline-icon-wrapper" class="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-slate-500/10 to-slate-500/5 dark:from-slate-500/20 dark:to-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/10 dark:border-slate-500/20 group-hover:scale-110 transition-all duration-300 floating-icon" style="animation-delay: 1s">
-                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M2 10.5Q14 2 26 10.5" stroke="#F7C1C1" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M5 15Q14 8 23 15" stroke="#F09595" stroke-width="2.2" stroke-linecap="round" fill="none"/><line x1="4" y1="4" x2="24" y2="24" stroke="#E24B4A" stroke-width="2.2" stroke-linecap="round"/><path d="M8.5 19.5Q14 14.5 19.5 19.5" stroke="#E24B4A" stroke-width="2.2" stroke-linecap="round" fill="none"/><circle cx="14" cy="24" r="3.8" fill="#E24B4A"/><line x1="11.8" y1="21.8" x2="16.2" y2="26.2" stroke="white" stroke-width="1.6" stroke-linecap="round"/><line x1="16.2" y1="21.8" x2="11.8" y2="26.2" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg>
-                    </div>
-                    <span id="offline-badge" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600/30">STANDBY</span>
+        <div id="offline-card-wrapper" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group relative overflow-hidden">
+            <div id="offline-glow" class="absolute -right-6 -bottom-6 w-24 h-24 bg-slate-500/5 dark:bg-slate-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between mb-3">
+                <div id="offline-icon-wrapper" class="w-11 h-11 rounded-2xl flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 group-hover:scale-110 transition-all duration-300 floating-icon" style="animation-delay: 1s">
+                    <i data-lucide="wifi-off" class="w-5 h-5"></i>
                 </div>
-                <div>
-                    <p class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Offline NAS</p>
-                    <div class="flex items-baseline mt-1">
-                        <span class="text-3xl font-extrabold text-slate-500 dark:text-slate-400 tracking-tight font-outfit transition-all duration-300" id="stat-offline-nas">0</span>
-                        <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium ml-1">terputus</span>
-                    </div>
+                <span id="offline-badge" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600/30">
+                    STANDBY
+                </span>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Offline / Unreachable</p>
+                <div class="flex items-baseline mt-1">
+                    <span class="text-3xl font-extrabold text-slate-500 dark:text-slate-400 tracking-tight font-outfit" id="stat-offline-nas">0</span>
+                    <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium ml-1.5">terputus</span>
                 </div>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Status koneksi ICMP/TCP</p>
             </div>
         </div>
 
-        <!-- Total Active Sessions -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 stat-card-glow group relative overflow-hidden transition-all duration-300">
-            <!-- Background Accent Glow -->
-            <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-purple-500/5 dark:bg-purple-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
-            
-            <div class="flex flex-col justify-between h-full relative z-10">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-500/20 group-hover:scale-110 transition-all duration-300 floating-icon" style="animation-delay: 1.5s">
-                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><circle cx="10" cy="9.5" r="3.8" fill="#AFA9EC"/><path d="M3 24Q3 17.5 10 17.5Q13 17.5 15 19" stroke="#AFA9EC" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="18.5" cy="8.5" r="4.8" fill="#7F77DD"/><path d="M9.5 25.5Q9.5 18.5 18.5 18.5Q27.5 18.5 27.5 25.5" stroke="#7F77DD" stroke-width="4.5" stroke-linecap="round" fill="none"/><circle cx="24.5" cy="4.5" r="3.8" fill="#3B6D11"/><path d="M22.8 4.5L24 5.8L26.5 3" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </div>
-                    <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40">SESSIONS</span>
+        <!-- Total Sesi & Bandwidth -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-purple-500/5 dark:bg-purple-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-11 h-11 rounded-2xl flex items-center justify-center bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-500/20 group-hover:scale-110 transition-all duration-300 floating-icon" style="animation-delay: 1.5s">
+                    <i data-lucide="users" class="w-5 h-5 text-purple-600 dark:text-purple-400"></i>
                 </div>
-                <div>
-                    <p class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Sesi Aktif</p>
-                    <div class="flex items-baseline mt-1">
-                        <span class="text-3xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight font-outfit" id="noc-total-sessions">0</span>
-                        <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium ml-1">sesi</span>
-                    </div>
+                <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/40">
+                    TRAFFIC
+                </span>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Sesi Aktif</p>
+                <div class="flex items-baseline mt-1">
+                    <span class="text-3xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight font-outfit" id="noc-total-sessions">0</span>
+                    <span class="text-[11px] text-slate-400 dark:text-slate-500 font-medium ml-1.5">sesi aktif</span>
                 </div>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-semibold flex items-center gap-1" id="stat-total-bandwidth">
+                    <i data-lucide="arrow-up-down" class="w-3 h-3 text-purple-500"></i>
+                    <span>Total Kuota: --</span>
+                </p>
             </div>
         </div>
     </div>
 
-    <!-- Charts Section -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
-        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm h-80 flex flex-col relative">
-            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Distribusi Status NAS</h3>
-            <div id="nasStatusChart" class="w-full flex-1" style="min-height: 220px;"></div>
+    <!-- 3. VISUAL CHARTS SECTION -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- Chart 1: Sesi & Bandwidth per NAS -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm h-72 flex flex-col relative">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-blue-500"></i>
+                    Beban Sesi Aktif per Router
+                </h3>
+                <span class="text-[10px] text-slate-400 font-mono" id="chart-session-total-label">-- Sesi Total</span>
+            </div>
+            <div id="nasSessionChart" class="w-full flex-1" style="min-height: 190px;"></div>
         </div>
-        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm h-80 flex flex-col relative">
-            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Top 5 NAS (Beban Sesi Aktif)</h3>
-            <div id="nasSessionChart" class="w-full flex-1" style="min-height: 220px;"></div>
+
+        <!-- Chart 2: Latency Antar Router -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-5 shadow-sm h-72 flex flex-col relative">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="activity" class="w-3.5 h-3.5 text-emerald-500"></i>
+                    Ping RTT Latency Antar NAS (ms)
+                </h3>
+                <div class="flex items-center gap-2 text-[9px] font-semibold text-slate-400">
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>&lt;30ms</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span>30-80ms</span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span>&gt;80ms</span>
+                </div>
+            </div>
+            <div id="nasLatencyChart" class="w-full flex-1" style="min-height: 190px;"></div>
         </div>
     </div>
 
-    <!-- Filters & Search Bar -->
-    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-4 shadow-sm mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+    <!-- 4. TOOLBAR: SEARCH, FILTERS & DUAL VIEW SWITCHER -->
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-3.5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
         <!-- Search Input -->
         <div class="relative w-full md:w-80">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
-                <i data-lucide="search" class="w-5 h-5"></i>
+                <i data-lucide="search" class="w-4 h-4"></i>
             </span>
-            <input type="text" id="nasSearchInput" oninput="filterNASDevices()" placeholder="Cari IP, nama, tipe..." 
-                   class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium transition-all">
+            <input type="text" id="nasSearchInput" oninput="filterNASDevices()" placeholder="Cari IP, nama router, tipe..." 
+                   class="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs font-medium transition-all">
         </div>
 
-        <!-- Filter Tabs -->
-        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <button onclick="setFilter('all')" id="btn-filter-all" class="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-blue-600 text-white shadow-md shadow-blue-500/10 border border-transparent">
-                Semua
-            </button>
-            <button onclick="setFilter('online')" id="btn-filter-online" class="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                Online
-            </button>
-            <button onclick="setFilter('offline')" id="btn-filter-offline" class="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                Offline
-            </button>
-            <button onclick="setFilter('mikrotik')" id="btn-filter-mikrotik" class="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                MikroTik
-            </button>
+        <!-- Filter Tabs & View Switcher -->
+        <div class="flex flex-wrap items-center justify-between md:justify-end gap-2 w-full md:w-auto">
+            <!-- Filter Tabs -->
+            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-700/40">
+                <button onclick="setFilter('all')" id="btn-filter-all" 
+                        class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-blue-600 text-white shadow-sm">
+                    Semua
+                </button>
+                <button onclick="setFilter('online')" id="btn-filter-online" 
+                        class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                    Online
+                </button>
+                <button onclick="setFilter('offline')" id="btn-filter-offline" 
+                        class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                    Offline
+                </button>
+                <button onclick="setFilter('mikrotik')" id="btn-filter-mikrotik" 
+                        class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                    MikroTik
+                </button>
+            </div>
+
+            <!-- Dual View Switcher (Grid vs Table) -->
+            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-2xl border border-slate-200/60 dark:border-slate-700/40">
+                <button onclick="switchView('cards')" id="btn-view-cards" title="Tampilan Kartu Rack"
+                        class="view-btn active px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
+                    <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Kartu Rack</span>
+                </button>
+                <button onclick="switchView('table')" id="btn-view-table" title="Tampilan Tabel Padat"
+                        class="view-btn px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-400">
+                    <i data-lucide="list" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Tabel</span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Main Content Container -->
-    <div id="nasList" class="space-y-6">
+    <!-- 5. MAIN CONTENT CONTAINER (CARDS OR TABLE) -->
+    <div id="nasListContainer">
+        <!-- Initial Loader -->
         <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-16 shadow-sm text-center">
-            <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-            <p class="text-gray-600 dark:text-slate-300 font-semibold text-lg">Memuat perangkat NAS...</p>
-            <p class="text-gray-400 text-sm mt-2">Silakan tunggu sebentar</p>
+            <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p class="text-slate-700 dark:text-slate-300 font-semibold text-base">Memuat perangkat NAS & gateway...</p>
+            <p class="text-slate-400 text-xs mt-1">Mengambil status, latency, dan beban sesi</p>
         </div>
     </div>
+
 </div>
 
-<!-- Add NAS Modal - Enhanced -->
-<div id="addNasModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
-    <div class="modern-card rounded-3xl shadow-2xl p-8 w-full max-w-2xl mx-4 border-2 border-white/20 dark:border-slate-850">
+<!-- ===== MODAL: ADD NAS ===== -->
+<div id="addNasModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 sm:p-8 w-full max-w-xl border border-slate-200 dark:border-slate-800">
         <div class="flex justify-between items-center mb-6">
             <div class="flex items-center">
-                <div class="w-12 h-12 icon-gradient-add rounded-xl flex items-center justify-center mr-3 shadow-md">
-                    <i data-lucide="plus" class="w-6 h-6 text-white"></i>
+                <div class="w-11 h-11 icon-gradient-add rounded-2xl flex items-center justify-center mr-3 shadow-md">
+                    <i data-lucide="plus" class="w-5 h-5 text-white"></i>
                 </div>
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-white">Add New NAS Device</h3>
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white">Tambah Perangkat NAS</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Daftarkan router gateway baru ke RADIUS server</p>
+                </div>
             </div>
-            <button onclick="closeAddNasModal()" class="w-10 h-10 bg-gray-100 dark:bg-slate-800 hover:bg-red-100 dark:hover:bg-red-950/40 text-gray-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all duration-200 flex items-center justify-center">
-                <i data-lucide="x" class="w-5 h-5"></i>
+            <button onclick="closeAddNasModal()" class="w-9 h-9 bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 rounded-xl transition-all flex items-center justify-center">
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
 
-        <form id="addNasForm" class="space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form id="addNasForm" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-                        <i data-lucide="network" class="w-4 h-4 text-blue-500 inline mr-1.5"></i>
-                        NAS Name/IP *
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        <i data-lucide="network" class="w-3.5 h-3.5 text-blue-500 inline mr-1"></i>
+                        IP Address Router *
                     </label>
                     <input type="text" name="nasname" required 
-                           class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all" 
-                           placeholder="192.168.1.1">
+                           class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-800 dark:text-white transition-all font-mono" 
+                           placeholder="10.177.177.2">
                 </div>
-                
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-                        <i data-lucide="tag" class="w-4 h-4 text-green-500 inline mr-1.5"></i>
-                        Short Name *
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        <i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-500 inline mr-1"></i>
+                        Short Name (Nama Alias) *
                     </label>
                     <input type="text" name="shortname" required 
-                           class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all" 
-                           placeholder="mikrotik-1">
+                           class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-800 dark:text-white transition-all" 
+                           placeholder="RB5009-Core">
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-                        <i data-lucide="settings" class="w-4 h-4 text-purple-500 inline mr-1.5"></i>
-                        Device Type
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-500 inline mr-1"></i>
+                        Tipe Perangkat
                     </label>
                     <select name="type" 
-                            class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all">
-                        <option value="other">Other</option>
-                        <option value="mikrotik">MikroTik</option>
-                        <option value="cisco">Cisco</option>
-                        <option value="linux">Linux</option>
+                            class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-800 dark:text-white transition-all">
+                        <option value="mikrotik" selected>MikroTik RouterOS</option>
+                        <option value="cisco">Cisco IOS</option>
+                        <option value="linux">Linux Server</option>
+                        <option value="other">Vendor Lain (Other)</option>
                     </select>
                 </div>
-                
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-                        <i data-lucide="ethernet-port" class="w-4 h-4 text-orange-500 inline mr-1.5"></i>
-                        RADIUS Port
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        <i data-lucide="ethernet-port" class="w-3.5 h-3.5 text-amber-500 inline mr-1"></i>
+                        Port RADIUS Auth
                     </label>
                     <input type="number" name="ports" value="1812" 
-                           class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all">
+                           class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-800 dark:text-white transition-all">
                 </div>
             </div>
             
             <div>
-                <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-                    <i data-lucide="key" class="w-4 h-4 text-red-500 inline mr-1.5"></i>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    <i data-lucide="key" class="w-3.5 h-3.5 text-rose-500 inline mr-1"></i>
                     Shared Secret *
                 </label>
-                <input type="text" name="secret" required 
-                       class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all" 
-                       placeholder="testing123">
-                <p class="text-xs text-gray-500 dark:text-slate-400 mt-2 flex items-center gap-1">
-                    <i data-lucide="info" class="w-3.5 h-3.5 inline"></i>
-                    This must match the secret configured on your NAS device
-                </p>
+                <div class="relative">
+                    <input type="text" name="secret" required 
+                           class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-xs font-mono text-slate-800 dark:text-white transition-all" 
+                           placeholder="radiussecret">
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Harus sama persis dengan yang diatur di menu <code>/radius</code> pada router.</p>
             </div>
 
             <div>
-                <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2">
-                    <i data-lucide="message-square" class="w-4 h-4 text-indigo-500 inline mr-1.5"></i>
-                    Description (Optional)
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    <i data-lucide="message-square" class="w-3.5 h-3.5 text-indigo-500 inline mr-1"></i>
+                    Deskripsi / Lokasi (Opsional)
                 </label>
                 <input type="text" name="description" 
-                       class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all" 
-                       placeholder="Main Router - Office Building">
+                       class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-xs font-medium text-slate-800 dark:text-white transition-all" 
+                       placeholder="Router Gateway OLT Area Timur">
             </div>
 
-            <div class="flex space-x-4 pt-6 border-t-2 border-gray-200 dark:border-slate-700">
+            <div class="flex space-x-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button type="button" onclick="closeAddNasModal()" 
-                        class="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-all font-semibold flex items-center justify-center gap-2">
-                    <i data-lucide="x" class="w-4 h-4"></i>Cancel
+                        class="flex-1 px-4 py-2.5 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all">
+                    Batal
                 </button>
                 <button type="submit" 
-                        class="flex-1 text-white px-6 py-3 rounded-xl transition-all font-semibold shadow-lg flex items-center justify-center gap-2" style="background:linear-gradient(to right,#667eea,#764ba2);">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i>Add NAS Device
+                        class="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all">
+                    Simpan Perangkat
                 </button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Delete NAS Confirm Modal -->
-<div id="deleteNasModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
-    <div class="modern-card rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-white/20 dark:border-slate-800">
-        <div class="flex items-center mb-4">
-            <div class="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center mr-4 shadow-lg">
-                <i data-lucide="trash-2" class="w-6 h-6 text-white"></i>
-            </div>
-            <h3 class="text-xl font-bold text-gray-800 dark:text-white">Delete NAS</h3>
-        </div>
-        <p class="text-gray-600 dark:text-gray-300 mb-6">Hapus NAS <strong id="deleteNasName" class="text-red-600"></strong>? Tindakan ini tidak dapat dibatalkan.</p>
-        <div class="flex space-x-3">
-            <button onclick="closeDeleteNasModal()" class="flex-1 px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-xl font-semibold transition-all">Batal</button>
-            <button onclick="confirmDeleteNas()" class="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-semibold transition-all">Hapus</button>
-        </div>
-    </div>
-</div>
-
-<!-- Edit NAS Modal -->
-<div id="editNasModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50">
-    <div class="modern-card rounded-3xl shadow-2xl p-8 w-full max-w-2xl mx-4 border-2 border-white/20 dark:border-slate-850">
+<!-- ===== MODAL: EDIT NAS ===== -->
+<div id="editNasModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 sm:p-8 w-full max-w-xl border border-slate-200 dark:border-slate-800">
         <div class="flex justify-between items-center mb-6">
             <div class="flex items-center">
-                <div class="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center mr-3 shadow-md">
-                    <i data-lucide="edit" class="w-6 h-6 text-white"></i>
+                <div class="w-11 h-11 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mr-3 shadow-md">
+                    <i data-lucide="edit" class="w-5 h-5 text-white"></i>
                 </div>
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-white">Edit NAS Device</h3>
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white">Edit Perangkat NAS</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Perbarui informasi konfigurasi router gateway</p>
+                </div>
             </div>
-            <button onclick="closeEditNasModal()" class="w-10 h-10 bg-gray-100 dark:bg-slate-800 hover:bg-red-100 dark:hover:bg-red-950/40 text-gray-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all duration-200 flex items-center justify-center">
-                <i data-lucide="x" class="w-5 h-5"></i>
+            <button onclick="closeEditNasModal()" class="w-9 h-9 bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 rounded-xl transition-all flex items-center justify-center">
+                <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
-        <form id="editNasForm" class="space-y-6">
+
+        <form id="editNasForm" class="space-y-4">
             <input type="hidden" id="editNasId">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2"><i data-lucide="network" class="w-4 h-4 text-blue-500 inline mr-1.5"></i>NAS Name/IP *</label>
-                    <input type="text" id="editNasName" required class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">IP Address Router *</label>
+                    <input type="text" id="editNasName" required class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 text-xs font-medium text-slate-800 dark:text-white transition-all font-mono">
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2"><i data-lucide="tag" class="w-4 h-4 text-green-500 inline mr-1.5"></i>Short Name *</label>
-                    <input type="text" id="editShortname" required class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Short Name *</label>
+                    <input type="text" id="editShortname" required class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 text-xs font-medium text-slate-800 dark:text-white transition-all">
                 </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2"><i data-lucide="settings" class="w-4 h-4 text-purple-500 inline mr-1.5"></i>Device Type</label>
-                    <select id="editType" class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all">
-                        <option value="other">Other</option>
-                        <option value="mikrotik">MikroTik</option>
-                        <option value="cisco">Cisco</option>
-                        <option value="linux">Linux</option>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Tipe Perangkat</label>
+                    <select id="editType" class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 text-xs font-medium text-slate-800 dark:text-white transition-all">
+                        <option value="mikrotik">MikroTik RouterOS</option>
+                        <option value="cisco">Cisco IOS</option>
+                        <option value="linux">Linux Server</option>
+                        <option value="other">Vendor Lain (Other)</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2"><i data-lucide="ethernet-port" class="w-4 h-4 text-orange-500 inline mr-1.5"></i>RADIUS Port</label>
-                    <input type="number" id="editPorts" class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all">
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Port RADIUS Auth</label>
+                    <input type="number" id="editPorts" class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 text-xs font-medium text-slate-800 dark:text-white transition-all">
                 </div>
             </div>
+
             <div>
-                <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2"><i data-lucide="key" class="w-4 h-4 text-red-500 inline mr-1.5"></i>Shared Secret *</label>
-                <input type="text" id="editSecret" required class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Shared Secret *</label>
+                <input type="text" id="editSecret" required class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 text-xs font-mono text-slate-800 dark:text-white transition-all">
             </div>
+
             <div>
-                <label class="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-2"><i data-lucide="message-square" class="w-4 h-4 text-indigo-500 inline mr-1.5"></i>Description</label>
-                <input type="text" id="editDescription" class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-transparent text-gray-800 dark:text-white font-medium transition-all">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Deskripsi</label>
+                <input type="text" id="editDescription" class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 text-xs font-medium text-slate-800 dark:text-white transition-all">
             </div>
-            <div class="flex space-x-4 pt-6 border-t-2 border-gray-200 dark:border-slate-700">
-                <button type="button" onclick="closeEditNasModal()" class="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-all font-semibold flex items-center justify-center gap-2">
-                    <i data-lucide="x" class="w-4 h-4"></i>Cancel
+
+            <div class="flex space-x-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button type="button" onclick="closeEditNasModal()" class="flex-1 px-4 py-2.5 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all">
+                    Batal
                 </button>
-                <button type="submit" class="flex-1 text-white px-6 py-3 rounded-xl transition-all font-semibold shadow-lg flex items-center justify-center gap-2" style="background:linear-gradient(to right,#f59e0b,#ef4444);">
-                    <i data-lucide="save" class="w-4 h-4"></i>Save Changes
+                <button type="submit" class="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all">
+                    Simpan Perubahan
                 </button>
             </div>
         </form>
     </div>
 </div>
-<!-- NAS Detail Slide-over Panel (Drawer) -->
+
+<!-- ===== MODAL: DELETE NAS ===== -->
+<div id="deleteNasModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800">
+        <div class="flex items-center mb-4">
+            <div class="w-11 h-11 bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl flex items-center justify-center mr-3 shadow-md">
+                <i data-lucide="trash-2" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-slate-800 dark:text-white">Hapus Perangkat NAS</h3>
+                <p class="text-xs text-slate-400">Konfirmasi tindakan</p>
+            </div>
+        </div>
+        <p class="text-xs text-slate-600 dark:text-slate-300 mb-5 leading-relaxed">
+            Hapus perangkat NAS <strong id="deleteNasName" class="text-rose-600 font-mono"></strong>? Tindakan ini akan mencabut izin autentikasi router tersebut ke RADIUS.
+        </p>
+        <div class="flex space-x-3">
+            <button onclick="closeDeleteNasModal()" class="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all">
+                Batal
+            </button>
+            <button onclick="confirmDeleteNas()" class="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md transition-all">
+                Ya, Hapus
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODAL: MIKROTIK SCRIPT GENERATOR ===== -->
+<div id="scriptNasModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 sm:p-7 w-full max-w-2xl border border-slate-200 dark:border-slate-800">
+        <div class="flex justify-between items-center mb-5">
+            <div class="flex items-center">
+                <div class="w-11 h-11 icon-gradient-script rounded-2xl flex items-center justify-center mr-3 shadow-md">
+                    <i data-lucide="terminal" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white">Skrip Setup MikroTik CLI</h3>
+                    <p class="text-xs text-slate-400 mt-0.5" id="scriptNasTitle">Salin perintah otomatis untuk WinBox Terminal</p>
+                </div>
+            </div>
+            <button onclick="closeScriptModal()" class="w-9 h-9 bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 rounded-xl transition-all flex items-center justify-center">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs">
+                <div class="flex flex-wrap items-center gap-3">
+                    <label class="font-bold text-slate-600 dark:text-slate-400">IP Server RADIUS:</label>
+                    <input type="text" id="scriptRadiusServerIp" oninput="generateMikrotikScript()" 
+                           class="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-800 dark:text-white w-44" 
+                           value="100.204.0.53">
+                    <span class="text-[10px] text-slate-400">Gunakan IP server yang dapat dijangkau oleh router.</span>
+                </div>
+            </div>
+
+            <div class="relative">
+                <div class="flex items-center justify-between bg-slate-900 text-slate-300 px-4 py-2 rounded-t-2xl text-[11px] font-mono border-b border-slate-800">
+                    <span class="flex items-center gap-1.5"><i data-lucide="terminal" class="w-3.5 h-3.5 text-emerald-400"></i>MikroTik RouterOS CLI</span>
+                    <button onclick="copyGeneratedScript()" class="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-bold">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i> Salin Semua
+                    </button>
+                </div>
+                <pre id="mikrotikScriptOutput" class="bg-slate-950 text-emerald-400 p-4 rounded-b-2xl font-mono text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed border border-slate-800" style="max-height: 280px;"></pre>
+            </div>
+
+            <div class="bg-blue-50 dark:bg-blue-950/30 p-3.5 rounded-2xl border border-blue-100 dark:border-blue-900/40 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2.5">
+                <i data-lucide="info" class="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500"></i>
+                <div class="leading-relaxed text-[11px]">
+                    <strong>Petunjuk:</strong> Buka <b>Terminal</b> di WinBox atau SSH ke router Anda, lalu paste skrip di atas. Skrip otomatis mendaftarkan server RADIUS, mengaktifkan RADIUS Incoming (CoA port 3799 untuk disconnect otomatis), serta mengaktifkan accounting interval 5 menit.
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="closeScriptModal()" class="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== SLIDE-OVER DETAIL DRAWER ===== -->
 <div id="nasDetailOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 hidden transition-opacity duration-300 ease-in-out opacity-0" onclick="closeNasDetailDrawer()"></div>
 
-<div id="nasDetailDrawer" class="fixed inset-y-0 right-0 w-full max-w-md bg-white dark:bg-slate-900 shadow-2xl z-50 transform translate-x-full hidden transition-transform duration-300 ease-in-out border-l border-slate-200 dark:border-slate-800 flex flex-col">
-    <!-- Header -->
-    <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+<div id="nasDetailDrawer" class="fixed inset-y-0 right-0 w-full max-w-lg bg-white dark:bg-slate-900 shadow-2xl z-50 transform translate-x-full hidden transition-transform duration-300 ease-in-out border-l border-slate-200 dark:border-slate-800 flex flex-col">
+    <!-- Header Drawer -->
+    <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <div class="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                 <i data-lucide="server" class="w-5 h-5"></i>
             </div>
             <div>
-                <h3 class="text-lg font-extrabold text-slate-800 dark:text-white font-outfit">Detail Perangkat</h3>
-                <p class="text-[11px] text-slate-400 dark:text-slate-500 font-medium">Informasi lengkap konfigurasi NAS</p>
+                <h3 class="text-base font-extrabold text-slate-800 dark:text-white font-outfit" id="drawer-nasname-title">Detail Perangkat</h3>
+                <p class="text-[11px] text-slate-400 font-medium" id="drawer-nas-subtitle">Informasi lengkap konfigurasi NAS</p>
             </div>
         </div>
-        <button onclick="closeNasDetailDrawer()" class="w-9 h-9 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-xl transition-all duration-200 flex items-center justify-center">
+        <button onclick="closeNasDetailDrawer()" class="w-8 h-8 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 rounded-xl transition-all flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
         </button>
     </div>
 
-    <!-- Body -->
-    <div class="flex-1 overflow-y-auto p-6 space-y-6">
-        <!-- Status Indicator Card -->
-        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <div class="flex flex-col">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Perangkat</span>
-                <span class="text-sm font-bold text-slate-700 dark:text-slate-300 mt-1 font-outfit" id="drawer-nasname-title">192.168.1.1</span>
-                <span class="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5" id="drawer-status-time"></span>
-            </div>
-            <div id="drawer-status-badge">
-                <!-- Status badge dynamic -->
-            </div>
-        </div>
+    <!-- Drawer Tabs Navigation -->
+    <div class="flex border-b border-slate-200 dark:border-slate-800 px-5 pt-3 bg-white dark:bg-slate-900 gap-4 text-xs font-bold">
+        <button onclick="switchDrawerTab('overview')" id="tab-drawer-overview" class="pb-2.5 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 flex items-center gap-1.5">
+            <i data-lucide="info" class="w-3.5 h-3.5"></i> Ringkasan
+        </button>
+        <button onclick="switchDrawerTab('consumers')" id="tab-drawer-consumers" class="pb-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 flex items-center gap-1.5">
+            <i data-lucide="flame" class="w-3.5 h-3.5"></i> Top Konsumen
+        </button>
+        <button onclick="switchDrawerTab('script')" id="tab-drawer-script" class="pb-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 flex items-center gap-1.5">
+            <i data-lucide="terminal" class="w-3.5 h-3.5"></i> Skrip RouterOS
+        </button>
+    </div>
 
-        <!-- Detail Fields -->
-        <div class="space-y-4">
-            <!-- Shortname -->
-            <div class="flex flex-col bg-slate-50/50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center"><i data-lucide="tag" class="w-3.5 h-3.5 text-blue-500 mr-1.5 inline"></i>Short Name</span>
-                <span class="text-sm font-extrabold text-slate-700 dark:text-slate-200 mt-1" id="drawer-shortname">-</span>
-            </div>
-
-            <!-- Device ID -->
-            <div class="flex flex-col bg-slate-50/50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center"><i data-lucide="fingerprint" class="w-3.5 h-3.5 text-orange-500 mr-1.5 inline"></i>Device ID</span>
-                <span class="text-sm font-mono font-extrabold text-blue-600 dark:text-blue-400 mt-1" id="drawer-id">-</span>
-            </div>
-
-            <!-- Vendor Type -->
-            <div class="flex flex-col bg-slate-50/50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center"><i data-lucide="tag" class="w-3.5 h-3.5 text-purple-500 mr-1.5 inline"></i>Tipe Vendor</span>
-                <span class="text-sm font-extrabold text-slate-700 dark:text-slate-200 mt-1 capitalize" id="drawer-type">-</span>
+    <!-- Body Drawer -->
+    <div class="flex-1 overflow-y-auto p-5 space-y-5">
+        <!-- TAB 1: OVERVIEW -->
+        <div id="drawer-panel-overview" class="space-y-4">
+            <!-- Status Card -->
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div class="flex flex-col">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Koneksi</span>
+                    <span class="text-sm font-extrabold text-slate-800 dark:text-white mt-0.5 font-outfit" id="drawer-status-summary">Online</span>
+                    <span class="text-[10px] text-slate-400 mt-0.5" id="drawer-status-time">-</span>
+                </div>
+                <div id="drawer-status-badge"></div>
             </div>
 
-            <!-- RADIUS Port -->
-            <div class="flex flex-col bg-slate-50/50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center"><i data-lucide="ethernet-port" class="w-3.5 h-3.5 text-green-500 mr-1.5 inline"></i>RADIUS Port</span>
-                <span class="text-sm font-extrabold text-slate-700 dark:text-slate-200 mt-1" id="drawer-port">1812</span>
+            <!-- Metrics Grid -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <i data-lucide="activity" class="w-3 h-3 text-emerald-500"></i> Ping Latency
+                    </span>
+                    <span class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 mt-1 font-mono" id="drawer-latency">-- ms</span>
+                </div>
+                <div class="bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <i data-lucide="users" class="w-3 h-3 text-blue-500"></i> Sesi Aktif
+                    </span>
+                    <span class="text-sm font-extrabold text-blue-600 dark:text-blue-400 mt-1" id="drawer-sessions">0 Sesi</span>
+                </div>
             </div>
 
-            <!-- RADIUS Secret -->
-            <div class="flex flex-col bg-slate-50/50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center"><i data-lucide="key" class="w-3.5 h-3.5 text-red-500 mr-1.5 inline"></i>RADIUS Shared Secret</span>
-                <div class="flex items-center justify-between mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-xl">
-                    <code class="text-blue-600 dark:text-blue-400 font-mono text-sm truncate" id="drawer-secret">••••••••</code>
-                    <div class="flex items-center gap-1">
-                        <button id="btn-reveal-drawer-secret" class="p-1.5 text-slate-400 hover:text-blue-600 transition-colors" title="Lihat/Sembunyikan Secret">
-                            <i data-lucide="eye" class="w-4 h-4"></i>
-                        </button>
-                        <button id="btn-copy-drawer-secret" class="p-1.5 text-slate-400 hover:text-green-600 transition-colors" title="Salin Secret">
-                            <i data-lucide="copy" class="w-4 h-4"></i>
-                        </button>
+            <!-- Bandwidth Details -->
+            <div class="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                    <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-purple-500"></i> Total Akumulasi Kuota Sesi
+                </span>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-slate-400">Download (In/Rx):</span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200 mt-0.5" id="drawer-rx">0 B</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-slate-400">Upload (Out/Tx):</span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200 mt-0.5" id="drawer-tx">0 B</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Description -->
-            <div class="flex flex-col bg-slate-50/50 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center"><i data-lucide="info" class="w-3.5 h-3.5 text-teal-500 mr-1.5 inline"></i>Deskripsi / Info</span>
-                <span class="text-sm text-slate-700 dark:text-slate-300 mt-1 font-medium leading-relaxed" id="drawer-description">-</span>
+            <!-- Configuration Fields -->
+            <div class="space-y-3">
+                <div class="flex flex-col bg-slate-50/60 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Short Name & Tipe</span>
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="font-bold text-slate-800 dark:text-white" id="drawer-shortname">-</span>
+                        <span class="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-bold capitalize text-[10px]" id="drawer-type">-</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col bg-slate-50/60 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Port Konfigurasi</span>
+                    <div class="flex items-center justify-between mt-1 text-slate-700 dark:text-slate-300 font-mono">
+                        <span>Auth Port: <strong id="drawer-port">1812</strong></span>
+                        <span>CoA Port: <strong>3799</strong></span>
+                    </div>
+                </div>
+
+                <!-- RADIUS Secret -->
+                <div class="flex flex-col bg-slate-50/60 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">RADIUS Shared Secret</span>
+                    <div class="flex items-center justify-between mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl">
+                        <code class="text-blue-600 dark:text-blue-400 font-mono text-xs truncate" id="drawer-secret">••••••••</code>
+                        <div class="flex items-center gap-1">
+                            <button id="btn-reveal-drawer-secret" class="p-1 text-slate-400 hover:text-blue-600" title="Lihat/Sembunyikan">
+                                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button id="btn-copy-drawer-secret" class="p-1 text-slate-400 hover:text-emerald-600" title="Salin Secret">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col bg-slate-50/60 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Deskripsi</span>
+                    <span class="text-slate-600 dark:text-slate-400 mt-1 font-medium" id="drawer-description">-</span>
+                </div>
+            </div>
+
+            <!-- Drawer Quick Actions -->
+            <div class="pt-2 flex gap-2">
+                <button id="drawer-btn-ping" class="flex-1 py-2.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 hover:text-white border border-emerald-200 dark:border-emerald-800/40 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5">
+                    <i data-lucide="plug" class="w-3.5 h-3.5"></i> Uji Ping
+                </button>
+                <button id="drawer-btn-sessions" class="flex-1 py-2.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-600 text-blue-600 dark:text-blue-400 hover:text-white border border-blue-200 dark:border-blue-800/40 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5">
+                    <i data-lucide="users" class="w-3.5 h-3.5"></i> Lihat Sesi
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 2: TOP CONSUMERS -->
+        <div id="drawer-panel-consumers" class="hidden space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-300">Top 5 Pengguna Terberat</span>
+                <span class="text-[10px] text-slate-400">Berdasarkan total kuota Rx+Tx</span>
+            </div>
+            <div id="drawer-consumers-list" class="space-y-2.5">
+                <div class="text-center py-8 text-slate-400 text-xs">Memuat data pengguna...</div>
+            </div>
+        </div>
+
+        <!-- TAB 3: SCRIPT ROUTEROS -->
+        <div id="drawer-panel-script" class="hidden space-y-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+                Skrip konfigurasi cepat untuk router MikroTik ini:
+            </div>
+            <div class="relative">
+                <button onclick="copyDrawerScript()" class="absolute top-2.5 right-2.5 bg-slate-800 hover:bg-slate-700 text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+                    <i data-lucide="copy" class="w-3 h-3"></i> Salin
+                </button>
+                <pre id="drawer-script-code" class="bg-slate-950 text-emerald-400 p-3.5 pt-8 rounded-2xl font-mono text-[11px] overflow-x-auto whitespace-pre-wrap leading-relaxed border border-slate-800"></pre>
             </div>
         </div>
     </div>
@@ -562,134 +775,27 @@
 <script>
     let allNasData = [];
     let currentFilter = 'all';
+    let currentView = localStorage.getItem('nas_dashboard_view') || 'cards';
     let nasStatusCache = {};
 
-    // Sorting & Pagination state
-    let currentPage = 1;
-    const pageSize = 10;
-    let sortBy = 'id';
-    let sortOrder = 'asc';
+    // Charts instances
+    let sessionChartInstance = null;
+    let latencyChartInstance = null;
 
-    function toggleSecret(id, secret) {
-        const el = document.getElementById('secret-' + id);
-        if (el) {
-            if (el.textContent === '••••••••') {
-                el.textContent = secret;
-            } else {
-                el.textContent = '••••••••';
-            }
-        }
+    // Auto-refresh state
+    let isAutoRefresh = false;
+    let autoRefreshTimer = null;
+
+    // Helper: format bytes
+    function fmtBytes(b) {
+        if (!b || b === 0) return '0 B';
+        const k = 1024;
+        const s = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(b) / Math.log(k));
+        return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
     }
 
-    function copySecret(secret) {
-        if (!navigator.clipboard) {
-            const textArea = document.createElement("textarea");
-            textArea.value = secret;
-            textArea.style.position = "fixed";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                showNotification('Secret disalin ke clipboard', 'success');
-            } catch (err) {
-                showNotification('Gagal menyalin secret', 'error');
-            }
-            document.body.removeChild(textArea);
-            return;
-        }
-        navigator.clipboard.writeText(secret).then(function() {
-            showNotification('Secret disalin ke clipboard', 'success');
-        }, function(err) {
-            showNotification('Gagal menyalin secret: ' + err, 'error');
-        });
-    }
-
-    function filterNASDevices() {
-        currentPage = 1; // Reset to page 1 on search
-        renderNAS();
-    }
-
-    function setFilter(filterType) {
-        currentFilter = filterType;
-        
-        ['all', 'online', 'offline', 'mikrotik'].forEach(type => {
-            const btn = document.getElementById('btn-filter-' + type);
-            if (btn) {
-                if (type === filterType) {
-                    btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-blue-600 text-white shadow-md shadow-blue-500/10 border border-transparent';
-                } else {
-                    btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700';
-                }
-            }
-        });
-        
-        currentPage = 1; // Reset to page 1 on filter change
-        renderNAS();
-    }
-
-    function updateStatsCounters() {
-        const totalEl = document.getElementById('stat-total-nas');
-        if (totalEl) totalEl.innerText = allNasData.length;
-        
-        let online = 0;
-        let offline = 0;
-        allNasData.forEach(nas => {
-            const cacheVal = nasStatusCache[nas.id];
-            const status = cacheVal && typeof cacheVal === 'object' ? cacheVal.status : (cacheVal || 'unknown');
-            if (status === 'online') online++;
-            else if (status === 'offline') offline++;
-        });
-        
-        const onlineEl = document.getElementById('stat-online-nas');
-        if (onlineEl) onlineEl.innerText = online;
-        
-        const offlineEl = document.getElementById('stat-offline-nas');
-        if (offlineEl) {
-            offlineEl.innerText = offline;
-            
-            const offlineCard = document.getElementById('offline-card-wrapper');
-            const offlineIcon = document.getElementById('offline-icon-wrapper');
-            const offlineBadge = document.getElementById('offline-badge');
-            const offlineGlow = document.getElementById('offline-glow');
-            
-            if (offline > 0) {
-                if (offlineCard) {
-                    offlineCard.className = "bg-white dark:bg-slate-800 border border-rose-300 dark:border-rose-900 rounded-3xl p-6 stat-card-glow group relative overflow-hidden transition-all duration-300 shadow-lg shadow-rose-500/5";
-                }
-                if (offlineGlow) {
-                    offlineGlow.className = "absolute -right-6 -bottom-6 w-28 h-28 bg-rose-500/10 dark:bg-rose-500/20 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500";
-                }
-                if (offlineIcon) {
-                    offlineIcon.className = "w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-rose-500/10 to-red-500/5 dark:from-rose-500/20 dark:to-red-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 dark:border-rose-500/40 group-hover:scale-110 transition-all duration-300 shadow-sm shadow-rose-500/5 floating-icon";
-                }
-                if (offlineBadge) {
-                    offlineBadge.className = "flex items-center space-x-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/50";
-                    offlineBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500 pulse-dot-offline"></span><span>ATTENTION</span>`;
-                }
-                offlineEl.className = "text-3xl font-extrabold text-red-600 dark:text-red-400 tracking-tight font-outfit transition-all duration-300";
-            } else {
-                if (offlineCard) {
-                    offlineCard.className = "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 stat-card-glow group relative overflow-hidden transition-all duration-300";
-                }
-                if (offlineGlow) {
-                    offlineGlow.className = "absolute -right-6 -bottom-6 w-28 h-28 bg-slate-500/5 dark:bg-slate-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500";
-                }
-                if (offlineIcon) {
-                    offlineIcon.className = "w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-slate-500/10 to-slate-500/5 dark:from-slate-500/20 dark:to-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/10 dark:border-slate-500/20 group-hover:scale-110 transition-all duration-300 shadow-sm shadow-slate-500/5 floating-icon";
-                }
-                if (offlineBadge) {
-                    offlineBadge.className = "text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600/30";
-                    offlineBadge.innerHTML = `STANDBY`;
-                }
-                offlineEl.className = "text-3xl font-extrabold text-slate-500 dark:text-slate-400 tracking-tight font-outfit transition-all duration-300";
-            }
-        }
-        
-        // Update Visual Charts if initialized
-        updateCharts(online, offline);
-    }
-
+    // Helper: format relative time
     function formatTimeAgo(isoString) {
         if (!isoString) return '';
         try {
@@ -702,161 +808,84 @@
             const diffHours = Math.floor(diffMins / 60);
             if (diffHours < 24) return `${diffHours}j lalu`;
             const diffDays = Math.floor(diffHours / 24);
-            return `${diffDays} hari lalu`;
+            return `${diffDays}h lalu`;
         } catch (e) {
             return '';
         }
     }
 
-    function updateSingleNasStatusElements(nasId, status, lastSeen, onlineSince) {
-        const badge = document.getElementById('status-badge-' + nasId);
-        const dot = document.getElementById('status-dot-' + nasId);
-        const td = document.getElementById('nas-status-td-' + nasId);
-        const subtext = document.getElementById('status-time-subtext-' + nasId);
-        const isOnline = status === 'online';
-        
-        if (badge) {
-            badge.className = `text-[10px] font-extrabold px-2.5 py-1 rounded-full flex-shrink-0 ${isOnline ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/10'} flex items-center shadow-sm w-fit`;
-            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full mr-1.5 ${isOnline ? 'bg-emerald-500 pulse-dot-online' : 'bg-rose-500 pulse-dot-offline'}"></span>${isOnline ? 'Online' : 'Offline'}`;
-        }
-        
-        if (dot) {
-            dot.className = `absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-800 ${isOnline ? 'bg-emerald-500 pulse-dot-online' : 'bg-rose-500 pulse-dot-offline'}`;
-            dot.title = isOnline ? 'Online' : 'Offline';
-        }
-        
-        if (td) {
-            td.className = `py-4 px-4 border-l-4 ${isOnline ? 'border-l-emerald-500' : 'border-l-rose-500'} transition-all duration-300`;
-        }
+    // Switch view mode (cards vs table)
+    function switchView(view) {
+        currentView = view;
+        localStorage.setItem('nas_dashboard_view', view);
 
-        if (subtext) {
-            if (isOnline) {
-                subtext.innerText = onlineSince ? `Online sejak ${formatTimeAgo(onlineSince)}` : 'Online / Active';
+        const btnCards = document.getElementById('btn-view-cards');
+        const btnTable = document.getElementById('btn-view-table');
+        if (btnCards && btnTable) {
+            if (view === 'cards') {
+                btnCards.className = 'view-btn active px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all';
+                btnTable.className = 'view-btn px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-400';
             } else {
-                subtext.innerText = lastSeen ? `Last seen ${formatTimeAgo(lastSeen)}` : 'Offline / Inactive';
+                btnTable.className = 'view-btn active px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all';
+                btnCards.className = 'view-btn px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-400';
             }
         }
-    }
-
-    function handleSort(field) {
-        if (sortBy === field) {
-            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-        } else {
-            sortBy = field;
-            sortOrder = 'asc';
-        }
-        currentPage = 1;
         renderNAS();
     }
 
-    function changePage(p) {
-        currentPage = p;
+    // Set filter
+    function setFilter(filterType) {
+        currentFilter = filterType;
+        ['all', 'online', 'offline', 'mikrotik'].forEach(type => {
+            const btn = document.getElementById('btn-filter-' + type);
+            if (btn) {
+                if (type === filterType) {
+                    btn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-blue-600 text-white shadow-sm';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+                }
+            }
+        });
         renderNAS();
     }
 
-    function handleRowClick(event, nasId) {
-        if (event.target.closest('button') || event.target.closest('a') || event.target.closest('code') || window.getSelection().toString()) {
+    function filterNASDevices() {
+        renderNAS();
+    }
+
+    // Copy secret or script to clipboard
+    function copyText(text, label = 'Teks') {
+        if (!navigator.clipboard) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showNotification(`${label} disalin ke clipboard`, 'success');
+            } catch (err) {
+                showNotification('Gagal menyalin', 'error');
+            }
+            document.body.removeChild(textArea);
             return;
         }
-        openNasDetailDrawer(nasId);
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification(`${label} disalin ke clipboard`, 'success');
+        }).catch(() => {
+            showNotification('Gagal menyalin', 'error');
+        });
     }
 
-    let drawerActiveNas = null;
-
-    function openNasDetailDrawer(nasId) {
-        const nas = allNasData.find(n => n.id === nasId);
-        if (!nas) return;
-        
-        drawerActiveNas = nas;
-        
-        document.getElementById('drawer-nasname-title').innerText = nas.nasname;
-        document.getElementById('drawer-shortname').innerText = nas.shortname;
-        document.getElementById('drawer-id').innerText = '#' + nas.id;
-        document.getElementById('drawer-type').innerText = nas.type || 'other';
-        document.getElementById('drawer-port').innerText = nas.ports || '1812';
-        document.getElementById('drawer-description').innerHTML = nas.description ? nas.description : '<span class="text-slate-400 dark:text-slate-600 italic">Tidak ada deskripsi</span>';
-        
-        const secretCode = document.getElementById('drawer-secret');
-        if (secretCode) secretCode.innerText = '••••••••';
-        
-        const statusVal = nasStatusCache[nas.id];
-        const status = statusVal && typeof statusVal === 'object' ? statusVal.status : (statusVal || 'offline');
-        const lastSeen = statusVal && typeof statusVal === 'object' ? statusVal.last_seen : null;
-        const onlineSince = statusVal && typeof statusVal === 'object' ? statusVal.online_since : null;
-        const isOnline = status === 'online';
-
-        const badge = document.getElementById('drawer-status-badge');
-        if (badge) {
-            badge.className = `text-[10px] font-extrabold px-3 py-1.5 rounded-full flex-shrink-0 ${isOnline ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/10'} flex items-center shadow-sm w-fit`;
-            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full mr-1.5 ${isOnline ? 'bg-emerald-500 pulse-dot-online' : 'bg-rose-500 pulse-dot-offline'}"></span>${isOnline ? 'Online' : 'Offline'}`;
-        }
-
-        const drawerTime = document.getElementById('drawer-status-time');
-        if (drawerTime) {
-            if (isOnline) {
-                drawerTime.innerText = onlineSince ? `Online sejak ${formatTimeAgo(onlineSince)}` : 'Online / Active';
-            } else {
-                drawerTime.innerText = lastSeen ? `Last seen ${formatTimeAgo(lastSeen)}` : 'Offline / Inactive';
-            }
-        }
-        
-        const revealBtn = document.getElementById('btn-reveal-drawer-secret');
-        if (revealBtn) {
-            revealBtn.innerHTML = '<i data-lucide="eye" class="w-4 h-4"></i>';
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-            revealBtn.onclick = () => {
-                if (secretCode.innerText === '••••••••') {
-                    secretCode.innerText = nas.secret;
-                    revealBtn.innerHTML = '<i data-lucide="eye-off" class="w-4 h-4"></i>';
-                } else {
-                    secretCode.innerText = '••••••••';
-                    revealBtn.innerHTML = '<i data-lucide="eye" class="w-4 h-4"></i>';
-                }
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-            };
-        }
-        
-        const copyBtn = document.getElementById('btn-copy-drawer-secret');
-        if (copyBtn) {
-            copyBtn.onclick = () => {
-                copySecret(nas.secret);
-            };
-        }
-        
-        const overlay = document.getElementById('nasDetailOverlay');
-        const drawer = document.getElementById('nasDetailDrawer');
-        if (overlay) {
-            overlay.classList.remove('hidden');
-            setTimeout(() => { overlay.classList.add('opacity-100'); }, 10);
-        }
-        if (drawer) {
-            drawer.classList.remove('hidden');
-            setTimeout(() => { drawer.classList.remove('translate-x-full'); }, 10);
-        }
-    }
-
-    function closeNasDetailDrawer() {
-        const overlay = document.getElementById('nasDetailOverlay');
-        const drawer = document.getElementById('nasDetailDrawer');
-        if (overlay) {
-            overlay.classList.remove('opacity-100');
-            setTimeout(() => { overlay.classList.add('hidden'); }, 300);
-        }
-        if (drawer) {
-            drawer.classList.add('translate-x-full');
-            setTimeout(() => { drawer.classList.add('hidden'); }, 300);
-        }
-        drawerActiveNas = null;
-    }
-
+    // Render NAS Devices
     function renderNAS() {
         const queryInput = document.getElementById('nasSearchInput');
         const query = queryInput ? queryInput.value.toLowerCase().trim() : '';
-        const nasList = document.getElementById('nasList');
-        if (!nasList) return;
-        
+        const container = document.getElementById('nasListContainer');
+        if (!container) return;
+
         let filtered = allNasData;
-        
+
         if (query) {
             filtered = filtered.filter(nas => 
                 (nas.nasname && nas.nasname.toLowerCase().includes(query)) || 
@@ -865,67 +894,206 @@
                 (nas.type && nas.type.toLowerCase().includes(query))
             );
         }
-        
+
         if (currentFilter === 'online') {
             filtered = filtered.filter(nas => {
-                const statusVal = nasStatusCache[nas.id];
-                const status = statusVal && typeof statusVal === 'object' ? statusVal.status : (statusVal || 'offline');
+                const c = nasStatusCache[nas.id];
+                const status = (c && typeof c === 'object') ? c.status : (c || nas.status || 'offline');
                 return status === 'online';
             });
         } else if (currentFilter === 'offline') {
             filtered = filtered.filter(nas => {
-                const statusVal = nasStatusCache[nas.id];
-                const status = statusVal && typeof statusVal === 'object' ? statusVal.status : (statusVal || 'offline');
+                const c = nasStatusCache[nas.id];
+                const status = (c && typeof c === 'object') ? c.status : (c || nas.status || 'offline');
                 return status === 'offline';
             });
         } else if (currentFilter === 'mikrotik') {
             filtered = filtered.filter(nas => (nas.type || '').toLowerCase() === 'mikrotik');
         }
 
-        // Sorting logic
-        filtered.sort((a, b) => {
-            let valA, valB;
-            if (sortBy === 'status') {
-                const statusValA = nasStatusCache[a.id];
-                const statusValB = nasStatusCache[b.id];
-                valA = statusValA && typeof statusValA === 'object' ? statusValA.status : (statusValA || 'offline');
-                valB = statusValB && typeof statusValB === 'object' ? statusValB.status : (statusValB || 'offline');
-            } else if (sortBy === 'session_count') {
-                valA = a.session_count || 0;
-                valB = b.session_count || 0;
-            } else {
-                valA = a[sortBy] || '';
-                valB = b[sortBy] || '';
-            }
-
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-        
         if (filtered.length === 0) {
-            nasList.className = 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-16 shadow-sm';
-            nasList.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="w-20 h-20 bg-slate-50 dark:bg-slate-900 rounded-3xl flex items-center justify-center mx-auto mb-5 border border-slate-100 dark:border-slate-800">
-                        <i data-lucide="search-x" class="w-10 h-10 text-slate-400"></i>
+            container.innerHTML = `
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-12 text-center shadow-sm">
+                    <div class="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-400">
+                        <i data-lucide="search-x" class="w-8 h-8"></i>
                     </div>
-                    <h4 class="text-slate-700 dark:text-slate-200 font-extrabold text-lg mb-2 font-outfit">Tidak Ada Hasil Cocok</h4>
-                    <p class="text-slate-400 text-sm max-w-sm mx-auto mb-6">Ubah kata kunci pencarian Anda atau gunakan filter lain untuk menemukan perangkat NAS.</p>
-                    <button onclick="document.getElementById('nasSearchInput').value = ''; setFilter('all');" class="bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-600 text-blue-600 dark:text-blue-400 hover:text-white px-5 py-2.5 rounded-2xl font-bold transition-all text-xs">
-                        Reset Filter & Pencarian
+                    <h4 class="text-slate-800 dark:text-white font-extrabold text-base mb-1 font-outfit">Tidak Ada NAS yang Cocok</h4>
+                    <p class="text-slate-400 text-xs max-w-sm mx-auto mb-4">Silakan ubah kata kunci pencarian Anda atau pilih filter status yang lain.</p>
+                    <button onclick="document.getElementById('nasSearchInput').value = ''; setFilter('all');" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-all">
+                        Reset Filter
                     </button>
                 </div>
             `;
             if (typeof lucide !== 'undefined') lucide.createIcons();
             return;
         }
-        
-        // Paginate logic
-        const start = (currentPage - 1) * pageSize;
-        const paginated = filtered.slice(start, start + pageSize);
 
-        nasList.className = 'space-y-6';
+        if (currentView === 'cards') {
+            renderCardsView(filtered, container);
+        } else {
+            renderTableView(filtered, container);
+        }
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // Render CARDS View
+    function renderCardsView(list, container) {
+        let html = `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">`;
+
+        html += list.map(nas => {
+            const cacheVal = nasStatusCache[nas.id];
+            const status = (cacheVal && typeof cacheVal === 'object') ? cacheVal.status : (cacheVal || nas.status || 'offline');
+            const isOnline = status === 'online';
+            const latency = (cacheVal && typeof cacheVal === 'object' && cacheVal.latency != null) ? cacheVal.latency : nas.latency;
+            const lastSeen = (cacheVal && typeof cacheVal === 'object') ? cacheVal.last_seen : nas.last_seen;
+            const onlineSince = (cacheVal && typeof cacheVal === 'object') ? cacheVal.online_since : nas.online_since;
+
+            // Latency badge format
+            let latencyBadge = `<span class="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-700/50 text-slate-400">Offline</span>`;
+            if (isOnline && latency != null) {
+                let latColor = 'emerald';
+                if (latency > 80) latColor = 'rose';
+                else if (latency > 30) latColor = 'amber';
+                latencyBadge = `
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-${latColor}-50 dark:bg-${latColor}-950/40 text-${latColor}-600 dark:text-${latColor}-400 border border-${latColor}-200/50 dark:border-${latColor}-800/40 flex items-center gap-1">
+                        <i data-lucide="activity" class="w-3 h-3"></i> ${latency.toFixed(1)} ms
+                    </span>
+                `;
+            } else if (isOnline) {
+                latencyBadge = `
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 flex items-center gap-1">
+                        <i data-lucide="check" class="w-3 h-3"></i> Online
+                    </span>
+                `;
+            }
+
+            const totalBytes = (nas.total_in_bytes || 0) + (nas.total_out_bytes || 0);
+            const pppoeCount = nas.pppoe_count || 0;
+            const hotspotCount = nas.hotspot_count || 0;
+            const sessionCount = nas.session_count || 0;
+
+            return `
+            <div class="bg-white dark:bg-slate-800 rounded-3xl border ${isOnline ? 'nas-card-online' : 'nas-card-offline'} p-5 stat-card-glow nas-card-premium flex flex-col justify-between" id="nas-card-${nas.id}">
+                <div>
+                    <!-- Card Header: Device info & Status -->
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
+                                <i data-lucide="server" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h4 class="font-extrabold text-slate-800 dark:text-white text-base tracking-tight font-outfit" title="${nas.nasname}">
+                                        ${nas.shortname || nas.nasname}
+                                    </h4>
+                                    <span class="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 text-[9px] font-mono text-slate-500 font-bold uppercase">
+                                        ${nas.type || 'mikrotik'}
+                                    </span>
+                                </div>
+                                <p class="text-xs font-mono text-slate-400 dark:text-slate-500 mt-0.5 flex items-center gap-1">
+                                    <i data-lucide="network" class="w-3 h-3"></i> ${nas.nasname}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Status & Latency Pills -->
+                        <div class="flex flex-col items-end gap-1">
+                            <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center ${isOnline ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40'}">
+                                <span class="w-1.5 h-1.5 rounded-full mr-1.5 ${isOnline ? 'bg-emerald-500 pulse-dot-online' : 'bg-rose-500 pulse-dot-offline'}"></span>
+                                ${isOnline ? 'ONLINE' : 'OFFLINE'}
+                            </span>
+                            ${latencyBadge}
+                        </div>
+                    </div>
+
+                    <!-- Metrics Section -->
+                    <div class="bg-slate-50/80 dark:bg-slate-900/50 rounded-2xl p-3.5 border border-slate-100 dark:border-slate-800/60 space-y-2.5 my-3">
+                        <!-- Active sessions with progress bar -->
+                        <div>
+                            <div class="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                <span class="flex items-center gap-1 text-[11px] text-slate-500">
+                                    <i data-lucide="users" class="w-3.5 h-3.5 text-blue-500"></i> Beban Sesi
+                                </span>
+                                <span class="text-blue-600 dark:text-blue-400 font-extrabold">${sessionCount} Aktif</span>
+                            </div>
+                            <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-500" style="width: ${Math.min(sessionCount * 2, 100)}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Protocol breakdown pills -->
+                        <div class="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-800/60 text-[10px]">
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold border border-purple-100 dark:border-purple-800/30">
+                                    ${pppoeCount} PPPoE
+                                </span>
+                                <span class="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-bold border border-amber-100 dark:border-amber-800/30">
+                                    ${hotspotCount} Hotspot
+                                </span>
+                            </div>
+                            <span class="font-bold font-mono text-slate-500 dark:text-slate-400" title="Total Kuota Transferred">
+                                📊 ${fmtBytes(totalBytes)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Description / Location -->
+                    ${nas.description ? `
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-3 line-clamp-1 italic">
+                            "${nas.description}"
+                        </p>
+                    ` : '<div class="mb-2"></div>'}
+                </div>
+
+                <!-- Card Footer Actions -->
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-1.5">
+                    <div class="flex items-center gap-1">
+                        <button onclick="testConnection(${nas.id})" id="test-btn-${nas.id}" 
+                                class="p-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-600 text-emerald-600 dark:text-emerald-400 hover:text-white rounded-xl transition-all" 
+                                title="Uji Ping Latency">
+                            <i data-lucide="plug" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <a href="/sessions?nas=${encodeURIComponent(nas.nasname)}" 
+                           class="p-2 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-600 text-blue-600 dark:text-blue-400 hover:text-white rounded-xl transition-all" 
+                           title="Lihat Sesi Aktif di Router Ini">
+                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                        </a>
+                        <button onclick="openScriptModal(${nas.id})" 
+                                class="p-2 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-600 text-purple-600 dark:text-purple-400 hover:text-white rounded-xl transition-all" 
+                                title="Skrip Setup MikroTik CLI">
+                            <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-1">
+                        <button onclick="openEditNasModal(${nas.id})" 
+                                class="p-2 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-600 text-amber-600 dark:text-amber-400 hover:text-white rounded-xl transition-all" 
+                                title="Edit Router">
+                            <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="deleteNAS(${nas.id})" 
+                                class="p-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-600 text-rose-600 dark:text-rose-400 hover:text-white rounded-xl transition-all" 
+                                title="Hapus Router">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="openNasDetailDrawer(${nas.id})" 
+                                class="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1">
+                            <span>Detail</span>
+                            <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            `;
+        }).join('');
+
+        html += `</div>`;
+        container.innerHTML = html;
+    }
+
+    // Render TABLE View
+    function renderTableView(list, container) {
         let html = `
         <div class="overflow-x-auto min-w-full bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-4 shadow-sm">
             <table class="w-full text-left border-collapse align-middle">
@@ -933,223 +1101,348 @@
                     <tr class="border-b border-slate-100 dark:border-slate-700/50 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         <th class="pb-3 pt-1 px-4 font-extrabold">Device / IP</th>
                         <th class="pb-3 pt-1 px-4 font-extrabold">Short Name</th>
-                        <th class="pb-3 pt-1 px-4 font-extrabold cursor-pointer select-none" onclick="handleSort('status')" title="Klik untuk mengurutkan berdasarkan status">
-                            Status ${sortBy === 'status' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
-                        </th>
-                        <th class="pb-3 pt-1 px-4 font-extrabold">Config & Description</th>
-                        <th class="pb-3 pt-1 px-4 font-extrabold cursor-pointer select-none" onclick="handleSort('session_count')" title="Klik untuk mengurutkan berdasarkan beban sesi">
-                            Session Load ${sortBy === 'session_count' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
-                        </th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Status & Latency</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Beban Sesi</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Akumulasi Kuota</th>
+                        <th class="pb-3 pt-1 px-4 font-extrabold">Config</th>
                         <th class="pb-3 pt-1 px-4 font-extrabold text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
         `;
-        
-        html += paginated.map(nas => {
+
+        html += list.map(nas => {
             const cacheVal = nasStatusCache[nas.id];
-            const status = cacheVal && typeof cacheVal === 'object' ? cacheVal.status : (cacheVal || 'offline');
+            const status = (cacheVal && typeof cacheVal === 'object') ? cacheVal.status : (cacheVal || nas.status || 'offline');
             const isOnline = status === 'online';
+            const latency = (cacheVal && typeof cacheVal === 'object' && cacheVal.latency != null) ? cacheVal.latency : nas.latency;
+
+            let latencyHtml = `<span class="text-[10px] font-mono text-slate-400">--</span>`;
+            if (isOnline && latency != null) {
+                let latColor = 'emerald';
+                if (latency > 80) latColor = 'rose';
+                else if (latency > 30) latColor = 'amber';
+                latencyHtml = `<span class="text-[10px] font-mono font-bold text-${latColor}-600 dark:text-${latColor}-400">${latency.toFixed(1)} ms</span>`;
+            }
+
+            const totalBytes = (nas.total_in_bytes || 0) + (nas.total_out_bytes || 0);
+
             return `
             <tr id="nas-row-${nas.id}" class="hover:bg-slate-50/50 dark:hover:bg-slate-700/20 transition-colors cursor-pointer" onclick="handleRowClick(event, ${nas.id})">
-                <td id="nas-status-td-${nas.id}" class="py-4 px-4 border-l-4 ${isOnline ? 'border-l-emerald-500' : 'border-l-rose-500'} transition-all duration-300">
+                <td class="py-3.5 px-4 border-l-4 ${isOnline ? 'border-l-emerald-500' : 'border-l-rose-500'}">
                     <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 bg-gradient-to-tr from-blue-500/10 to-indigo-500/10 text-blue-600 dark:text-blue-400 relative border border-blue-500/15">
+                        <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/30">
                             <i data-lucide="server" class="w-4 h-4"></i>
-                            <span id="status-dot-${nas.id}" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-800 bg-gray-300" title="Checking..."></span>
                         </div>
                         <div class="flex flex-col">
-                            <span class="font-extrabold text-slate-800 dark:text-white text-sm tracking-tight font-outfit" title="${nas.nasname}">${nas.nasname}</span>
-                            <span class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">ID: #${nas.id}</span>
+                            <span class="font-extrabold text-slate-800 dark:text-white text-xs font-mono">${nas.nasname}</span>
+                            <span class="text-[10px] text-slate-400">ID: #${nas.id}</span>
                         </div>
                     </div>
                 </td>
-                <td class="py-4 px-4">
-                    <span class="inline-block bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 text-blue-700 dark:text-blue-400 text-xs font-bold px-2.5 py-1 rounded-xl border border-blue-100/30 dark:border-blue-500/10">${nas.shortname}</span>
+                <td class="py-3.5 px-4">
+                    <span class="font-bold text-slate-800 dark:text-white text-xs">${nas.shortname || '-'}</span>
+                    ${nas.description ? `<p class="text-[10px] text-slate-400 truncate max-w-[150px]">${nas.description}</p>` : ''}
                 </td>
-                <td class="py-4 px-4">
+                <td class="py-3.5 px-4">
                     <div class="flex flex-col gap-0.5">
-                        <span id="status-badge-${nas.id}" class="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-500 flex-shrink-0 flex items-center shadow-sm w-fit">
-                            <span class="inline-block w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-1.5"></span>Checking
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center w-fit ${isOnline ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'}">
+                            <span class="w-1.5 h-1.5 rounded-full mr-1 ${isOnline ? 'bg-emerald-500 pulse-dot-online' : 'bg-rose-500 pulse-dot-offline'}"></span>
+                            ${isOnline ? 'Online' : 'Offline'}
                         </span>
-                        <span id="status-time-subtext-${nas.id}" class="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 ml-1">
-                            ${isOnline ? 'Online / Active' : 'Offline / Inactive'}
-                        </span>
+                        <div class="mt-0.5">${latencyHtml}</div>
                     </div>
                 </td>
-                <td class="py-4 px-4">
-                    <div class="flex flex-col gap-1.5">
-                        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 capitalize">
-                            <i data-lucide="tag" class="w-3.5 h-3.5 text-purple-500"></i>
-                            <span>${nas.type || 'other'}</span>
-                            <span class="text-[10px] text-slate-400 dark:text-slate-500 font-normal">Port: ${nas.ports || '1812'}</span>
-                        </div>
-                        ${nas.description ? `
-                            <span class="inline-block bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 w-fit truncate max-w-[150px]" title="${nas.description}">
-                                ${nas.description}
-                            </span>
-                        ` : ''}
+                <td class="py-3.5 px-4">
+                    <div class="flex flex-col">
+                        <span class="font-bold text-blue-600 dark:text-blue-400 text-xs">${nas.session_count || 0} Sesi</span>
+                        <span class="text-[10px] text-slate-400">${nas.pppoe_count || 0} PPPoE • ${nas.hotspot_count || 0} Hotspot</span>
                     </div>
                 </td>
-                <td class="py-4 px-4">
-                    <div class="flex flex-col w-32">
-                        <div class="flex items-center justify-between text-[11px] mb-1 font-bold text-slate-600 dark:text-slate-400">
-                            <span>${nas.session_count || 0} Sesi</span>
-                        </div>
-                        <div class="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-500" style="width: ${Math.min((nas.session_count || 0) * 2.5, 100)}%"></div>
-                        </div>
+                <td class="py-3.5 px-4 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                    ${fmtBytes(totalBytes)}
+                </td>
+                <td class="py-3.5 px-4">
+                    <div class="text-[10px] text-slate-500">
+                        <span class="font-bold capitalize">${nas.type || 'other'}</span>
+                        <span class="text-slate-400">:${nas.ports || 1812}</span>
                     </div>
                 </td>
-                <td class="py-4 px-4 text-right">
-                    <div class="flex items-center justify-end gap-1.5">
-                        <button onclick="testConnection(${nas.id})"
-                                id="test-btn-${nas.id}"
-                                class="w-9 h-9 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-600 text-blue-600 dark:text-blue-400 hover:text-white rounded-xl flex items-center justify-center transition-all shadow-sm"
-                                title="Test Connection / Ping">
-                            <i data-lucide="plug" class="w-4 h-4"></i>
+                <td class="py-3.5 px-4 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                        <button onclick="testConnection(${nas.id})" id="table-test-btn-${nas.id}" class="w-7 h-7 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded-lg flex items-center justify-center transition-all" title="Ping Test">
+                            <i data-lucide="plug" class="w-3.5 h-3.5"></i>
                         </button>
-                        <button onclick="openEditNasModal(${nas.id})"
-                                class="w-9 h-9 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-500 text-yellow-600 dark:text-yellow-400 hover:text-white rounded-xl flex items-center justify-center transition-all shadow-sm"
-                                title="Edit NAS Device">
-                            <i data-lucide="edit" class="w-4 h-4"></i>
+                        <a href="/sessions?nas=${encodeURIComponent(nas.nasname)}" class="w-7 h-7 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg flex items-center justify-center transition-all" title="Lihat Sesi">
+                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                        </a>
+                        <button onclick="openScriptModal(${nas.id})" class="w-7 h-7 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-600 text-purple-600 hover:text-white rounded-lg flex items-center justify-center transition-all" title="Skrip RouterOS">
+                            <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
                         </button>
-                        <button onclick="deleteNAS(${nas.id})"
-                                class="w-9 h-9 bg-red-50 dark:bg-red-900/20 hover:bg-red-600 text-red-600 dark:text-red-400 hover:text-white rounded-xl flex items-center justify-center transition-all shadow-sm"
-                                title="Delete NAS Device">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        <button onclick="openEditNasModal(${nas.id})" class="w-7 h-7 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-600 text-amber-600 hover:text-white rounded-lg flex items-center justify-center transition-all" title="Edit">
+                            <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button onclick="deleteNAS(${nas.id})" class="w-7 h-7 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg flex items-center justify-center transition-all" title="Hapus">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                         </button>
                     </div>
                 </td>
             </tr>
             `;
         }).join('');
-        
+
         html += `
                 </tbody>
             </table>
         </div>
         `;
+        container.innerHTML = html;
+    }
 
-        // Render pagination controls
-        const totalPages = Math.ceil(filtered.length / pageSize);
-        if (totalPages > 1) {
-            html += `
-            <div class="flex items-center justify-between mt-4 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl">
-                <div class="flex-1 flex justify-between sm:hidden">
-                    <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} class="relative inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-700 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                        Previous
-                    </button>
-                    <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} class="ml-3 relative inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-700 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                        Next
-                    </button>
-                </div>
-                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <div>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">
-                            Menampilkan <span class="font-bold text-slate-700 dark:text-slate-200">${start + 1}</span> sampai <span class="font-bold text-slate-700 dark:text-slate-200">${Math.min(start + pageSize, filtered.length)}</span> dari <span class="font-bold text-slate-700 dark:text-slate-200">${filtered.length}</span> NAS
-                        </p>
-                    </div>
-                    <div>
-                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                            <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} class="relative inline-flex items-center px-3 py-2 rounded-l-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                            </button>
-            `;
-            
-            for (let i = 1; i <= totalPages; i++) {
-                if (i === currentPage) {
-                    html += `
-                            <button class="z-10 bg-blue-600 text-white relative inline-flex items-center px-3.5 py-2 border border-blue-600 text-xs font-extrabold">
-                                ${i}
-                            </button>
-                    `;
-                } else {
-                    html += `
-                            <button onclick="changePage(${i})" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 relative inline-flex items-center px-3.5 py-2 text-xs font-bold">
-                                ${i}
-                            </button>
-                    `;
-                }
-            }
-            
-            html += `
-                            <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} class="relative inline-flex items-center px-3 py-2 rounded-r-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                            </button>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-            `;
+    function handleRowClick(event, nasId) {
+        if (event.target.closest('button') || event.target.closest('a') || window.getSelection().toString()) {
+            return;
         }
-        
-        nasList.innerHTML = html;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        
-        paginated.forEach(nas => {
+        openNasDetailDrawer(nasId);
+    }
+
+    // Update Top Counters & Charts
+    function updateStatsCounters() {
+        const totalEl = document.getElementById('stat-total-nas');
+        if (totalEl) totalEl.innerText = allNasData.length;
+
+        let online = 0;
+        let offline = 0;
+        let totalSessions = 0;
+        let totalBytes = 0;
+        let latencySum = 0;
+        let latencyCount = 0;
+
+        allNasData.forEach(nas => {
             const cacheVal = nasStatusCache[nas.id];
-            if (cacheVal) {
-                const status = typeof cacheVal === 'object' ? cacheVal.status : cacheVal;
-                const lastSeen = typeof cacheVal === 'object' ? cacheVal.last_seen : null;
-                const onlineSince = typeof cacheVal === 'object' ? cacheVal.online_since : null;
-                updateSingleNasStatusElements(nas.id, status, lastSeen, onlineSince);
+            const status = (cacheVal && typeof cacheVal === 'object') ? cacheVal.status : (cacheVal || nas.status || 'offline');
+            const latency = (cacheVal && typeof cacheVal === 'object' && cacheVal.latency != null) ? cacheVal.latency : nas.latency;
+
+            if (status === 'online') {
+                online++;
+                if (latency != null) {
+                    latencySum += latency;
+                    latencyCount++;
+                }
+            } else {
+                offline++;
             }
+
+            totalSessions += (nas.session_count || 0);
+            totalBytes += (nas.total_in_bytes || 0) + (nas.total_out_bytes || 0);
+        });
+
+        const onlineEl = document.getElementById('stat-online-nas');
+        if (onlineEl) onlineEl.innerText = online;
+
+        const offlineEl = document.getElementById('stat-offline-nas');
+        if (offlineEl) offlineEl.innerText = offline;
+
+        const sessionsEl = document.getElementById('noc-total-sessions');
+        if (sessionsEl) sessionsEl.innerText = totalSessions;
+
+        const bwEl = document.getElementById('stat-total-bandwidth');
+        if (bwEl) bwEl.innerHTML = `<i data-lucide="arrow-up-down" class="w-3 h-3 text-purple-500"></i><span>Total Kuota: ${fmtBytes(totalBytes)}</span>`;
+
+        const avgLatEl = document.getElementById('stat-avg-latency');
+        if (avgLatEl) {
+            if (latencyCount > 0) {
+                avgLatEl.innerText = `Avg ping: ${(latencySum / latencyCount).toFixed(1)} ms`;
+            } else {
+                avgLatEl.innerText = `Avg ping: -- ms`;
+            }
+        }
+
+        // Highlight offline card if > 0
+        const offlineCard = document.getElementById('offline-card-wrapper');
+        const offlineBadge = document.getElementById('offline-badge');
+        if (offline > 0) {
+            if (offlineCard) offlineCard.className = "bg-white dark:bg-slate-800 border border-rose-300 dark:border-rose-900 rounded-3xl p-5 stat-card-glow group relative overflow-hidden shadow-lg shadow-rose-500/5";
+            if (offlineBadge) {
+                offlineBadge.className = "flex items-center space-x-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50";
+                offlineBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500 pulse-dot-offline"></span><span>ATTENTION</span>`;
+            }
+            if (offlineEl) offlineEl.className = "text-3xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight font-outfit";
+        } else {
+            if (offlineCard) offlineCard.className = "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-5 stat-card-glow group relative overflow-hidden";
+            if (offlineBadge) {
+                offlineBadge.className = "text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border border-slate-200/50 dark:border-slate-600/30";
+                offlineBadge.innerHTML = `STANDBY`;
+            }
+            if (offlineEl) offlineEl.className = "text-3xl font-extrabold text-slate-500 dark:text-slate-400 tracking-tight font-outfit";
+        }
+
+        updateCharts();
+    }
+
+    // Echarts Initialization
+    function initCharts() {
+        const sessionChartEl = document.getElementById('nasSessionChart');
+        const latencyChartEl = document.getElementById('nasLatencyChart');
+
+        if (sessionChartEl) {
+            sessionChartInstance = echarts.init(sessionChartEl);
+        }
+        if (latencyChartEl) {
+            latencyChartInstance = echarts.init(latencyChartEl);
+        }
+
+        window.addEventListener('resize', () => {
+            if (sessionChartInstance) sessionChartInstance.resize();
+            if (latencyChartInstance) latencyChartInstance.resize();
         });
     }
 
+    function updateCharts() {
+        if (!sessionChartInstance || !latencyChartInstance) return;
+
+        const isDark = document.documentElement.classList.contains('dark');
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+        const splitLineColor = isDark ? '#334155' : '#f1f5f9';
+
+        // 1. Session load chart
+        const sorted = [...allNasData].sort((a, b) => (b.session_count || 0) - (a.session_count || 0)).slice(0, 5);
+        const names = sorted.map(n => n.shortname || n.nasname).reverse();
+        const sessionValues = sorted.map(n => n.session_count || 0).reverse();
+
+        sessionChartInstance.setOption({
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                borderColor: isDark ? '#334155' : '#e2e8f0',
+                textStyle: { color: isDark ? '#f1f5f9' : '#0f172a', fontFamily: 'Outfit, sans-serif' }
+            },
+            grid: { left: '3%', right: '12%', bottom: '5%', top: '5%', containLabel: true },
+            xAxis: {
+                type: 'value',
+                splitLine: { show: true, lineStyle: { type: 'dashed', color: splitLineColor } },
+                axisLabel: { color: textColor, fontSize: 10 }
+            },
+            yAxis: {
+                type: 'category',
+                data: names,
+                axisLabel: { color: textColor, fontSize: 11, fontWeight: 'bold', fontFamily: 'Outfit, sans-serif' },
+                axisLine: { show: false },
+                axisTick: { show: false }
+            },
+            series: [{
+                name: 'Sesi Aktif',
+                type: 'bar',
+                barWidth: '45%',
+                data: sessionValues,
+                itemStyle: {
+                    borderRadius: [0, 6, 6, 0],
+                    color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                        { offset: 0, color: '#3b82f6' },
+                        { offset: 1, color: '#6366f1' }
+                    ])
+                },
+                label: {
+                    show: true,
+                    position: 'right',
+                    color: textColor,
+                    fontWeight: 'bold',
+                    fontSize: 10,
+                    formatter: '{c} Sesi'
+                }
+            }]
+        }, true);
+
+        // 2. Latency chart
+        const latencyList = [...allNasData].filter(n => {
+            const c = nasStatusCache[n.id];
+            const status = (c && typeof c === 'object') ? c.status : (c || n.status);
+            return status === 'online';
+        }).map(n => {
+            const c = nasStatusCache[n.id];
+            const lat = (c && typeof c === 'object' && c.latency != null) ? c.latency : (n.latency || 0);
+            return { name: n.shortname || n.nasname, latency: lat };
+        });
+
+        const latNames = latencyList.map(l => l.name);
+        const latValues = latencyList.map(l => {
+            let color = '#10b981';
+            if (l.latency > 80) color = '#f43f5e';
+            else if (l.latency > 30) color = '#f59e0b';
+            return {
+                value: parseFloat(l.latency.toFixed(1)),
+                itemStyle: { color: color, borderRadius: [6, 6, 0, 0] }
+            };
+        });
+
+        latencyChartInstance.setOption({
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                borderColor: isDark ? '#334155' : '#e2e8f0',
+                textStyle: { color: isDark ? '#f1f5f9' : '#0f172a' }
+            },
+            grid: { left: '3%', right: '3%', bottom: '5%', top: '10%', containLabel: true },
+            xAxis: {
+                type: 'category',
+                data: latNames,
+                axisLabel: { color: textColor, fontSize: 10, fontWeight: 'bold' },
+                axisLine: { show: false },
+                axisTick: { show: false }
+            },
+            yAxis: {
+                type: 'value',
+                splitLine: { show: true, lineStyle: { type: 'dashed', color: splitLineColor } },
+                axisLabel: { color: textColor, fontSize: 10, formatter: '{value} ms' }
+            },
+            series: [{
+                name: 'Ping Latency',
+                type: 'bar',
+                barWidth: '35%',
+                data: latValues,
+                label: {
+                    show: true,
+                    position: 'top',
+                    color: textColor,
+                    fontSize: 10,
+                    fontWeight: 'bold',
+                    formatter: '{c}ms'
+                }
+            }]
+        }, true);
+    }
+
+    // Load NAS list from API
     async function loadNAS() {
-        console.log('Loading NAS devices...');
         try {
             const data = await apiCall('/api/nas');
-            console.log('NAS API response:', data);
-            
             if (data.error) {
-                const nasList = document.getElementById('nasList');
-                nasList.className = 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-16 shadow-sm';
-                nasList.innerHTML = `
-                    <div class="text-center py-8">
-                        <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i data-lucide="alert-triangle" class="w-8 h-8 text-red-600"></i>
-                        </div>
-                        <p class="text-red-600 font-bold text-xl mb-2">Error Loading NAS Devices</p>
-                        <p class="text-slate-500 mb-4">${data.error}</p>
-                        <button onclick="loadNAS()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg inline-flex items-center">
-                            <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i>Retry
-                        </button>
-                    </div>
-                `;
-                if (typeof lucide !== 'undefined') lucide.createIcons();
+                showNotification('Gagal memuat NAS: ' + data.error, 'error');
                 return;
             }
 
             allNasData = data || [];
 
-            const totalSessions = allNasData.reduce((sum, nas) => sum + (nas.session_count || 0), 0);
-            const nocTotalSessions = document.getElementById('noc-total-sessions');
-            if (nocTotalSessions) nocTotalSessions.innerText = totalSessions;
+            // Populate status cache
+            allNasData.forEach(nas => {
+                nasStatusCache[nas.id] = {
+                    status: nas.status || 'offline',
+                    latency: nas.latency,
+                    last_seen: nas.last_seen,
+                    online_since: nas.online_since
+                };
+            });
 
             updateStatsCounters();
             renderNAS();
-            
-        } catch (error) {
-            console.error('Error loading NAS:', error);
-            const nasList = document.getElementById('nasList');
-            nasList.className = 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-3xl p-16 shadow-sm';
-            nasList.innerHTML = `
-                <div class="text-center py-8">
-                    <i data-lucide="alert-triangle" class="w-10 h-10 text-red-500 mb-4 mx-auto"></i>
-                    <p class="text-red-600 font-bold text-xl mb-2">Network Error</p>
-                    <p class="text-slate-500 mb-4">${error.message}</p>
-                    <button onclick="loadNAS()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-semibold">
-                        Try Again
-                    </button>
-                </div>
-            `;
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+        } catch (e) {
+            console.error('Error loading NAS:', e);
+            showNotification('Gagal memuat NAS: ' + e.message, 'error');
         }
     }
 
+    // Load status badges from /api/nas/status
     async function loadStatusBadges() {
         const btn = document.getElementById('btnRefreshNoc');
         const icon = document.getElementById('iconRefreshNoc');
@@ -1157,20 +1450,21 @@
             icon.classList.add('animate-spin');
             btn.disabled = true;
         }
+
         try {
             const data = await apiCall('/api/nas/status');
-            if (!data.success) return;
-            
-            data.nas_status.forEach(nas => {
-                nasStatusCache[nas.id] = {
-                    status: nas.status,
-                    last_seen: nas.last_seen,
-                    online_since: nas.online_since
-                };
-                updateSingleNasStatusElements(nas.id, nas.status, nas.last_seen, nas.online_since);
-            });
-            
-            updateStatsCounters();
+            if (data && data.success && data.nas_status) {
+                data.nas_status.forEach(nas => {
+                    nasStatusCache[nas.id] = {
+                        status: nas.status,
+                        latency: nas.latency,
+                        last_seen: nas.last_seen,
+                        online_since: nas.online_since
+                    };
+                });
+                updateStatsCounters();
+                renderNAS();
+            }
         } catch (e) {
             console.error('Status check error:', e);
         } finally {
@@ -1181,181 +1475,90 @@
         }
     }
 
+    // Bulk Ping Test
+    async function triggerBulkPing() {
+        const btn = document.getElementById('btnBulkPing');
+        const icon = document.getElementById('iconBulkPing');
+        if (btn && icon) {
+            icon.classList.add('animate-spin');
+            btn.disabled = true;
+        }
+        showNotification('Memulai pengujian ping ke semua NAS...', 'info');
+
+        try {
+            const data = await apiCall('/api/nas/bulk-ping', { method: 'POST' });
+            if (data.success && data.results) {
+                Object.keys(data.results).forEach(id => {
+                    const res = data.results[id];
+                    nasStatusCache[id] = {
+                        status: res.status,
+                        latency: res.latency,
+                        last_seen: res.last_seen,
+                        online_since: res.online_since
+                    };
+                });
+                updateStatsCounters();
+                renderNAS();
+                showNotification('Uji ping serentak selesai!', 'success');
+            } else {
+                showNotification('Gagal uji ping: ' + (data.error || 'Unknown error'), 'error');
+            }
+        } catch (e) {
+            showNotification('Error bulk ping: ' + e.message, 'error');
+        } finally {
+            if (btn && icon) {
+                icon.classList.remove('animate-spin');
+                btn.disabled = false;
+            }
+        }
+    }
+
+    // Single NAS Ping Test
     async function testConnection(nasId) {
         const nas = allNasData.find(n => n.id === nasId);
-        const nasName = nas ? nas.nasname : 'NAS';
-        const btn = document.getElementById('test-btn-' + nasId);
-        const originalHtml = btn ? btn.innerHTML : '';
-        if (btn) { btn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>'; btn.disabled = true; }
+        const name = nas ? (nas.shortname || nas.nasname) : 'NAS';
+        const cardBtn = document.getElementById('test-btn-' + nasId);
+        const tblBtn = document.getElementById('table-test-btn-' + nasId);
+
+        if (cardBtn) cardBtn.innerHTML = '<span class="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>';
+        if (tblBtn) tblBtn.innerHTML = '<span class="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></span>';
+
         try {
             const data = await apiCall('/api/nas/ping/' + nasId, { method: 'POST' });
             if (data.success) {
                 nasStatusCache[nasId] = {
                     status: data.status,
+                    latency: data.latency,
                     last_seen: data.last_seen,
                     online_since: data.online_since
                 };
-                updateSingleNasStatusElements(nasId, data.status, data.last_seen, data.online_since);
                 updateStatsCounters();
-                const online = data.status === 'online';
-                showNotification(`${nasName}: ${online ? '✅ Online' : '❌ Offline'}`, online ? 'success' : 'error');
+                renderNAS();
+
+                const isOnline = data.status === 'online';
+                const latStr = data.latency != null ? ` (${data.latency.toFixed(1)} ms)` : '';
+                showNotification(`${name}: ${isOnline ? '✅ Online' + latStr : '❌ Offline'}`, isOnline ? 'success' : 'error');
             } else {
-                showNotification('Test connection failed: ' + (data.error || 'Unknown error'), 'error');
+                showNotification('Gagal ping: ' + (data.error || 'Unknown error'), 'error');
             }
-        } catch (e) { 
-            showNotification('Test connection failed: ' + e.message, 'error'); 
+        } catch (e) {
+            showNotification('Ping error: ' + e.message, 'error');
         } finally {
-            if (btn) { btn.innerHTML = originalHtml; btn.disabled = false; }
+            if (cardBtn) cardBtn.innerHTML = '<i data-lucide="plug" class="w-3.5 h-3.5"></i>';
+            if (tblBtn) tblBtn.innerHTML = '<i data-lucide="plug" class="w-3.5 h-3.5"></i>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 
-    function openAddNasModal() {
-        document.getElementById('addNasModal').classList.remove('hidden');
-    }
-
-    // Backdrop close details drawer on ESC key
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') {
-            closeNasDetailDrawer();
-            closeAddNasModal();
-            closeEditNasModal();
-        }
-    });
-
-    function closeAddNasModal() {
-        document.getElementById('addNasModal').classList.add('hidden');
-    }
-
-    document.getElementById('addNasForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Adding NAS...';
-        submitBtn.disabled = true;
-
-        try {
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData);
-            data.ports = parseInt(data.ports);
-
-            const result = await apiCall('/api/nas/add', {
-                method: 'POST',
-                body: JSON.stringify(data)
-            });
-
-            if (result.success) {
-                showNotification(result.message, 'success');
-                closeAddNasModal();
-                this.reset();
-                loadNAS();
-            } else {
-                showNotification('Failed to add NAS: ' + result.error, 'error');
-            }
-        } catch (error) {
-            showNotification('Network error: ' + error.message, 'error');
-        } finally {
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        }
-    });
-
-    let _deleteNasId = null;
-
-    function deleteNAS(nasId) {
-        const nas = allNasData.find(n => n.id === nasId);
-        if (!nas) return;
-        _deleteNasId = nasId;
-        document.getElementById('deleteNasName').innerText = nas.nasname;
-        document.getElementById('deleteNasModal').classList.remove('hidden');
-    }
-
-    function closeDeleteNasModal() {
-        _deleteNasId = null;
-        document.getElementById('deleteNasModal').classList.add('hidden');
-    }
-
-    async function confirmDeleteNas() {
-        if (!_deleteNasId) return;
-        const nasId = _deleteNasId;
-        _deleteNasId = null;
-        try {
-            const result = await apiCall('/api/nas/delete/' + nasId, { method: 'DELETE' });
-            if (result.success) {
-                showNotification(result.message, 'success');
-                loadNAS();
-            } else {
-                showNotification('Failed to delete NAS: ' + result.error, 'error');
-            }
-        } catch (error) {
-            showNotification('Network error: ' + error.message, 'error');
-        } finally {
-            document.getElementById('deleteNasModal').classList.add('hidden');
-        }
-    }
-
-    function openEditNasModal(id) {
-        const nas = allNasData.find(n => n.id === id);
-        if (!nas) return;
-        document.getElementById('editNasId').value = nas.id;
-        document.getElementById('editNasName').value = nas.nasname;
-        document.getElementById('editShortname').value = nas.shortname;
-        document.getElementById('editType').value = nas.type || 'other';
-        document.getElementById('editPorts').value = nas.ports || 1812;
-        document.getElementById('editSecret').value = nas.secret;
-        document.getElementById('editDescription').value = nas.description || '';
-        document.getElementById('editNasModal').classList.remove('hidden');
-    }
-
-    function closeEditNasModal() {
-        document.getElementById('editNasModal').classList.add('hidden');
-    }
-
-    document.getElementById('editNasForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const id = document.getElementById('editNasId').value;
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Saving...';
-        submitBtn.disabled = true;
-        try {
-            const data = {
-                nasname: document.getElementById('editNasName').value,
-                shortname: document.getElementById('editShortname').value,
-                type: document.getElementById('editType').value,
-                ports: parseInt(document.getElementById('editPorts').value),
-                secret: document.getElementById('editSecret').value,
-                description: document.getElementById('editDescription').value
-            };
-            const result = await apiCall('/api/nas/edit/' + id, { method: 'PUT', body: JSON.stringify(data) });
-            if (result.success) {
-                showNotification(result.message, 'success');
-                closeEditNasModal();
-                loadNAS().then(() => loadStatusBadges());
-            } else {
-                showNotification('Failed: ' + result.error, 'error');
-            }
-        } catch (error) {
-            showNotification('Network error: ' + error.message, 'error');
-        } finally {
-            submitBtn.innerHTML = originalText;
-            submitBtn.disabled = false;
-        }
-    });
-
-    let isAutoRefresh = false;
-    let autoRefreshTimer = null;
-    
+    // Toggle Auto-refresh
     function toggleAutoRefreshButton() {
         isAutoRefresh = !isAutoRefresh;
         const btn = document.getElementById('btnAutoRefresh');
         const span = document.getElementById('textAutoRefresh');
-        
+
         if (isAutoRefresh) {
-            btn.classList.add('bg-emerald-50', 'dark:bg-emerald-500/20', 'text-emerald-700', 'dark:text-emerald-400', 'border-emerald-200', 'dark:border-emerald-500/50');
-            btn.classList.remove('bg-slate-900/5', 'dark:bg-white/10', 'text-slate-600', 'dark:text-slate-300', 'border-slate-900/10', 'dark:border-white/10');
+            btn.classList.add('bg-emerald-50', 'dark:bg-emerald-500/20', 'text-emerald-700', 'dark:text-emerald-400', 'border-emerald-200');
             span.innerText = 'Auto 10s: ON';
-            
             loadStatusBadges();
             autoRefreshTimer = setInterval(() => {
                 if (document.visibilityState === 'visible') {
@@ -1364,242 +1567,385 @@
             }, 10000);
             showNotification("Auto-Refresh Aktif (10s)", "success");
         } else {
-            btn.classList.remove('bg-emerald-50', 'dark:bg-emerald-500/20', 'text-emerald-700', 'dark:text-emerald-400', 'border-emerald-200', 'dark:border-emerald-500/50');
-            btn.classList.add('bg-slate-900/5', 'dark:bg-white/10', 'text-slate-600', 'dark:text-slate-300', 'border-slate-900/10', 'dark:border-white/10');
+            btn.classList.remove('bg-emerald-50', 'dark:bg-emerald-500/20', 'text-emerald-700', 'dark:text-emerald-400', 'border-emerald-200');
             span.innerText = 'Auto 10s: OFF';
-            
             if (autoRefreshTimer) clearInterval(autoRefreshTimer);
             autoRefreshTimer = null;
             showNotification("Auto-Refresh Dinonaktifkan", "warning");
         }
     }
 
-    let statusChartInstance = null;
-    let sessionChartInstance = null;
+    // ===== DRAWER FUNCTIONS =====
+    let activeDrawerNas = null;
 
-    function initCharts() {
-        const statusChartEl = document.getElementById('nasStatusChart');
-        const sessionChartEl = document.getElementById('nasSessionChart');
-        
-        const isDark = document.documentElement.classList.contains('dark');
-        const textColor = isDark ? '#94a3b8' : '#64748b';
+    async function openNasDetailDrawer(nasId) {
+        const nas = allNasData.find(n => n.id === nasId);
+        if (!nas) return;
+        activeDrawerNas = nas;
 
-        if (statusChartEl) {
-            statusChartInstance = echarts.init(statusChartEl);
-            statusChartInstance.showLoading({ text: 'Memuat data...', color: '#3b82f6', textColor: textColor, maskColor: 'rgba(255, 255, 255, 0.05)' });
-        }
-        if (sessionChartEl) {
-            sessionChartInstance = echarts.init(sessionChartEl);
-            sessionChartInstance.showLoading({ text: 'Memuat data...', color: '#3b82f6', textColor: textColor, maskColor: 'rgba(255, 255, 255, 0.05)' });
-        }
-        
-        window.addEventListener('resize', function() {
-            if (statusChartInstance) statusChartInstance.resize();
-            if (sessionChartInstance) sessionChartInstance.resize();
-        });
-    }
+        document.getElementById('drawer-nasname-title').innerText = nas.shortname || nas.nasname;
+        document.getElementById('drawer-nas-subtitle').innerText = `IP: ${nas.nasname} • ID: #${nas.id}`;
+        document.getElementById('drawer-shortname').innerText = nas.shortname || '-';
+        document.getElementById('drawer-type').innerText = nas.type || 'mikrotik';
+        document.getElementById('drawer-port').innerText = nas.ports || '1812';
+        document.getElementById('drawer-description').innerText = nas.description || 'Tidak ada deskripsi.';
+        document.getElementById('drawer-secret').innerText = '••••••••';
 
-    function updateCharts(online, offline) {
-        if (!statusChartInstance || !sessionChartInstance) return;
-        
-        const isDark = document.documentElement.classList.contains('dark');
-        const textColor = isDark ? '#94a3b8' : '#64748b';
-        const splitLineColor = isDark ? '#334155' : '#f1f5f9';
-        const titleColor = isDark ? '#ffffff' : '#0f172a';
-        
-        statusChartInstance.hideLoading();
-        
-        // Update Status Doughnut with smooth gradients & center text
-        const unknown = allNasData.length - online - offline;
-        statusChartInstance.setOption({
-            title: {
-                text: allNasData.length.toString(),
-                subtext: 'Total NAS',
-                left: 'center',
-                top: '35%',
-                textStyle: {
-                    fontSize: 24,
-                    fontWeight: '800',
-                    color: titleColor,
-                    fontFamily: 'Outfit, Inter, sans-serif'
-                },
-                subtextStyle: {
-                    fontSize: 10,
-                    fontWeight: '600',
-                    color: textColor,
-                    fontFamily: 'Inter, sans-serif',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                }
-            },
-            tooltip: { 
-                trigger: 'item',
-                backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                borderColor: isDark ? '#334155' : '#e2e8f0',
-                borderWidth: 1,
-                textStyle: { color: isDark ? '#f1f5f9' : '#0f172a', fontFamily: 'Inter, sans-serif' },
-                padding: [10, 14],
-                borderRadius: 12,
-                shadowColor: 'rgba(0,0,0,0.08)',
-                shadowBlur: 10
-            },
-            legend: { 
-                top: 'bottom', 
-                icon: 'circle',
-                itemGap: 15,
-                textStyle: { color: textColor, fontFamily: 'Inter, sans-serif', fontWeight: 'bold', fontSize: 11 } 
-            },
-            series: [{
-                name: 'Status',
-                type: 'pie',
-                radius: ['52%', '72%'],
-                center: ['50%', '45%'],
-                itemStyle: { 
-                    borderRadius: 8, 
-                    borderColor: isDark ? '#1e293b' : '#ffffff', 
-                    borderWidth: 3 
-                },
-                label: { show: false },
-                emphasis: {
-                    itemStyle: {
-                        shadowBlur: 15,
-                        shadowOffsetX: 0,
-                        shadowColor: 'rgba(0, 0, 0, 0.15)'
-                    }
-                },
-                data: [
-                    { 
-                        value: online, 
-                        name: 'Online',
-                        itemStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: '#10b981' },
-                                { offset: 1, color: '#059669' }
-                            ])
-                        }
-                    },
-                    { 
-                        value: offline, 
-                        name: 'Offline',
-                        itemStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: '#f43f5e' },
-                                { offset: 1, color: '#be123c' }
-                            ])
-                        }
-                    },
-                    { 
-                        value: unknown, 
-                        name: 'Unknown',
-                        itemStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: '#cbd5e1' },
-                                { offset: 1, color: '#94a3b8' }
-                            ])
-                        }
-                    }
-                ]
-            }]
-        }, true);
+        // Setup actions in drawer
+        const pingBtn = document.getElementById('drawer-btn-ping');
+        if (pingBtn) pingBtn.onclick = () => testConnection(nas.id);
 
-        // Update Session Bar Chart with premium gradients, values on top & zero borders
-        const sortedBySession = [...allNasData].sort((a, b) => (b.session_count || 0) - (a.session_count || 0)).slice(0, 5);
-        const names = sortedBySession.map(n => n.shortname || n.nasname).reverse();
-        
-        const sessionsData = sortedBySession.map(n => {
-            const val = n.session_count || 0;
-            let itemColor, shadowColor;
-            
-            if (val >= 70) {
-                itemColor = new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                    { offset: 0, color: '#f43f5e' },
-                    { offset: 1, color: '#be123c' }
-                ]);
-                shadowColor = 'rgba(244, 63, 94, 0.2)';
-            } else if (val >= 30) {
-                itemColor = new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                    { offset: 0, color: '#f59e0b' },
-                    { offset: 1, color: '#d97706' }
-                ]);
-                shadowColor = 'rgba(245, 158, 11, 0.2)';
-            } else {
-                itemColor = new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                    { offset: 0, color: '#10b981' },
-                    { offset: 1, color: '#059669' }
-                ]);
-                shadowColor = 'rgba(16, 185, 129, 0.2)';
-            }
-            
-            return {
-                value: val,
-                itemStyle: {
-                    borderRadius: [0, 8, 8, 0],
-                    color: itemColor,
-                    shadowBlur: 10,
-                    shadowColor: shadowColor
+        const sessBtn = document.getElementById('drawer-btn-sessions');
+        if (sessBtn) sessBtn.onclick = () => { window.location.href = `/sessions?nas=${encodeURIComponent(nas.nasname)}`; };
+
+        // Reveal & copy secret buttons
+        const revealBtn = document.getElementById('btn-reveal-drawer-secret');
+        if (revealBtn) {
+            revealBtn.onclick = () => {
+                const el = document.getElementById('drawer-secret');
+                if (el.innerText === '••••••••') {
+                    el.innerText = nas.secret;
+                } else {
+                    el.innerText = '••••••••';
                 }
             };
-        }).reverse();
+        }
+        const copySecBtn = document.getElementById('btn-copy-drawer-secret');
+        if (copySecBtn) {
+            copySecBtn.onclick = () => copyText(nas.secret, 'Shared Secret');
+        }
 
-        if (sessionChartInstance) {
-            sessionChartInstance.hideLoading();
-            sessionChartInstance.setOption({
-                tooltip: { 
-                    trigger: 'axis', 
-                    axisPointer: { type: 'shadow' },
-                    backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                    borderColor: isDark ? '#334155' : '#e2e8f0',
-                    borderWidth: 1,
-                    textStyle: { color: isDark ? '#f1f5f9' : '#0f172a', fontFamily: 'Inter, sans-serif' },
-                    padding: [10, 14],
-                    borderRadius: 12
-                },
-                grid: { left: '4%', right: '8%', bottom: '5%', top: '5%', containLabel: true },
-                xAxis: { 
-                    type: 'value', 
-                    splitLine: { 
-                        show: true,
-                        lineStyle: { 
-                            type: 'dashed',
-                            color: splitLineColor 
-                        } 
-                    }, 
-                    axisLabel: { color: textColor, fontFamily: 'Inter, sans-serif', fontSize: 10 },
-                    axisLine: { show: false },
-                    axisTick: { show: false }
-                },
-                yAxis: { 
-                    type: 'category', 
-                    data: names, 
-                    axisLabel: { color: textColor, fontFamily: 'Outfit, Inter, sans-serif', fontWeight: 'bold', fontSize: 11 },
-                    axisLine: { show: false },
-                    axisTick: { show: false }
-                },
-                series: [{
-                    name: 'Sesi Aktif',
-                    type: 'bar',
-                    barWidth: '45%',
-                    data: sessionsData,
-                    label: {
-                        show: true,
-                        position: 'right',
-                        valueAnimation: true,
-                        color: isDark ? '#cbd5e1' : '#475569',
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                        fontFamily: 'Outfit, sans-serif',
-                        formatter: '{c} Sesi'
-                    }
-                }]
-            }, true);
+        // Populate Overview Tab
+        const c = nasStatusCache[nas.id] || {};
+        const isOnline = (c.status || nas.status) === 'online';
+        const lat = c.latency != null ? c.latency : nas.latency;
+
+        document.getElementById('drawer-status-summary').innerText = isOnline ? 'Online & Terhubung' : 'Offline / Tidak Terjangkau';
+        document.getElementById('drawer-status-time').innerText = isOnline 
+            ? (c.online_since ? `Online sejak ${formatTimeAgo(c.online_since)}` : 'Aktif')
+            : (c.last_seen ? `Last seen ${formatTimeAgo(c.last_seen)}` : 'Offline');
+
+        const badge = document.getElementById('drawer-status-badge');
+        if (badge) {
+            badge.className = `text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center ${isOnline ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'}`;
+            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full mr-1.5 ${isOnline ? 'bg-emerald-500 pulse-dot-online' : 'bg-rose-500 pulse-dot-offline'}"></span>${isOnline ? 'ONLINE' : 'OFFLINE'}`;
+        }
+
+        document.getElementById('drawer-latency').innerText = lat != null ? `${lat.toFixed(1)} ms` : '-- ms';
+        document.getElementById('drawer-sessions').innerText = `${nas.session_count || 0} Sesi`;
+        document.getElementById('drawer-rx').innerText = fmtBytes(nas.total_in_bytes || 0);
+        document.getElementById('drawer-tx').innerText = fmtBytes(nas.total_out_bytes || 0);
+
+        // Populate RouterOS script inside drawer
+        const serverIp = window.location.hostname || '100.204.0.53';
+        const scriptCode = `/radius add service=ppp,hotspot,login address=${serverIp} secret="${nas.secret}" authentication-port=${nas.ports || 1812} accounting-port=1813 timeout=3000ms comment="Daranett RADIUS"\n/radius incoming set accept=yes port=3799\n/ppp aaa set use-radius=yes accounting=yes interim-update=5m\n/ip hotspot profile set [find] use-radius=yes`;
+        document.getElementById('drawer-script-code').innerText = scriptCode;
+
+        // Reset to overview tab
+        switchDrawerTab('overview');
+
+        // Show Drawer
+        const overlay = document.getElementById('nasDetailOverlay');
+        const drawer = document.getElementById('nasDetailDrawer');
+        if (overlay) {
+            overlay.classList.remove('hidden');
+            setTimeout(() => overlay.classList.add('opacity-100'), 10);
+        }
+        if (drawer) {
+            drawer.classList.remove('hidden');
+            setTimeout(() => drawer.classList.remove('translate-x-full'), 10);
+        }
+
+        // Fetch detailed statistics & top consumers asynchronously
+        fetchDrawerDetails(nas.id);
+    }
+
+    function closeNasDetailDrawer() {
+        const overlay = document.getElementById('nasDetailOverlay');
+        const drawer = document.getElementById('nasDetailDrawer');
+        if (overlay) {
+            overlay.classList.remove('opacity-100');
+            setTimeout(() => overlay.classList.add('hidden'), 300);
+        }
+        if (drawer) {
+            drawer.classList.add('translate-x-full');
+            setTimeout(() => drawer.classList.add('hidden'), 300);
+        }
+        activeDrawerNas = null;
+    }
+
+    function switchDrawerTab(tab) {
+        ['overview', 'consumers', 'script'].forEach(t => {
+            const btn = document.getElementById('tab-drawer-' + t);
+            const panel = document.getElementById('drawer-panel-' + t);
+            if (btn && panel) {
+                if (t === tab) {
+                    btn.className = 'pb-2.5 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 flex items-center gap-1.5';
+                    panel.classList.remove('hidden');
+                } else {
+                    btn.className = 'pb-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 flex items-center gap-1.5';
+                    panel.classList.add('hidden');
+                }
+            }
+        });
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    async function fetchDrawerDetails(nasId) {
+        const listEl = document.getElementById('drawer-consumers-list');
+        if (!listEl) return;
+
+        try {
+            const res = await apiCall(`/api/nas/details/${nasId}`);
+            if (res.success && res.top_consumers) {
+                if (res.top_consumers.length === 0) {
+                    listEl.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">Belum ada sesi aktif di router ini.</div>`;
+                    return;
+                }
+
+                listEl.innerHTML = res.top_consumers.map((u, i) => `
+                    <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-extrabold text-[10px] flex items-center justify-center">
+                                ${i + 1}
+                            </span>
+                            <div class="flex flex-col">
+                                <span class="font-extrabold text-slate-800 dark:text-white font-mono">${u.username}</span>
+                                <span class="text-[10px] text-slate-400">${u.framedipaddress || 'Dynamic IP'}</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="font-bold text-purple-600 dark:text-purple-400 font-mono">${fmtBytes(u.total_octets || 0)}</span>
+                            <span class="text-[9px] text-slate-400">Rx: ${fmtBytes(u.acctinputoctets || 0)} | Tx: ${fmtBytes(u.acctoutputoctets || 0)}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            listEl.innerHTML = `<div class="text-center py-6 text-rose-500 text-xs">Gagal memuat top konsumen: ${e.message}</div>`;
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    function copyDrawerScript() {
+        const code = document.getElementById('drawer-script-code').innerText;
+        copyText(code, 'Skrip RouterOS');
+    }
+
+    // ===== MIKROTIK SCRIPT GENERATOR MODAL =====
+    let activeScriptNas = null;
+
+    function openScriptModal(nasId) {
+        const nas = allNasData.find(n => n.id === nasId);
+        if (!nas) return;
+        activeScriptNas = nas;
+
+        document.getElementById('scriptNasTitle').innerText = `Perangkat: ${nas.shortname || nas.nasname} (${nas.nasname})`;
+        document.getElementById('scriptRadiusServerIp').value = window.location.hostname || '100.204.0.53';
+        generateMikrotikScript();
+
+        document.getElementById('scriptNasModal').classList.remove('hidden');
+    }
+
+    function closeScriptModal() {
+        document.getElementById('scriptNasModal').classList.add('hidden');
+        activeScriptNas = null;
+    }
+
+    function generateMikrotikScript() {
+        if (!activeScriptNas) return;
+        const serverIp = document.getElementById('scriptRadiusServerIp').value.trim() || '100.204.0.53';
+        const secret = activeScriptNas.secret || 'radiussecret';
+        const port = activeScriptNas.ports || 1812;
+
+        const script = `# ========================================================
+# DARANETT RADIUS CLIENT SETUP FOR MIKROTIK ROUTEROS
+# Router: ${activeScriptNas.shortname || activeScriptNas.nasname} (${activeScriptNas.nasname})
+# ========================================================
+
+# 1. Daftarkan Server RADIUS
+/radius add service=ppp,hotspot,login address=${serverIp} secret="${secret}" authentication-port=${port} accounting-port=1813 timeout=3000ms comment="Daranett RADIUS Server"
+
+# 2. Aktifkan RADIUS Incoming (CoA / Disconnect Requests)
+/radius incoming set accept=yes port=3799
+
+# 3. Aktifkan RADIUS pada Layanan PPP (PPPoE / L2TP / SSTP)
+/ppp aaa set use-radius=yes accounting=yes interim-update=5m
+
+# 4. Aktifkan RADIUS pada Hotspot Server
+/ip hotspot profile set [find] use-radius=yes`;
+
+        document.getElementById('mikrotikScriptOutput').innerText = script;
+    }
+
+    function copyGeneratedScript() {
+        const text = document.getElementById('mikrotikScriptOutput').innerText;
+        copyText(text, 'Skrip MikroTik CLI');
+    }
+
+    // ===== ADD / EDIT / DELETE MODALS =====
+    function openAddNasModal() {
+        document.getElementById('addNasModal').classList.remove('hidden');
+    }
+    function closeAddNasModal() {
+        document.getElementById('addNasModal').classList.add('hidden');
+    }
+
+    function openEditNasModal(id) {
+        const nas = allNasData.find(n => n.id === id);
+        if (!nas) return;
+        document.getElementById('editNasId').value = nas.id;
+        document.getElementById('editNasName').value = nas.nasname;
+        document.getElementById('editShortname').value = nas.shortname;
+        document.getElementById('editType').value = nas.type || 'mikrotik';
+        document.getElementById('editPorts').value = nas.ports || 1812;
+        document.getElementById('editSecret').value = nas.secret;
+        document.getElementById('editDescription').value = nas.description || '';
+        document.getElementById('editNasModal').classList.remove('hidden');
+    }
+    function closeEditNasModal() {
+        document.getElementById('editNasModal').classList.add('hidden');
+    }
+
+    let _deleteNasId = null;
+    function deleteNAS(nasId) {
+        const nas = allNasData.find(n => n.id === nasId);
+        if (!nas) return;
+        _deleteNasId = nasId;
+        document.getElementById('deleteNasName').innerText = `${nas.shortname || nas.nasname} (${nas.nasname})`;
+        document.getElementById('deleteNasModal').classList.remove('hidden');
+    }
+    function closeDeleteNasModal() {
+        _deleteNasId = null;
+        document.getElementById('deleteNasModal').classList.add('hidden');
+    }
+
+    async function confirmDeleteNas() {
+        if (!_deleteNasId) return;
+        const id = _deleteNasId;
+        _deleteNasId = null;
+
+        try {
+            const res = await apiCall('/api/nas/delete/' + id, { method: 'DELETE' });
+            if (res.success) {
+                showNotification(res.message, 'success');
+                closeDeleteNasModal();
+                loadNAS();
+            } else {
+                showNotification('Gagal hapus NAS: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Network error: ' + e.message, 'error');
+        }
+    }
+
+    // Form handlers
+    document.getElementById('addNasForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const orig = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-1"></span>Menyimpan...';
+        submitBtn.disabled = true;
+
+        try {
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            data.ports = parseInt(data.ports) || 1812;
+
+            const res = await apiCall('/api/nas/add', { method: 'POST', body: JSON.stringify(data) });
+            if (res.success) {
+                showNotification(res.message, 'success');
+                closeAddNasModal();
+                this.reset();
+                loadNAS();
+            } else {
+                showNotification('Gagal: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Error: ' + e.message, 'error');
+        } finally {
+            submitBtn.innerHTML = orig;
+            submitBtn.disabled = false;
+        }
+    });
+
+    document.getElementById('editNasForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const id = document.getElementById('editNasId').value;
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const orig = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-1"></span>Menyimpan...';
+        submitBtn.disabled = true;
+
+        try {
+            const data = {
+                nasname: document.getElementById('editNasName').value,
+                shortname: document.getElementById('editShortname').value,
+                type: document.getElementById('editType').value,
+                ports: parseInt(document.getElementById('editPorts').value) || 1812,
+                secret: document.getElementById('editSecret').value,
+                description: document.getElementById('editDescription').value
+            };
+
+            const res = await apiCall('/api/nas/edit/' + id, { method: 'PUT', body: JSON.stringify(data) });
+            if (res.success) {
+                showNotification(res.message, 'success');
+                closeEditNasModal();
+                loadNAS();
+            } else {
+                showNotification('Gagal: ' + res.error, 'error');
+            }
+        } catch (e) {
+            showNotification('Error: ' + e.message, 'error');
+        } finally {
+            submitBtn.innerHTML = orig;
+            submitBtn.disabled = false;
+        }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeNasDetailDrawer();
+            closeAddNasModal();
+            closeEditNasModal();
+            closeDeleteNasModal();
+            closeScriptModal();
+        }
+    });
+
+    // Socket.io Real-time listener for latency updates
+    function initSocketListener() {
+        if (typeof io !== 'undefined') {
+            try {
+                const socket = io();
+                socket.on('nas_latency_update', (data) => {
+                    if (!data || !data.nasname) return;
+                    const nas = allNasData.find(n => n.nasname === data.nasname);
+                    if (nas) {
+                        if (!nasStatusCache[nas.id]) nasStatusCache[nas.id] = {};
+                        nasStatusCache[nas.id].latency = data.latency;
+                        if (data.latency != null) nasStatusCache[nas.id].status = 'online';
+                        updateStatsCounters();
+                        renderNAS();
+                    }
+                });
+            } catch (err) {
+                console.log('Socket.IO connection skipped:', err);
+            }
+        }
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
         initCharts();
+        switchView(currentView);
         loadNAS().then(() => loadStatusBadges());
-        // Custom 10s auto refresh handled by toggle UI instead of hardcoded background intervals
-        setInterval(() => { if (!autoRefreshTimer) loadNAS(); }, 60000); // 1m full refresh fallback
+        initSocketListener();
+
+        // 60s background refresh fallback
+        setInterval(() => {
+            if (!autoRefreshTimer) loadStatusBadges();
+        }, 60000);
     });
 </script>
 {% endblock %}

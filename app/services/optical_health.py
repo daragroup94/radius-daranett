@@ -152,8 +152,8 @@ def background_optical_health_scan():
                     try:
                         rx_clean = rx.replace('dBm', '').strip()
                         rx_float = float(rx_clean)
-                        # Sinyal dianggap buruk/warning jika di bawah -23.0 dBm
-                        if rx_float < -23.0:
+                        # Sinyal dianggap buruk/warning jika di bawah -25.0 dBm
+                        if rx_float < -25.0:
                             execute_query("""
                                 INSERT INTO ont_health_issues (username, serial, model, manufacturer, rx_power, temperature, pon_mode, last_inform)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)

@@ -822,9 +822,9 @@ def api_get_nas_stats(nasname):
                 'error': str(e)
             })
 
-    from helpers import connect_mikrotik
+    from helpers import get_cached_mikrotik
     try:
-        api = connect_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=3)
+        api = get_cached_mikrotik(r['host'], username=r['username'], password=r['password'], port=r['port'], timeout=3)
         
         # 1. Fetch system resource (CPU, memory, uptime)
         resource = list(api('/system/resource/print'))
@@ -854,8 +854,6 @@ def api_get_nas_stats(nasname):
                     'rx_byte': int(iface.get('rx-byte', 0)),
                     'tx_byte': int(iface.get('tx-byte', 0))
                 })
-                
-        api.close()
         
         return jsonify({
             'success': True,

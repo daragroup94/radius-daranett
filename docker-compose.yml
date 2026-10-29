@@ -13,6 +13,8 @@ services:
     build: .
     container_name: radius-dashboard
     restart: unless-stopped
+    ports:
+      - "5000:5000"
     # Traefik Labels
     labels:
       - "traefik.enable=true"
@@ -21,19 +23,16 @@ services:
       - "traefik.http.routers.radius.middlewares=radius-https-redirect"
       - "traefik.http.middlewares.radius-https-redirect.redirectscheme.scheme=https"
       - "traefik.http.middlewares.radius-https-redirect.redirectscheme.permanent=true"
-      # IPoE Domain Router (Bypass HTTPS Redirect for /api/ipoe/ paths)
+      # IPoE HTTP Router (Bypass HTTPS Redirect for any /api/ipoe/ paths)
       - "traefik.http.routers.radius-ipoe.entrypoints=web"
-      - "traefik.http.routers.radius-ipoe.rule=(Host(`radius.app.daragroup.cloud`) || Host(`radius.go.daragroup.cloud`) || Host(`radius.access.daragroup.cloud`)) && PathPrefix(`/api/ipoe/`)"
+      - "traefik.http.routers.radius-ipoe.rule=PathPrefix(`/api/ipoe/`)"
+      - "traefik.http.routers.radius-ipoe.priority=1000"
       - "traefik.http.routers.radius-ipoe.service=radius-service"
-      # IPoE Raw IP Router (For RouterOS v6 compatibility where URL overrides host header)
-      - "traefik.http.routers.radius-ipoe-ip.entrypoints=web"
-      - "traefik.http.routers.radius-ipoe-ip.rule=(Host(`10.177.177.1`) || Host(`160.22.79.177`) || Host(`10.203.66.1`) || Host(`10.203.70.1`) || Host(`10.203.80.1`) || Host(`10.100.0.1`) || Host(`10.30.0.1`) || Host(`10.50.0.1`)) && PathPrefix(`/api/ipoe/`)"
-      - "traefik.http.routers.radius-ipoe-ip.service=radius-service"
-      # IPoE Raw IP HTTPS Router (For RouterOS v7 direct IP fetch over HTTPS)
-      - "traefik.http.routers.radius-ipoe-ip-secure.entrypoints=websecure"
-      - "traefik.http.routers.radius-ipoe-ip-secure.rule=(Host(`10.177.177.1`) || Host(`160.22.79.177`) || Host(`10.203.66.1`) || Host(`10.203.70.1`) || Host(`10.203.80.1`) || Host(`10.100.0.1`) || Host(`10.30.0.1`) || Host(`10.50.0.1`)) && PathPrefix(`/api/ipoe/`)"
-      - "traefik.http.routers.radius-ipoe-ip-secure.tls=true"
-      - "traefik.http.routers.radius-ipoe-ip-secure.service=radius-service"
+      # IPoE HTTPS Router (Bypass for any /api/ipoe/ paths over HTTPS)
+      - "traefik.http.routers.radius-ipoe-secure.entrypoints=websecure"
+      - "traefik.http.routers.radius-ipoe-secure.rule=PathPrefix(`/api/ipoe/`)"
+      - "traefik.http.routers.radius-ipoe-secure.tls=true"
+      - "traefik.http.routers.radius-ipoe-secure.service=radius-service"
       # HTTPS (Secure)
       - "traefik.http.routers.radius-secure.entrypoints=websecure"
       - "traefik.http.routers.radius-secure.rule=Host(`radius.app.daragroup.cloud`) || Host(`radius.go.daragroup.cloud`) || Host(`radius.access.daragroup.cloud`)"

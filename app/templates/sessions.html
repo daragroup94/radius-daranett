@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Active Sessions - RADIUS Manager{% endblock %}
 {% block page_title %}Active Sessions{% endblock %}
-{% block page_subtitle %}Real-time PPPoE Monitoring{% endblock %}
+{% block page_subtitle %}Real-time Active Sessions & Network Monitoring{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -417,6 +417,14 @@ async function loadNasFilter() {
     const nas = await apiCall('/api/nas');
     const sel = document.getElementById('filterNas');
     (nas||[]).forEach(n => { const o=document.createElement('option'); o.value=n.nasname; o.textContent=n.shortname||n.nasname; sel.appendChild(o); });
+    
+    // Auto-select NAS if specified in URL param ?nas=...
+    const urlParams = new URLSearchParams(window.location.search);
+    const nasParam = urlParams.get('nas');
+    if (nasParam && sel) {
+      sel.value = nasParam;
+      filterSessions();
+    }
   } catch(e) {}
 }
 

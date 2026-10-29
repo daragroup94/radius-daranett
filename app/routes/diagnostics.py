@@ -103,9 +103,9 @@ def api_optical_health_issues():
             try:
                 rx_clean = rx.replace('dBm', '').strip()
                 rx_float = float(rx_clean)
-                if rx_float >= -23.0:
+                if rx_float >= -25.0:
                     rx_status = 'good'
-                elif -27.0 <= rx_float < -23.0:
+                elif -27.0 <= rx_float < -25.0:
                     rx_status = 'warning'
                 else:
                     rx_status = 'critical'
@@ -193,10 +193,10 @@ def api_optical_health():
                 try:
                     rx_clean = rx.replace('dBm', '').strip()
                     rx_float = float(rx_clean)
-                    if rx_float >= -23.0:
+                    if rx_float >= -25.0:
                         rx_status = 'good'
                         stats['good'] += 1
-                    elif -27.0 <= rx_float < -23.0:
+                    elif -27.0 <= rx_float < -25.0:
                         rx_status = 'warning'
                         stats['warning'] += 1
                     else:
@@ -835,9 +835,9 @@ def api_diagnostics_user_diagnose():
                         try:
                             rx_clean = str(rx).replace('dBm', '').strip()
                             rx_float = float(rx_clean)
-                            if rx_float >= -23.0:
+                            if rx_float >= -25.0:
                                 rx_status = 'good'
-                            elif -27.0 <= rx_float < -23.0:
+                            elif -27.0 <= rx_float < -25.0:
                                 rx_status = 'warning'
                             else:
                                 rx_status = 'critical'

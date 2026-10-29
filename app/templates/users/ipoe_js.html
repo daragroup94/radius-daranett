@@ -2,16 +2,17 @@
 let ipoePage = 1, ipoeTotalPages = 1, ipoeSearchTimer = null, ipoeFilterStatus = null;
 let _selectedDevices = new Set();
 let _allUsers = [], _leaseMap = {};
-let _queueParents = [];  // cache parent queues dari MikroTik
 
+// ===== TOAST =====
 function showToast(msg, type='success') {
-    const colors = {success:'bg-emerald-500', error:'bg-red-500'};
+    const colors = {success:'bg-emerald-500', error:'bg-red-500', info:'bg-blue-500', warning:'bg-orange-500'};
     const t = document.createElement('div');
-    t.className = `fixed bottom-6 right-6 z-[9999] px-5 py-3 rounded-xl text-white text-sm font-bold shadow-xl ${colors[type]||colors.success}`;
+    t.className = `fixed bottom-6 right-6 z-[9999] px-5 py-3 rounded-xl text-white text-sm font-bold shadow-xl ${colors[type]||colors.success} max-w-xs`;
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 3000);
+    setTimeout(() => t.remove(), 4000);
 }
+
 function formatMacInput(input) {
     let v = input.value.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
     let out = '';
@@ -51,10 +52,12 @@ function ipoeSetStatus(status) {
 }
 
 // ===== LOAD DATA =====
-async function loadIpoeUsers() {
-    document.getElementById('ipoeTableBody').innerHTML =
-        `<tr><td colspan="8" class="text-center py-10 text-gray-400"><span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Loading...</td></tr>`;
-    clearSelection();
+async function loadIpoeUsers(showLoading = true) {
+    if (showLoading) {
+        document.getElementById('ipoeTableBody').innerHTML =
+            `<tr><td colspan="8" class="text-center py-10 text-gray-400"><span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>Loading...</td></tr>`;
+        clearSelection();
+    }
 
     // Fetch RADIUS users + DHCP leases paralel
     const [radiusRes, leaseRes] = await Promise.all([
@@ -84,7 +87,6 @@ async function loadIpoeUsers() {
             u.lease_hostname = lease.host_name;
             u.lease_router = lease.router;
             u.lease_flags = lease.flags;
-            u.lease_rate = lease.rate_limit;
         }
     }
 
@@ -95,7 +97,7 @@ async function loadIpoeUsers() {
 function renderTable() {
     const search = document.getElementById('ipoeSearch').value.toLowerCase();
     let users = _allUsers.filter(u => {
-        if (search && !u.mac_address.includes(search) && !(u.lease_hostname||'').toLowerCase().includes(search) && !(u.lease_ip||'').includes(search)) return false;
+        if (search && !u.mac_address.includes(search) && !(u.lease_hostname||'').toLowerCase().includes(search) && !(u.lease_ip||'').includes(search) && !(u.name||'').toLowerCase().includes(search)) return false;
         if (ipoeFilterStatus === 'online') return u.active_sessions > 0 || u.lease_status === 'bound';
         if (ipoeFilterStatus === 'offline') return u.active_sessions === 0 && u.lease_status !== 'bound';
         return true;
@@ -141,10 +143,6 @@ function renderTable() {
                         ? `<span class="font-mono text-xs text-blue-600">${u.ip_address}</span>`
                         : `<span class="text-gray-400 text-xs">Dynamic</span>`));
 
-            const rateCell = u.lease_rate || u.rate_limit
-                ? `<span class="font-mono text-xs text-gray-700">${u.lease_rate || u.rate_limit}</span>`
-                : `<span class="text-gray-400 text-xs">—</span>`;
-
             const leaseCell = u.lease_expires
                 ? `<div class="text-xs text-orange-600 font-mono">exp: ${u.lease_expires}</div>
                    <div class="text-[10px] text-gray-400">seen: ${u.lease_last_seen||'—'}</div>`
@@ -156,7 +154,8 @@ function renderTable() {
                 : `<span class="text-gray-400 text-xs">—</span>`;
 
             const checked = _selectedDevices.has(u.mac_address) ? 'checked' : '';
-             return `<tr class="border-b border-gray-50 hover:bg-blue-50/20 transition-colors" data-mac="${u.mac_address}">
+            const safeName = (u.name||'').replace(/'/g, "\\'");
+            return `<tr class="border-b border-gray-50 hover:bg-blue-50/20 transition-colors" data-mac="${u.mac_address}">
                 <td class="py-3 px-3">
                     <input type="checkbox" ${checked} onchange="toggleRowSelect(this,'${u.mac_address}')"
                            class="w-3.5 h-3.5 rounded accent-blue-500 cursor-pointer">
@@ -170,12 +169,11 @@ function renderTable() {
                 </td>
                 <td class="py-3 px-3">${ipCell}</td>
                 <td class="py-3 px-3">${serverCell}</td>
-                <td class="py-3 px-3">${rateCell}</td>
                 <td class="py-3 px-3">${leaseCell}</td>
                 <td class="py-3 px-3">${statusBadge}</td>
                 <td class="py-3 px-3 text-right">
                     <div class="flex justify-end gap-1">
-                        <button onclick="openEditModal('${u.mac_address}','${(u.name||'').replace(/'/g, '\\\'')}','${u.ip_address||''}','${u.framed_pool||''}','${u.rate_limit||''}')"
+                        <button onclick="openEditModal('${u.mac_address}','${safeName}','${u.ip_address||''}','${u.framed_pool||''}')"
                                 class="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-all" title="Edit">
                             <i data-lucide="edit" class="w-3.5 h-3.5"></i>
                         </button>
@@ -213,42 +211,14 @@ document.getElementById('ipoeSearch').addEventListener('input', () => {
     ipoeSearchTimer = setTimeout(() => { ipoePage=1; renderTable(); }, 300);
 });
 
-// ===== QUEUE PARENTS (dropdown) =====
-async function loadQueueParents() {
-    if (_queueParents.length) return _queueParents; // gunakan cache
-    try {
-        const res = await fetch('/api/ipoe/queue-parents');
-        const data = await res.json();
-        if (data.success) {
-            _queueParents = data.parents || [];
-        }
-    } catch(e) { _queueParents = []; }
-    return _queueParents;
-}
-
-function populateQueueDropdowns(dlId, ulId, selectedDl='', selectedUl='') {
-    const dlEl = document.getElementById(dlId);
-    const ulEl = document.getElementById(ulId);
-    if (!dlEl || !ulEl) return;
-
-    const makeOptions = (selected) => [
-        `<option value="">— Pilih —</option>`,
-        ..._queueParents.map(p =>
-            `<option value="${p.name}" ${p.name === selected ? 'selected' : ''}>${p.name}${p.max_limit && p.max_limit !== '0' ? ' ('+p.max_limit+')' : ''}</option>`
-        )
-    ].join('');
-
-    dlEl.innerHTML = makeOptions(selectedDl);
-    ulEl.innerHTML = makeOptions(selectedUl);
-}
-
 // ===== ADD =====
 function openAddModal() {
     document.getElementById('addModal').classList.remove('hidden');
-    // Load queue parents untuk dropdown
-    loadQueueParents().then(() => populateQueueDropdowns('addParentDl', 'addParentUl'));
 }
-function closeAddModal() { document.getElementById('addModal').classList.add('hidden'); document.getElementById('addForm').reset(); }
+function closeAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+    document.getElementById('addForm').reset();
+}
 
 async function submitAdd(e) {
     e.preventDefault();
@@ -257,61 +227,32 @@ async function submitAdd(e) {
         mac_address: form.mac_address.value.trim(),
         name: form.name.value.trim(),
         ip_address: form.ip_address.value.trim(),
-        ip_pool: form.ip_pool.value.trim(),
-        rate_limit: form.rate_limit.value.trim(),
-        // Queue Tree fields
-        parent_dl: document.getElementById('addParentDl').value,
-        parent_ul: document.getElementById('addParentUl').value,
-        limit_at: document.getElementById('addLimitAt').value.trim() || '0',
-        priority: document.getElementById('addPriority').value,
+        ip_pool: form.ip_pool.value.trim()
     };
+
     const data = await (await fetch('/api/ipoe/users/add', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
-    if (data.success) { showToast(data.message); closeAddModal(); loadIpoeUsers(); }
-    else showToast(data.error, 'error');
+    if (data.success) {
+        showToast(data.message);
+        closeAddModal();
+        loadIpoeUsers();
+    } else {
+        showToast(data.error, 'error');
+    }
 }
 
 // ===== EDIT =====
-async function openEditModal(mac, name, ip, pool, rate) {
+function openEditModal(mac, name, ip, pool) {
     document.getElementById('editMac').value = mac;
     document.getElementById('editMacLabel').textContent = mac;
     document.getElementById('editName').value = name;
     document.getElementById('editIpAddress').value = ip;
     document.getElementById('editIpPool').value = pool;
-    document.getElementById('editRateLimit').value = rate;
     document.getElementById('editModal').classList.remove('hidden');
-
-    // Load queue parents dan config lama secara paralel
-    const [_, statusRes] = await Promise.all([
-        loadQueueParents(),
-        fetch(`/api/ipoe/queue-status/${encodeURIComponent(mac)}`).then(r => r.json()).catch(() => null)
-    ]);
-
-    // Isi dropdown dengan nilai lama (jika ada)
-    const cfg = statusRes?.db_config;
-    populateQueueDropdowns('editParentDl', 'editParentUl', cfg?.parent_dl || '', cfg?.parent_ul || '');
-    document.getElementById('editLimitAt').value = cfg?.limit_at || '';
-    const prio = cfg?.priority || 8;
-    document.getElementById('editPriority').value = String(prio);
-
-    // Tampilkan status queue di MikroTik
-    const mk = statusRes?.mikrotik;
-    const badge = document.getElementById('editQueueBadge');
-    const badgeWrap = document.getElementById('editQueueStatus');
-    if (mk?.found) {
-        badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-700';
-        badge.innerHTML = '<i data-lucide="check-circle" class="w-3.5 h-3.5 inline mr-1"></i> Queue aktif di MikroTik';
-        badgeWrap.classList.remove('hidden');
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    } else if (cfg) {
-        badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-yellow-100 text-yellow-700';
-        badge.innerHTML = '<i data-lucide="alert-circle" class="w-3.5 h-3.5 inline mr-1"></i> Config ada, belum sync ke MikroTik';
-        badgeWrap.classList.remove('hidden');
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    } else {
-        badgeWrap.classList.add('hidden');
-    }
 }
-function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
 
 async function submitEdit(e) {
     e.preventDefault();
@@ -319,17 +260,17 @@ async function submitEdit(e) {
     const body = {
         name: document.getElementById('editName').value.trim(),
         ip_address: document.getElementById('editIpAddress').value.trim(),
-        ip_pool: document.getElementById('editIpPool').value.trim(),
-        rate_limit: document.getElementById('editRateLimit').value.trim(),
-        // Queue Tree fields
-        parent_dl: document.getElementById('editParentDl').value,
-        parent_ul: document.getElementById('editParentUl').value,
-        limit_at: document.getElementById('editLimitAt').value.trim() || '0',
-        priority: document.getElementById('editPriority').value,
+        ip_pool: document.getElementById('editIpPool').value.trim()
     };
+
     const data = await (await fetch(`/api/ipoe/users/update/${encodeURIComponent(mac)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
-    if (data.success) { showToast(data.message); closeEditModal(); loadIpoeUsers(); }
-    else showToast(data.error, 'error');
+    if (data.success) {
+        showToast(data.message);
+        closeEditModal();
+        loadIpoeUsers();
+    } else {
+        showToast(data.error, 'error');
+    }
 }
 
 // ===== DELETE =====
@@ -378,5 +319,5 @@ async function bulkDelete() {
 
 // Init
 loadIpoeUsers();
-setInterval(loadIpoeUsers, 30000);
+setInterval(() => loadIpoeUsers(false), 30000);
 </script>

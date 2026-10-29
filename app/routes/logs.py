@@ -117,3 +117,47 @@ def api_recent_failures():
     except Exception as e:
         return jsonify({'count': 0})
 
+@logs_bp.route('/api/logs/<int:log_id>', methods=['DELETE'])
+@login_required
+def api_delete_log(log_id):
+    """Hapus satu entri log autentikasi."""
+    try:
+        execute_query("DELETE FROM public.radpostauth WHERE id = %s", (log_id,), fetch=False)
+        return jsonify({'success': True, 'message': 'Log berhasil dihapus.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@logs_bp.route('/api/logs/cleanup', methods=['POST'])
+@login_required
+def api_cleanup_logs():
+    """Bersihkan / pangkas riwayat auth log berdasarkan kriteria."""
+    try:
+        data = request.get_json() or {}
+        mode = data.get('mode', 'days')
+
+        if mode == 'all':
+            execute_query("DELETE FROM public.radpostauth", fetch=False)
+            message = "Semua riwayat auth log berhasil dibersihkan."
+        elif mode == 'days':
+            days = int(data.get('days', 30))
+            if days < 1:
+                return jsonify({'success': False, 'error': 'Jumlah hari minimal 1'}), 400
+            execute_query("DELETE FROM public.radpostauth WHERE authdate < NOW() - make_interval(days => %s)", (days,), fetch=False)
+            message = f"Auth log lebih dari {days} hari berhasil dibersihkan."
+        elif mode == 'reject':
+            execute_query("DELETE FROM public.radpostauth WHERE reply = 'Access-Reject'", fetch=False)
+            message = "Semua riwayat log gagal (Access-Reject) berhasil dibersihkan."
+        elif mode == 'username':
+            username = data.get('username', '').strip()
+            if not username:
+                return jsonify({'success': False, 'error': 'Username tidak boleh kosong'}), 400
+            execute_query("DELETE FROM public.radpostauth WHERE LOWER(username) = LOWER(%s)", (username,), fetch=False)
+            message = f"Semua log untuk user '{username}' berhasil dibersihkan."
+        else:
+            return jsonify({'success': False, 'error': 'Mode pembersihan tidak valid'}), 400
+
+        return jsonify({'success': True, 'message': message})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
